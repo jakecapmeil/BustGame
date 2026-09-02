@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#D98E74">
+<meta name="description" content="BUST — a fast tactical board game of chain reactions. Load a tile past three balls and it bursts, flinging one ball to every neighbour and stealing whatever they land on.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>BUST</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ------------------------------------------------------------------ home -- -->
+<section class="screen is-active" id="screen-home">
+  <div class="stack">
+    <h1 class="logo">BUST<span class="logo-dot"></span></h1>
+    <p class="tagline">Load a tile past three.<br>Watch the board go up.</p>
+    <nav class="menu">
+      <button class="btn btn-primary" data-goto="screen-solo">Solo</button>
+      <button class="btn" data-goto="screen-local">Pass &amp; Play</button>
+      <button class="btn" data-goto="screen-online">Online</button>
+      <button class="btn btn-ghost" data-goto="screen-rules">How to play</button>
+    </nav>
+    <div class="toggles">
+      <button class="chip-toggle" id="toggle-sound" aria-pressed="true">Sound on</button>
+      <button class="chip-toggle" id="toggle-haptics" aria-pressed="true">Haptics on</button>
+    </div>
+  </div>
+</section>
+
+<!-- ------------------------------------------------------------------ solo -- -->
+<section class="screen" id="screen-solo">
+  <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back">‹</button><h2>Solo</h2></header>
+  <div class="stack setup">
+    <fieldset class="opt"><legend>Opponents</legend>
+      <div class="seg" id="solo-count">
+        <button class="seg-btn is-on" data-v="2">1 bot</button>
+        <button class="seg-btn" data-v="3">2 bots</button>
+        <button class="seg-btn" data-v="4">3 bots</button>
+      </div>
+    </fieldset>
+    <fieldset class="opt"><legend>Difficulty</legend>
+      <div class="seg" id="solo-diff">
+        <button class="seg-btn" data-v="easy">Easy</button>
+        <button class="seg-btn is-on" data-v="medium">Medium</button>
+        <button class="seg-btn" data-v="hard">Hard</button>
+        <button class="seg-btn" data-v="brutal">Brutal</button>
+      </div>
+    </fieldset>
+    <fieldset class="opt"><legend>Board</legend>
+      <div class="seg" id="solo-size">
+        <button class="seg-btn" data-v="small">Small</button>
+        <button class="seg-btn is-on" data-v="medium">Medium</button>
+        <button class="seg-btn" data-v="large">Large</button>
+      </div>
+    </fieldset>
+    <button class="btn btn-primary" id="solo-start">Start</button>
+  </div>
+</section>
+
+<!-- ----------------------------------------------------------------- local -- -->
+<section class="screen" id="screen-local">
+  <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back">‹</button><h2>Pass &amp; Play</h2></header>
+  <div class="stack setup">
+    <p class="hint">One phone, passed around. Each player gets their own corner of the screen.</p>
+    <fieldset class="opt"><legend>Players</legend>
+      <div class="seg" id="local-count">
+        <button class="seg-btn is-on" data-v="2">2</button>
+        <button class="seg-btn" data-v="3">3</button>
+        <button class="seg-btn" data-v="4">4</button>
+      </div>
+    </fieldset>
+    <fieldset class="opt"><legend>Board</legend>
+      <div class="seg" id="local-size">
+        <button class="seg-btn" data-v="small">Small</button>
+        <button class="seg-btn is-on" data-v="medium">Medium</button>
+        <button class="seg-btn" data-v="large">Large</button>
+      </div>
+    </fieldset>
+    <button class="btn btn-primary" id="local-start">Start</button>
+  </div>
+</section>
+
+<!-- ---------------------------------------------------------------- online -- -->
+<section class="screen" id="screen-online">
+  <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back">‹</button><h2>Online</h2></header>
+  <div class="stack setup" id="online-setup">
+    <p class="hint">Play across devices. One player hosts and shares the room code.</p>
+    <fieldset class="opt"><legend>Players</legend>
+      <div class="seg" id="online-count">
+        <button class="seg-btn is-on" data-v="2">2</button>
+        <button class="seg-btn" data-v="3">3</button>
+        <button class="seg-btn" data-v="4">4</button>
+      </div>
+    </fieldset>
+    <fieldset class="opt"><legend>Board</legend>
+      <div class="seg" id="online-size">
+        <button class="seg-btn" data-v="small">Small</button>
+        <button class="seg-btn is-on" data-v="medium">Medium</button>
+        <button class="seg-btn" data-v="large">Large</button>
+      </div>
+    </fieldset>
+    <button class="btn btn-primary" id="online-host">Host a room</button>
+    <div class="divider"><span>or</span></div>
+    <div class="join-row">
+      <input id="online-code" class="code-input" inputmode="text" autocapitalize="characters"
+             autocomplete="off" spellcheck="false" maxlength="5" placeholder="CODE" aria-label="Room code">
+      <button class="btn" id="online-join">Join</button>
+    </div>
+    <p class="err" id="online-err" role="alert"></p>
+  </div>
+
+  <div class="stack setup is-hidden" id="online-lobby">
+    <p class="hint">Room code</p>
+    <div class="room-code" id="online-room-code">—</div>
+    <button class="btn btn-ghost" id="online-copy">Copy code</button>
+    <ul class="lobby-list" id="online-players"></ul>
+    <p class="err" id="online-lobby-msg" role="status"></p>
+    <button class="btn btn-primary is-hidden" id="online-begin">Start game</button>
+    <button class="btn btn-ghost" id="online-leave">Leave room</button>
+  </div>
+</section>
+
+<!-- ----------------------------------------------------------------- rules -- -->
+<section class="screen" id="screen-rules">
+  <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back">‹</button><h2>How to play</h2></header>
+  <div class="stack rules">
+    <h3>The goal</h3>
+    <p>Wipe every other colour off the board. Last colour standing wins.</p>
+
+    <h3>Opening</h3>
+    <p>Everyone picks one tile on the empty board. It <b>busts immediately</b>, throwing a ball to each of its four neighbours — so you start with up to four tiles.</p>
+    <p>Openings claim a <b>3×3 zone</b> and no two zones may overlap, so nobody can crowd anyone out on move one. Shaded tiles are the ones you can't take.</p>
+
+    <h3>Your turn</h3>
+    <p>Tap any tile you own to add a ball. Tiles hold <b>three</b>.</p>
+
+    <h3>Busting</h3>
+    <p>Add a ball to a tile that already holds three and it <b>busts</b>: the tile empties and fires one ball into each of the four neighbouring tiles. Every tile a ball lands on becomes yours.</p>
+    <p>If a landing ball pushes a tile past three, that one busts too — chains can run away across the whole board.</p>
+
+    <h3>The edge tax</h3>
+    <p>A bust always fires four balls, even with nowhere to put them. Bust on an edge and one ball falls off the board; bust in a corner and you lose two. Edges are cheap to hold and expensive to attack from.</p>
+
+    <h3>Reading a tile</h3>
+    <p>The dots inside a disc are its balls. A disc with a <b>ring</b> around it is loaded — one more ball and it goes.</p>
+  </div>
+</section>
+
+<!-- ------------------------------------------------------------------ game -- -->
+<section class="screen screen-game" id="screen-game">
+  <div class="seat seat-top"    data-seat="top"></div>
+  <div class="seat seat-left"   data-seat="left"></div>
+  <div class="seat seat-right"  data-seat="right"></div>
+  <div class="seat seat-bottom" data-seat="bottom"></div>
+
+  <button class="icon-btn game-menu" id="btn-pause" aria-label="Menu">≡</button>
+  <div class="board-area" id="board-area">
+    <canvas id="board" aria-label="Game board"></canvas>
+  </div>
+  <div class="turn-banner" id="turn-banner"><span id="turn-text">—</span></div>
+</section>
+
+<!-- -------------------------------------------------------------- overlays -- -->
+<div class="overlay" id="overlay-pause" hidden>
+  <div class="card">
+    <h2>Paused</h2>
+    <button class="btn btn-primary" id="pause-resume">Resume</button>
+    <button class="btn" id="pause-restart">Restart</button>
+    <button class="btn btn-ghost" id="pause-quit">Quit to menu</button>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-over" hidden>
+  <div class="card">
+    <div class="winner-disc" id="over-disc"></div>
+    <h2 id="over-title">—</h2>
+    <p id="over-sub" class="hint"></p>
+    <button class="btn btn-primary" id="over-again">Play again</button>
+    <button class="btn btn-ghost" id="over-menu">Menu</button>
+  </div>
+</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

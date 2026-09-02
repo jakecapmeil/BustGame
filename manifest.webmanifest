@@ -1,0 +1,18 @@
+{
+  "name": "BUST",
+  "short_name": "BUST",
+  "description": "A fast tactical board game of chain reactions. Load a tile past three balls and it bursts, flinging one ball to every neighbour and stealing whatever they land on.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#D98E74",
+  "theme_color": "#D98E74",
+  "categories": ["games", "board"],
+  "icons": [
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

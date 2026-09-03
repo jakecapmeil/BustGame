@@ -158,6 +158,16 @@ export function drawBoard(ctx, L, view) {
       ctx.restore();
     }
 
+    // Keyboard cursor — a bold ring the arrow keys move around.
+    if (view.cursor === i) {
+      ctx.save();
+      roundRect(ctx, x + 1, y + 1, L.tile - 2, L.tile - 2, radius - 1);
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = Math.max(2, L.tile * 0.055);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     if (o === EMPTY || c === 0) continue;
 
     let scale = 1;
@@ -205,144 +215,217 @@ function drawFlyers(ctx, L, busts, t) {
 
 /* --------------------------------------------------------------- animator -- */
 
+const nowMs = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+
 /**
  * Plays a frame script. Resolves once the last wave has landed.
  *
  * Waves accelerate as a cascade runs long, so a 30-wave chain stays punchy
  * instead of holding the player hostage for six seconds.
+ *
+ * There is exactly one rAF loop. A `mode` flag decides what each tick does —
+ * paint the breathing idle board, or advance the current playback — so the
+ * idle loop and the animation loop can never fight over a shared handle (the
+ * bug that used to freeze a cascade mid-wave). `play()` always settles: on the
+ * last frame, or if `cancel()` interrupts it, so nothing awaiting it can hang.
  */
 export class BoardAnimator {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.L = null;
-    this.raf = 0;
-    this.anim = null;
     this.staticView = null;
-    this.onTick = null;
     this.speed = 1;
+
+    this._mode = 'stopped'; // 'stopped' | 'idle' | 'play'
+    this._rafId = 0;
+    this._looping = false;
+    this._lastTick = 0;
+    this._wd = 0; // watchdog interval — drives playback when rAF is starved
+    this._play = null; // { frames, chrome, onEvent, idx, waveNo, announced, frameStart, resolve }
   }
 
   resize(cssW, cssH, cols, rows) {
-    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const dpr = Math.min((typeof window !== 'undefined' && window.devicePixelRatio) || 1, 3);
     this.canvas.width = Math.round(cssW * dpr);
     this.canvas.height = Math.round(cssH * dpr);
     this.canvas.style.width = `${cssW}px`;
     this.canvas.style.height = `${cssH}px`;
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.L = computeLayout(cssW, cssH, cols, rows);
+    if (this._mode !== 'play') this.renderStatic();
     return this.L;
   }
 
   /** Show a board with no animation running. */
   setView(view) {
     this.staticView = view;
-    if (!this.anim) this.renderStatic();
+    if (this._mode !== 'play') this.renderStatic();
   }
 
   renderStatic() {
     if (!this.L || !this.staticView) return;
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 480);
+    const pulse = 0.5 + 0.5 * Math.sin(nowMs() / 480);
     drawBoard(ctx, this.L, { ...this.staticView, pulse });
+  }
+
+  /* -- the single loop -------------------------------------------------- */
+
+  _ensureLoop() {
+    if (this._looping) return;
+    this._looping = true;
+    this._lastTick = nowMs();
+    const tick = (now) => {
+      this._lastTick = nowMs(); // only the real rAF loop refreshes this
+      if (this._mode === 'stopped') { this._looping = false; this._rafId = 0; return; }
+      if (this._mode === 'play') this._advance(now);
+      else this.renderStatic();
+      if (this._mode === 'stopped') { this._looping = false; this._rafId = 0; return; }
+      this._rafId = requestAnimationFrame(tick);
+    };
+    this._rafId = requestAnimationFrame(tick);
+  }
+
+  /**
+   * `requestAnimationFrame` is paused while the tab is hidden and throttled
+   * hard under heavy jank. That would freeze a cascade mid-wave and leave
+   * `play()`'s awaiter — and the whole move queue behind it — hung until the
+   * tab came back. This interval force-advances playback whenever the rAF loop
+   * has gone quiet, so a game left in the background still resolves its turns.
+   */
+  _startWatchdog() {
+    if (this._wd) return;
+    const id = setInterval(() => {
+      if (this._mode !== 'play') return;
+      const t = nowMs();
+      if (t - this._lastTick > 150) this._advance(t); // rAF has gone quiet
+    }, 100);
+    if (id && typeof id.unref === 'function') id.unref(); // don't hold Node's loop open
+    this._wd = id;
+  }
+
+  _stopWatchdog() {
+    if (this._wd) clearInterval(this._wd);
+    this._wd = 0;
   }
 
   /** Idle loop so the legal-move hint keeps breathing between turns. */
   startIdle() {
-    if (this.raf || this.anim) return;
-    const loop = () => {
-      if (this.anim) { this.raf = 0; return; }
-      this.renderStatic();
-      this.raf = requestAnimationFrame(loop);
-    };
-    this.raf = requestAnimationFrame(loop);
+    if (this._mode === 'play') return;
+    this._mode = 'idle';
+    this._ensureLoop();
   }
 
   stopIdle() {
-    if (this.raf) cancelAnimationFrame(this.raf);
-    this.raf = 0;
+    if (this._mode !== 'idle') return;
+    this._mode = 'stopped';
+    if (this._rafId) cancelAnimationFrame(this._rafId);
+    this._rafId = 0;
+    this._looping = false;
+    this._stopWatchdog();
   }
 
   /**
    * @param {Array} frames  from engine.applyMove
    * @param {object} chrome extra view props (legal/blocked sets) to keep drawing
    * @param {(evt: {type:string, wave?:number, busts?:Array}) => void} [onEvent]
+   * @returns {Promise<void>} resolves when the last frame has landed
    */
   play(frames, chrome = {}, onEvent = null) {
-    this.stopIdle();
+    // Settle any playback already in flight so its awaiter is never stranded.
+    this._settlePlay();
     return new Promise((resolve) => {
-      const waves = frames.filter((f) => f.kind === 'wave');
-      let idx = 0; // index into `frames`
-      let start = performance.now();
-
-      const durationFor = (f, k) => {
-        if (f.kind === 'place' || f.kind === 'open') return 170 / this.speed;
-        if (f.kind === 'settle') return 120 / this.speed;
-        return Math.max(85, 230 - k * 14) / this.speed;
+      if (!frames || !frames.length) { resolve(); return; }
+      this._mode = 'play';
+      this._play = {
+        frames, chrome, onEvent,
+        idx: 0, waveNo: 0, announced: -1, frameStart: nowMs(),
+        resolve,
       };
-
-      let waveNo = 0;
-      let announced = -1;
-
-      const step = (now) => {
-        if (idx >= frames.length) {
-          this.anim = null;
-          this.staticView = { owner: frames[frames.length - 1].owner, count: frames[frames.length - 1].count, ...chrome };
-          this.renderStatic();
-          resolve();
-          return;
-        }
-
-        const f = frames[idx];
-        const dur = durationFor(f, waveNo);
-        let t = (now - start) / dur;
-        if (t > 1) t = 1;
-
-        if (announced !== idx && onEvent) {
-          announced = idx;
-          onEvent({ type: f.kind, wave: waveNo, busts: f.busts, frame: f });
-        }
-
-        const ctx = this.ctx;
-        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        const pulse = 0.5 + 0.5 * Math.sin(now / 480);
-
-        if (f.kind === 'wave') {
-          // Draw the board as it stood before this wave, minus the tiles that
-          // are mid-air, then lay the flying balls over the top.
-          const prev = frames[idx - 1];
-          const hidden = new Set(f.busts.map((b) => b.at));
-          drawBoard(ctx, this.L, { owner: prev.owner, count: prev.count, hidden, pulse, ...chrome });
-          drawFlyers(ctx, this.L, f.busts, t);
-        } else {
-          const prev = idx > 0 ? frames[idx - 1] : null;
-          const view = { owner: f.owner, count: f.count, pulse, ...chrome };
-          if (f.kind === 'place' || f.kind === 'open') {
-            view.popAt = f.at;
-            view.popT = t;
-          }
-          void prev;
-          drawBoard(ctx, this.L, view);
-        }
-
-        if (t >= 1) {
-          idx++;
-          if (f.kind === 'wave') waveNo++;
-          start = now;
-        }
-        this.anim = requestAnimationFrame(step);
-      };
-
-      this.anim = requestAnimationFrame(step);
-      void waves;
+      this._ensureLoop();
+      this._startWatchdog();
     });
   }
 
+  _durationFor(f, k) {
+    const s = this.speed || 1;
+    if (f.kind === 'place' || f.kind === 'open') return 170 / s;
+    if (f.kind === 'settle') return 120 / s;
+    return Math.max(85, 230 - k * 14) / s;
+  }
+
+  _advance(now) {
+    const p = this._play;
+    if (!p) { this._mode = 'idle'; return; }
+    if (p.frameStart === null) p.frameStart = now; // paranoia; play() seeds it
+
+    // Retire every whole frame the elapsed time now covers — a tab that was
+    // hidden for a while can wake many frames behind — then draw the one still
+    // in progress. Leftover time carries forward so catch-up stays exact.
+    let guard = 0;
+    while (p.idx < p.frames.length && guard++ < 100000) {
+      const f = p.frames[p.idx];
+      if (p.announced !== p.idx) {
+        p.announced = p.idx;
+        try { p.onEvent?.({ type: f.kind, wave: p.waveNo, busts: f.busts, frame: f }); } catch { /* sfx/haptics are cosmetic */ }
+      }
+
+      const dur = Math.max(1, this._durationFor(f, p.waveNo));
+      let t = (now - p.frameStart) / dur;
+      if (!(t >= 0)) t = 0; // NaN, or a clock that jumped backwards
+
+      if (t < 1) { this._drawFrame(f, p, t); return; }
+
+      p.idx++;
+      if (f.kind === 'wave') p.waveNo++;
+      p.frameStart += dur;
+    }
+    this._settlePlay();
+  }
+
+  _drawFrame(f, p, t) {
+    if (!this.L) return;
+    const ctx = this.ctx;
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    const pulse = 0.5 + 0.5 * Math.sin(nowMs() / 480);
+
+    if (f.kind === 'wave') {
+      const prev = p.frames[p.idx - 1];
+      const hidden = new Set(f.busts.map((b) => b.at));
+      drawBoard(ctx, this.L, { owner: prev.owner, count: prev.count, hidden, pulse, ...p.chrome });
+      drawFlyers(ctx, this.L, f.busts, t);
+    } else {
+      const view = { owner: f.owner, count: f.count, pulse, ...p.chrome };
+      if (f.kind === 'place' || f.kind === 'open') { view.popAt = f.at; view.popT = t; }
+      drawBoard(ctx, this.L, view);
+    }
+  }
+
+  /** Land the final board, drop back to idle, and resolve the play promise. */
+  _settlePlay() {
+    const p = this._play;
+    this._play = null;
+    if (!p) return;
+    const last = p.frames[p.frames.length - 1];
+    if (last) this.staticView = { owner: last.owner, count: last.count, ...p.chrome };
+    this._mode = 'idle';
+    this._stopWatchdog();
+    this.renderStatic();
+    this._ensureLoop();
+    try { p.resolve(); } catch { /* ignore */ }
+  }
+
   cancel() {
-    if (this.anim) cancelAnimationFrame(this.anim);
-    this.anim = null;
-    this.stopIdle();
+    const p = this._play;
+    this._play = null;
+    this._mode = 'stopped';
+    if (this._rafId) cancelAnimationFrame(this._rafId);
+    this._rafId = 0;
+    this._looping = false;
+    this._stopWatchdog();
+    if (p) { try { p.resolve(); } catch { /* ignore */ } }
   }
 }
 

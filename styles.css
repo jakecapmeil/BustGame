@@ -154,6 +154,23 @@ html, body {
   cursor: pointer; transition: background .14s ease, color .14s ease;
 }
 .seg-btn.is-on { background: var(--card); color: var(--ink); }
+.seg-tight .seg-btn { font-size: 13px; padding: 12px 2px; }
+
+/* ------------------------------------------------------------------ roster */
+
+.roster { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.roster-seat {
+  display: flex; flex-direction: column; gap: 7px;
+  background: rgba(255, 255, 255, 0.13);
+  border-radius: 14px; padding: 9px 10px;
+}
+.roster-main { display: flex; align-items: center; gap: 10px; }
+.roster-seat .dot { width: 18px; height: 18px; border-radius: 50%; flex: none; box-shadow: inset 0 -2px 0 rgba(0,0,0,.12); }
+.roster-seat .who { font-size: 14px; font-weight: 800; color: #fff; flex: 1; }
+.roster-seat .seg { padding: 4px; gap: 5px; background: rgba(0, 0, 0, 0.08); margin: 0; }
+.roster-seat .seg-btn { min-height: 38px; font-size: 13px; padding: 8px 4px; }
+.roster-seat .kind { flex: none; width: 8.4em; }
+.roster-seat.is-human .diff { display: none; }
 
 .toggles { display: flex; gap: 9px; justify-content: center; margin-top: 6px; }
 .chip-toggle {
@@ -166,6 +183,78 @@ html, body {
 .chip-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
 
 .hint { color: rgba(255, 255, 255, 0.82); font-weight: 700; font-size: 14px; line-height: 1.5; margin: 0 0 4px; }
+
+/* -------------------------------------------------------------- ranked -- */
+
+.trophy-ico::before { content: '🏆'; font-size: 0.95em; }
+
+.rank-badge {
+  display: inline-grid; place-items: center;
+  width: 34px; height: 34px; border-radius: 10px; flex: none;
+  font-size: 15px; font-weight: 900; color: #fff;
+  background: #8a5a3c; box-shadow: inset 0 -3px 0 rgba(0,0,0,.18);
+}
+.rank-badge-lg { width: 66px; height: 66px; border-radius: 18px; font-size: 30px; }
+
+.rank-strip {
+  appearance: none; border: 0; cursor: pointer;
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; text-align: left;
+  background: rgba(255,255,255,.16); color: #fff;
+  border-radius: var(--radius); padding: 12px 14px; margin-bottom: 4px;
+  box-shadow: 0 4px 0 rgba(120,60,38,.16);
+}
+.rank-strip:active { transform: translateY(3px); }
+.rank-strip-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.rank-strip-name { font-size: 14px; font-weight: 900; }
+.rank-strip-bar, .rank-hero-bar {
+  height: 8px; border-radius: 999px; background: rgba(0,0,0,.18); overflow: hidden;
+}
+.rank-strip-fill, .rank-hero-fill {
+  display: block; height: 100%; width: 0%;
+  background: linear-gradient(90deg, #F0A430, #F2564B);
+  transition: width .5s cubic-bezier(.2,.8,.2,1);
+}
+.rank-strip-trophies, .rank-hero-trophies {
+  display: flex; align-items: center; gap: 5px; font-weight: 900;
+}
+.rank-strip-trophies { font-size: 16px; }
+
+.rank-hero { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 8px 0 4px; }
+.rank-hero-name { font-size: 22px; font-weight: 900; color: #fff; }
+.rank-hero-trophies { font-size: 26px; color: #fff; }
+.rank-hero-bar { width: 100%; height: 10px; }
+.rank-hero-next { margin: 0; }
+
+.ladder { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 40vh; overflow-y: auto; }
+.ladder li {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,.12); border-radius: 12px; padding: 8px 11px;
+  color: rgba(255,255,255,.85); font-weight: 800; font-size: 13px;
+}
+.ladder li .rank-badge { width: 26px; height: 26px; border-radius: 8px; font-size: 12px; }
+.ladder li .lad-min { margin-left: auto; opacity: .7; font-size: 12px; }
+.ladder li.is-here { background: rgba(255,255,255,.34); color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,.4); }
+.ladder li.is-locked { opacity: .5; }
+.rank-record { text-align: center; margin-top: 8px; }
+
+/* trophy tally on the game-over card */
+.trophy-result { display: flex; flex-direction: column; align-items: center; gap: 9px; margin: 2px 0 6px; }
+.trophy-result[hidden] { display: none; }
+.trophy-delta { font-size: 34px; font-weight: 900; letter-spacing: -.01em; }
+.trophy-delta.up { color: #2F9E5B; }
+.trophy-delta.down { color: #C6392F; }
+.trophy-count-row { display: flex; align-items: center; gap: 8px; font-size: 22px; font-weight: 900; color: var(--ink); }
+.trophy-result .rank-hero-bar { background: rgba(74,35,23,.14); }
+.rank-jump {
+  font-size: 14px; font-weight: 900; text-align: center;
+  padding: 7px 14px; border-radius: 999px;
+}
+.rank-jump[hidden] { display: none; }
+.rank-jump.promo { background: rgba(47,158,91,.16); color: #217A45; }
+.rank-jump.demo { background: rgba(198,57,47,.14); color: #A22C23; }
+.trophy-breakdown { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; width: 100%; }
+.trophy-breakdown li { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 700; color: var(--ink-soft); }
 .err { color: #FFE2DC; font-weight: 800; font-size: 14px; min-height: 20px; margin: 4px 0 0; }
 
 .rules h3 { color: #fff; font-size: 16px; margin: 18px 0 5px; font-weight: 900; }
@@ -204,12 +293,12 @@ html, body {
 .screen-game { padding: 0; display: none; }
 .screen-game.is-active { display: grid; }
 .screen-game {
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr;
   grid-template-rows: auto 1fr auto;
   grid-template-areas:
-    ".    top    ."
-    "left board right"
-    ".    bottom .";
+    "top"
+    "board"
+    "bottom";
   gap: 2px;
   padding: calc(var(--safe-t) + 6px) calc(var(--safe-r) + 6px)
            calc(var(--safe-b) + 6px) calc(var(--safe-l) + 6px);
@@ -221,9 +310,16 @@ html, body {
 .seat.is-shown { display: flex; }
 .seat-top    { grid-area: top; }
 .seat-bottom { grid-area: bottom; }
-.seat-left   { grid-area: left; }
-.seat-right  { grid-area: right; }
 .seat-top    .score-chip { transform: rotate(180deg); }
+
+/* With 3+ players the board gives up a lane on each side for the rotated chips
+   (fitBoard() shrinks the drawing width to match). */
+.seat-left, .seat-right {
+  position: absolute; top: 50%; z-index: 2;
+  width: 40px; height: 0; overflow: visible; padding: 0;
+}
+.seat-left  { left: calc(var(--safe-l) + 2px); transform: translateY(-50%); }
+.seat-right { right: calc(var(--safe-r) + 2px); transform: translateY(-50%); }
 .seat-left   .score-chip { transform: rotate(90deg); }
 .seat-right  .score-chip { transform: rotate(-90deg); }
 
@@ -245,7 +341,7 @@ html, body {
 .game-menu { position: absolute; top: calc(var(--safe-t) + 8px); right: calc(var(--safe-r) + 8px); z-index: 4; }
 
 .turn-banner {
-  position: absolute; left: 50%; top: calc(var(--safe-t) + 10px);
+  position: absolute; left: 50%; top: calc(var(--safe-t) + 56px);
   transform: translateX(-50%);
   padding: 8px 18px; border-radius: 999px;
   background: rgba(255, 255, 255, 0.24);
@@ -295,6 +391,13 @@ html, body {
 }
 
 .is-hidden { display: none !important; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+#board:focus-visible { outline: 3px solid #fff; outline-offset: 2px; border-radius: 8px; }
 
 /* Landscape phones: keep the board as tall as it can be. */
 @media (orientation: landscape) and (max-height: 520px) {

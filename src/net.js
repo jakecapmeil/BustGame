@@ -177,7 +177,9 @@ export async function joinRoom({ code, handlers }) {
   const peer = await makePeer(Peer, null);
 
   return new Promise((resolve, reject) => {
-    const conn = peer.connect(ROOM_PREFIX + code, { reliable: true, serialization: 'json' });
+    // Leave serialization at the PeerJS default so both ends negotiate the same
+    // codec — an explicit mismatch here silently garbles every packet.
+    const conn = peer.connect(ROOM_PREFIX + code, { reliable: true });
     const timer = setTimeout(() => {
       try { peer.destroy(); } catch { /* ignore */ }
       reject(new Error('No room with that code'));

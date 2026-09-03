@@ -11,7 +11,11 @@ import {
   createGame, applyMove, isLegalMove, legalMoves, scores,
   PHASE_PLACE, PHASE_PLAY, PHASE_OVER,
 } from './engine.js';
-import { chooseMove } from './ai.js';
+import { chooseMove, difficultyLabel, DIFFICULTY_ORDER } from './ai.js';
+import {
+  RANKS, rankFor, rankIndexFor, progressToNext, nextRank,
+  matchmake, scoreResult, recordMatch, loadProfile, saveProfile,
+} from './rank.js';
 import { BoardAnimator, PLAYER_COLORS, hitTest, blockedPlacementTiles } from './render.js';
 import { sfx, unlock as unlockAudio, setEnabled as setSoundEnabled, buzz } from './audio.js';
 import { hostRoom, joinRoom, normaliseCode } from './net.js';
@@ -49,6 +53,18 @@ const SEAT_ORDER = {
   4: ['bottom', 'top', 'left', 'right'],
 };
 
+const boardFor = (count, size) => BOARD_SIZES[count][size];
+
+// Badge tints per rank, weakest → strongest.
+const RANK_COLORS = {
+  wood: '#8A5A3C', stone: '#8C8C94', bronze: '#B87333', iron: '#6E7B8B',
+  silver: '#AEB6BD', gold: '#E7B023', platinum: '#3FB6C6',
+  diamond: '#4C7DF0', master: '#9B72E0', legend: '#F24BA0',
+};
+
+/** @type {object} persisted trophy profile */
+let profile = loadProfile();
+
 /* --------------------------------------------------------------------- dom -- */
 
 const $ = (sel) => document.querySelector(sel);
@@ -58,7 +74,21 @@ const canvas = $('#board');
 const boardArea = $('#board-area');
 const turnBanner = $('#turn-banner');
 const turnText = $('#turn-text');
+const liveRegion = $('#a11y-live');
 const animator = new BoardAnimator(canvas);
+
+/** Push a message to the screen-reader live region (deduped). */
+let lastAnnounced = '';
+function announce(msg) {
+  if (!liveRegion || msg === lastAnnounced) return;
+  lastAnnounced = msg;
+  liveRegion.textContent = msg;
+}
+
+/* -------------------------------------------------------- keyboard cursor -- */
+
+let keyCursor = -1;   // tile index the arrow-key cursor sits on
+let keyActive = false; // becomes true once the player uses the keyboard
 
 /* ------------------------------------------------------------------ screens -- */
 
@@ -68,6 +98,8 @@ function show(id) {
   $$('.screen').forEach((s) => s.classList.toggle('is-active', s.id === id));
   currentScreen = id;
   if (id === 'screen-game') requestAnimationFrame(fitBoard);
+  if (id === 'screen-home') renderHomeStrip();
+  if (id === 'screen-ranked') renderRankedScreen();
 }
 
 function closeOverlays() {
@@ -102,13 +134,14 @@ function makePlayers(mode, count, difficulty) {
 
 /**
  * @param {object} opts
- * @param {'solo'|'local'|'online'} opts.mode
+ * @param {'solo'|'local'|'online'|'ranked'} opts.mode
  * @param {number} opts.cols @param {number} opts.rows
  * @param {Array} opts.players
  * @param {number} [opts.localSeat] which player this device controls (online)
  * @param {object} [opts.room] net room handle (online)
+ * @param {number[]} [opts.ratings] trophy-equivalent rating per player id (ranked)
  */
-function startGame({ mode, cols, rows, players, localSeat = 0, room = null }) {
+function startGame({ mode, cols, rows, players, localSeat = 0, room = null, ratings = null }) {
   epoch++;
   animator.cancel();
   closeOverlays();
@@ -117,12 +150,18 @@ function startGame({ mode, cols, rows, players, localSeat = 0, room = null }) {
     mode,
     room,
     localSeat,
+    ratings,
+    elimTurn: {},   // pid -> state.turnNumber it was knocked out on
     state: createGame({ cols, rows, players }),
     queue: [],
     pumping: false,
     aiTimer: 0,
     over: false,
   };
+
+  keyCursor = Math.floor((rows * cols) / 2);
+  keyActive = false;
+  lastAnnounced = '';
 
   buildSeats();
   show('screen-game');
@@ -146,6 +185,9 @@ function buildSeats() {
   const { state, localSeat } = session;
   const n = state.players.length;
   const order = SEAT_ORDER[n] || SEAT_ORDER[4];
+
+  // 3+ players use the left/right edges, so the board yields a lane each side.
+  $('#screen-game').classList.toggle('has-sides', order.includes('left') || order.includes('right'));
 
   $$('.seat').forEach((el) => { el.classList.remove('is-shown'); el.innerHTML = ''; });
 
@@ -175,7 +217,9 @@ function escapeHtml(s) {
 function fitBoard() {
   if (!session) return;
   const r = boardArea.getBoundingClientRect();
-  const w = Math.max(80, r.width);
+  // 3–4 players put a score chip on each side edge; keep the board clear of them.
+  const sideLane = $('#screen-game').classList.contains('has-sides') ? 44 : 0;
+  const w = Math.max(80, r.width - sideLane * 2);
   const h = Math.max(80, r.height);
   animator.resize(w, h, session.state.cols, session.state.rows);
   refreshBoardOnly();
@@ -187,6 +231,7 @@ function chrome() {
   if (s.phase === PHASE_PLACE) view.blocked = blockedPlacementTiles(s);
   if (s.phase !== PHASE_OVER && controlsPlayer(s.turn)) {
     view.legal = new Set(legalMoves(s));
+    if (keyActive && keyCursor >= 0) view.cursor = keyCursor;
   }
   return view;
 }
@@ -213,6 +258,11 @@ function refresh() {
     ? 'rgba(255,255,255,0.24)'
     : hexToSoft(PLAYER_COLORS[s.turn].ball);
 
+  if (s.phase !== PHASE_OVER) {
+    const you = tiles.map((t, pid) => `${playerLabel(s.players[pid])} ${t}`).join(', ');
+    announce(`${bannerText()}. Tiles: ${you}.`);
+  }
+
   refreshBoardOnly();
 }
 
@@ -230,7 +280,7 @@ function bannerText() {
     return mine ? 'Pick your opening tile' : `${playerLabel(p)} is opening`;
   }
   if (p.kind === 'ai') return `${playerLabel(p)} is thinking…`;
-  if (session.mode === 'solo') return 'Your turn';
+  if (session.mode === 'solo' || session.mode === 'ranked') return 'Your turn';
   return mine && session.mode === 'online' ? 'Your turn' : `${playerLabel(p)}'s turn`;
 }
 
@@ -272,6 +322,14 @@ async function pump() {
 
       await animateMove(r.frames);
       if (!session || epoch !== myEpoch) return;
+
+      // Note when each player was knocked out — the trophy scorer weighs how
+      // long you lasted.
+      for (const p of r.state.players) {
+        if (!p.alive && session.elimTurn[p.id] === undefined) {
+          session.elimTurn[p.id] = r.state.turnNumber;
+        }
+      }
 
       session.state = r.state;
       refresh();
@@ -321,25 +379,20 @@ function scheduleAI() {
 
 /* -------------------------------------------------------------------- input -- */
 
-function onBoardPointer(ev) {
-  if (!session || session.over) return;
-  unlockAudio();
+/** True when this device may act on the current turn right now. */
+function canActNow() {
+  if (!session || session.over) return false;
   const s = session.state;
-  if (s.phase === PHASE_OVER) return;
-  if (!controlsPlayer(s.turn)) return;
-  if (session.queue.length || session.pumping) return; // mid-cascade
+  if (s.phase === PHASE_OVER) return false;
+  if (!controlsPlayer(s.turn)) return false;
+  if (session.queue.length || session.pumping) return false; // mid-cascade
+  return true;
+}
 
-  const rect = canvas.getBoundingClientRect();
-  const pt = ev.changedTouches ? ev.changedTouches[0] : ev;
-  const idx = hitTest(animator.L, pt.clientX - rect.left, pt.clientY - rect.top);
-  if (idx < 0) return;
-
-  if (!isLegalMove(s, idx)) {
-    sfx.deny();
-    haptic(26);
-    return;
-  }
-
+/** Send a chosen tile through the same path a tap would take. */
+function commitTile(idx) {
+  const s = session.state;
+  if (!isLegalMove(s, idx)) { sfx.deny(); haptic(26); return; }
   if (session.mode === 'online' && !session.room?.isHost) {
     // Clients propose; they apply only when the host echoes it back.
     session.room.sendMove(idx);
@@ -348,7 +401,51 @@ function onBoardPointer(ev) {
   enqueue(idx, 'local');
 }
 
+function onBoardPointer(ev) {
+  unlockAudio();
+  if (!canActNow()) return;
+  const rect = canvas.getBoundingClientRect();
+  const pt = ev.changedTouches ? ev.changedTouches[0] : ev;
+  const idx = hitTest(animator.L, pt.clientX - rect.left, pt.clientY - rect.top);
+  if (idx < 0) return;
+  keyActive = false; // a tap takes over from the keyboard cursor
+  commitTile(idx);
+}
+
+function onBoardKey(ev) {
+  if (!session || session.over || !session.state) return;
+  const s = session.state;
+  const { cols, rows } = s;
+  const n = cols * rows;
+  if (keyCursor < 0 || keyCursor >= n) keyCursor = Math.floor(n / 2);
+
+  let dx = 0;
+  let dy = 0;
+  switch (ev.key) {
+    case 'ArrowLeft': case 'a': dx = -1; break;
+    case 'ArrowRight': case 'd': dx = 1; break;
+    case 'ArrowUp': case 'w': dy = -1; break;
+    case 'ArrowDown': case 's': dy = 1; break;
+    case 'Enter': case ' ': case 'Spacebar':
+      ev.preventDefault();
+      unlockAudio();
+      if (canActNow()) commitTile(keyCursor);
+      return;
+    default: return;
+  }
+  ev.preventDefault();
+  keyActive = true;
+  const cx = Math.min(cols - 1, Math.max(0, (keyCursor % cols) + dx));
+  const cy = Math.min(rows - 1, Math.max(0, ((keyCursor / cols) | 0) + dy));
+  keyCursor = cy * cols + cx;
+  const owner = s.owner[keyCursor];
+  const who = owner === -1 ? 'empty' : `${PLAYER_COLORS[owner].name}, ${s.count[keyCursor]}`;
+  announce(`Cursor on column ${cx + 1}, row ${cy + 1}: ${who}.`);
+  refreshBoardOnly();
+}
+
 canvas.addEventListener('pointerup', onBoardPointer);
+canvas.addEventListener('keydown', onBoardKey);
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 /* ------------------------------------------------------------------ ending -- */
@@ -358,10 +455,11 @@ function finish() {
   session.over = true;
   const s = session.state;
   const w = s.winner;
-  const won = controlsPlayer(w) || (session.mode === 'local');
+  const won = controlsPlayer(w) || (session.mode === 'local' && s.players[w].kind !== 'ai');
 
   $('#over-disc').style.background = PLAYER_COLORS[w].ball;
   const isSelf = (session.mode === 'solo' && w === 0)
+    || (session.mode === 'ranked' && w === 0)
     || (session.mode === 'online' && w === session.localSeat);
   $('#over-title').textContent = isSelf ? 'You win!'
     : session.mode === 'local' ? `${playerLabel(s.players[w])} wins!`
@@ -369,16 +467,167 @@ function finish() {
 
   const { tiles } = scores(s);
   $('#over-sub').textContent = `${tiles[w]} tiles held · ${s.turnNumber} moves`;
+
+  const tally = session.mode === 'ranked' ? settleRanked() : null;
+  $('#over-trophies').hidden = !tally;
   $('#overlay-over').hidden = false;
 
   if (isSelf || (session.mode === 'local' && won)) sfx.win(); else sfx.lose();
   haptic(50);
+  let msg = `${$('#over-title').textContent} ${$('#over-sub').textContent}`;
+  if (tally) {
+    msg += `. ${tally.result.delta >= 0 ? '+' : ''}${tally.result.delta} trophies, now ${tally.profile.trophies}.`;
+    if (tally.promotedTo) msg += ` Promoted to ${tally.promotedTo.name}.`;
+    if (tally.demotedTo) msg += ` Demoted to ${tally.demotedTo.name}.`;
+  }
+  announce(msg);
 }
+
+/**
+ * Score the finished ranked match, persist the new trophy total, and paint the
+ * tally onto the game-over card. Returns the recordMatch() bundle, or null if
+ * this wasn't a scorable ranked game.
+ */
+function settleRanked() {
+  const s = session.state;
+  if (!session.ratings || s.winner === null || s.winner === undefined) return null;
+
+  const before = profile;
+  const result = scoreResult({
+    state: s,
+    myId: 0,
+    ratings: session.ratings,
+    elimTurn: session.elimTurn,
+    trophies: before.trophies,
+    played: before.played,
+  });
+  const bundle = recordMatch(before, result);
+  profile = bundle.profile;
+  saveProfile(profile);
+
+  const up = result.delta >= 0;
+  const dEl = $('#over-delta');
+  dEl.textContent = `${up ? '+' : ''}${result.delta}`;
+  dEl.className = `trophy-delta ${up ? 'up' : 'down'}`;
+  $('#over-troph-count').textContent = profile.trophies;
+  paintBadge($('#over-troph-badge'), rankFor(profile.trophies));
+  $('#over-troph-fill').style.width = `${Math.round(progressToNext(profile.trophies).frac * 100)}%`;
+
+  const jump = $('#over-rank-jump');
+  if (bundle.promotedTo) {
+    jump.hidden = false; jump.className = 'rank-jump promo';
+    jump.textContent = `Promoted — ${bundle.promotedTo.name}`;
+  } else if (bundle.demotedTo) {
+    jump.hidden = false; jump.className = 'rank-jump demo';
+    jump.textContent = `Demoted — ${bundle.demotedTo.name}`;
+  } else {
+    jump.hidden = true;
+  }
+
+  const bd = $('#over-breakdown');
+  bd.innerHTML = '';
+  result.breakdown.forEach((b) => {
+    const li = document.createElement('li');
+    const beat = b.result > b.expected;
+    li.innerHTML = `<span>${escapeHtml(playerLabel(s.players[b.oppId]))} · ${Math.round(b.oppRating)} 🏆</span>`
+      + `<span>${b.result === 1 ? 'beat' : b.result === 0 ? 'lost to' : 'tied'}${beat ? ' ↑' : ''}</span>`;
+    bd.appendChild(li);
+  });
+  return bundle;
+}
+
+/* ------------------------------------------------------------------ ranked -- */
+
+function paintBadge(el, rank) {
+  if (!el) return;
+  el.textContent = rank.name[0];
+  el.style.background = RANK_COLORS[rank.key] || '#8A5A3C';
+  el.setAttribute('aria-hidden', 'true');
+}
+
+/** The persistent trophy pill on the home screen. */
+function renderHomeStrip() {
+  const strip = $('#rank-strip');
+  if (!strip) return;
+  strip.hidden = false; // always show it — 0 trophies is a valid start
+  const rank = rankFor(profile.trophies);
+  paintBadge($('#strip-badge'), rank);
+  $('#strip-name').textContent = rank.name;
+  $('#strip-count').textContent = profile.trophies;
+  $('#strip-fill').style.width = `${Math.round(progressToNext(profile.trophies).frac * 100)}%`;
+}
+
+function matchShape(rank) {
+  const total = Math.min(3, rank.opponents) + 1;
+  const label = rank.opponents === 1 ? '1 v 1' : `1 v ${rank.opponents}`;
+  const [cols, rows] = boardFor(total, rank.board);
+  const pool = rank.pool.map(difficultyLabel).join(' / ');
+  return `${label} · ${pool} · ${cols}×${rows} board`;
+}
+
+function renderRankedScreen() {
+  const rank = rankFor(profile.trophies);
+  paintBadge($('#rank-hero-badge'), rank);
+  $('#rank-hero-name').textContent = rank.name;
+  $('#rank-hero-count').textContent = profile.trophies;
+  const prog = progressToNext(profile.trophies);
+  $('#rank-hero-fill').style.width = `${Math.round(prog.frac * 100)}%`;
+  const nxt = nextRank(profile.trophies);
+  $('#rank-hero-next').textContent = nxt
+    ? `${prog.need - prog.have} to ${nxt.name}`
+    : 'Top rank reached';
+  $('#rank-preview').textContent = `Next match: ${matchShape(rank)}`;
+
+  const wr = profile.played ? Math.round((profile.won / profile.played) * 100) : 0;
+  const streak = profile.streak > 1 ? ` · ${profile.streak} win streak`
+    : profile.streak < -1 ? ` · ${-profile.streak} loss streak` : '';
+  $('#rank-record').textContent = profile.played
+    ? `${profile.won}/${profile.played} won (${wr}%) · best ${profile.best} 🏆${streak}`
+    : 'No ranked matches yet.';
+
+  const here = rankIndexFor(profile.trophies);
+  const list = $('#ladder-list');
+  list.innerHTML = '';
+  RANKS.forEach((r, i) => {
+    const li = document.createElement('li');
+    if (i === here) li.classList.add('is-here');
+    if (i > here) li.classList.add('is-locked');
+    const badge = document.createElement('span');
+    badge.className = 'rank-badge';
+    paintBadge(badge, r);
+    li.appendChild(badge);
+    const name = document.createElement('span');
+    name.textContent = r.name;
+    li.appendChild(name);
+    const min = document.createElement('span');
+    min.className = 'lad-min';
+    min.textContent = `${r.min} 🏆`;
+    li.appendChild(min);
+    list.appendChild(li);
+  });
+}
+
+function startRankedMatch() {
+  const m = matchmake(profile.trophies, boardFor);
+  startGame({
+    mode: 'ranked',
+    cols: m.cols, rows: m.rows,
+    players: m.players,
+    ratings: m.ratings,
+  });
+}
+
+$('#ranked-play').addEventListener('click', () => {
+  unlockAudio(); sfx.ui(); haptic(8);
+  startRankedMatch();
+});
 
 /* --------------------------------------------------------------- restarting -- */
 
 function restartGame() {
   if (!session) return;
+  // "Play again" in ranked means a fresh matchmade opponent, not a rematch.
+  if (session.mode === 'ranked') { startRankedMatch(); return; }
   const { mode, state, localSeat, room } = session;
   const players = state.players.map((p) => ({ name: p.name, kind: p.kind, difficulty: p.difficulty }));
   if (mode === 'online') {
@@ -428,10 +677,80 @@ $('#solo-start').addEventListener('click', () => {
   startGame({ mode: 'solo', cols, rows, players: makePlayers('solo', count, diff) });
 });
 
+/* -------------------------------------------------------- local line-up -- */
+
+// Every seat is Human or a Bot at one of the five difficulties. Mix freely:
+// all humans is classic pass-and-play, all bots is a spectator match, and any
+// blend in between works — the turn scheduler keys off each seat's kind.
+let localRoster = [
+  { kind: 'human', difficulty: 'medium' },
+  { kind: 'human', difficulty: 'medium' },
+];
+
+function localSeatCount() {
+  return Number(segValue('local-count')) || 2;
+}
+
+function syncRosterLength() {
+  const n = localSeatCount();
+  while (localRoster.length < n) localRoster.push({ kind: 'ai', difficulty: 'medium' });
+  localRoster.length = n;
+}
+
+function buildRoster() {
+  syncRosterLength();
+  const ul = $('#local-roster');
+  if (!ul) return;
+  ul.innerHTML = '';
+  localRoster.forEach((seat, i) => {
+    const li = document.createElement('li');
+    li.className = 'roster-seat' + (seat.kind === 'human' ? ' is-human' : '');
+    li.dataset.seat = String(i);
+    const diffBtns = DIFFICULTY_ORDER.map((k) => (
+      `<button class="seg-btn${seat.difficulty === k ? ' is-on' : ''}" type="button" data-diff="${k}">${escapeHtml(difficultyLabel(k))}</button>`
+    )).join('');
+    li.innerHTML = `
+      <div class="roster-main">
+        <span class="dot" style="background:${PLAYER_COLORS[i].ball}"></span>
+        <span class="who">${escapeHtml(PLAYER_COLORS[i].name)}</span>
+        <div class="seg kind" role="group" aria-label="Seat ${i + 1} type">
+          <button class="seg-btn${seat.kind === 'human' ? ' is-on' : ''}" type="button" data-kind="human">Human</button>
+          <button class="seg-btn${seat.kind === 'ai' ? ' is-on' : ''}" type="button" data-kind="ai">Bot</button>
+        </div>
+      </div>
+      <div class="seg diff seg-tight" role="group" aria-label="Seat ${i + 1} difficulty">${diffBtns}</div>`;
+    ul.appendChild(li);
+  });
+}
+
+$('#local-roster').addEventListener('click', (e) => {
+  const btn = e.target.closest('.seg-btn');
+  if (!btn) return;
+  const li = e.target.closest('.roster-seat');
+  if (!li) return;
+  const i = Number(li.dataset.seat);
+  unlockAudio(); sfx.ui(); haptic(8);
+  if (btn.dataset.kind) localRoster[i].kind = btn.dataset.kind;
+  else if (btn.dataset.diff) localRoster[i].difficulty = btn.dataset.diff;
+  buildRoster();
+});
+
+$('#local-count').addEventListener('click', (e) => {
+  if (e.target.closest('.seg-btn')) buildRoster();
+});
+
+buildRoster();
+
 $('#local-start').addEventListener('click', () => {
-  const count = Number(segValue('local-count'));
+  syncRosterLength();
+  const count = localRoster.length;
   const [cols, rows] = BOARD_SIZES[count][segValue('local-size')];
-  startGame({ mode: 'local', cols, rows, players: makePlayers('local', count) });
+  const players = localRoster.map((seat, i) => ({
+    name: seat.kind === 'ai' ? `${PLAYER_COLORS[i].name} bot` : PLAYER_COLORS[i].name,
+    kind: seat.kind,
+    difficulty: seat.difficulty,
+  }));
+  startGame({ mode: 'local', cols, rows, players });
 });
 
 $('#btn-pause').addEventListener('click', () => {

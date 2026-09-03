@@ -1,5 +1,52 @@
 # HANDOFF — read this first
 
+> ## Status — 2026-09-02 pass
+>
+> **Done:**
+> - **Bug #1 (cascade freeze) fixed.** `BoardAnimator` rewritten around a single rAF
+>   loop with a `mode` flag — no more `this.anim`/`this.raf` handle collision. `play()`
+>   now always settles: on the last frame, on `cancel()`, or via a `setInterval`
+>   watchdog that carries playback to completion when rAF is starved (hidden tab /
+>   heavy jank). Regression cover in `test/render.test.mjs` (7 tests). Verified in
+>   a real solo game: openings bust, cascades resolve, the turn advances every time.
+> - **Five bot rungs** (`easy/medium/hard/expert/brutal`). The original four are
+>   byte-identical; `expert` is new, a ply deeper than hard on a shorter clock than
+>   brutal. Ladder re-measured (24 games/pair): each rung strictly beats the one below.
+> - **Mixed local line-up.** "Pass & Play" is now "Local Game": 2–4 seats, each Human
+>   or Bot-at-a-difficulty, freely mixed (Boomerang-Fu style). All-human is the old
+>   pass-and-play; all-bot is a spectator match.
+> - **3–4-player board layout fixed.** Side seat chips were stealing the board's width
+>   and squeezing it to a sliver; they now ride the screen edges and the board keeps
+>   a 40px lane each side.
+> - **Accessibility pass.** Canvas is focusable; arrow keys / WASD move a cursor,
+>   Enter/Space plays it; an `aria-live` region announces turns, tile counts and the
+>   result.
+> - **Service worker** switched to stale-while-revalidate (was cache-first, which
+>   pinned stale JS/CSS across deploys). `CACHE` bumped to `bust-v2`.
+> - **README.md** written.
+>
+> **Added after the first pass (trophy ladder):**
+> - **Ranked mode** — a Clash-Royale-style trophy ladder vs matchmade bots.
+>   `src/rank.js` (pure, 12 tests in `test/rank.test.mjs`): 10 ranks Woodline→Legend,
+>   Elo scoring folded over every opponent, a margin multiplier so a blowout win pays
+>   more and getting wiped early costs more, soft rank floors, promotion/demotion
+>   detection, `localStorage` profile. New `#screen-ranked` (badge, trophy bar,
+>   match preview, full ladder), a home-screen rank strip, and a trophy tally on the
+>   game-over card. Verified in-browser: a full ranked match scores, persists, and
+>   renders the tally; promotion maths checked against `recordMatch`.
+> - This is a **solo ladder** — trophies are local and unverified. A real online
+>   ranked mode needs a backend (accounts, matchmaking pool, server-authoritative
+>   results). `rank.js` takes opponent ratings as input, so an online result could
+>   feed the same scorer later.
+>
+> **Still needs a live test (could not be done here):**
+> - **Online multiplayer** — still never had two clients connected. One real bug fixed
+>   on inspection: the client forced `serialization: 'json'` while the host used the
+>   PeerJS default, which would garble every packet; the override is removed. Test
+>   host/join/lobby/replicate/disconnect with two devices.
+> - **PWA offline install** — sw.js logic reviewed, not verified installed-and-offline.
+
+
 > **To any AI agent picking up this repo: your job is to fix everything listed under
 > [Open bugs](#open-bugs) and finish everything under [Remaining work](#remaining-work).**
 >

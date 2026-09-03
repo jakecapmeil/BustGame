@@ -2,7 +2,7 @@
    Solo and pass-and-play work with no connection at all; only the online mode
    needs the network, and that request is deliberately never cached. */
 
-const CACHE = 'bust-v1';
+const CACHE = 'bust-v2';
 const ASSETS = [
   './',
   'index.html',
@@ -57,13 +57,21 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
+  // Stale-while-revalidate: hand back the cached copy at once so the board
+  // never waits on a round trip, but refresh it in the background so a
+  // deployed update to the JS/CSS lands on the very next load.
   e.respondWith(
-    caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-      if (res.ok) {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(req, copy));
-      }
-      return res;
-    })),
+    caches.match(req).then((hit) => {
+      const fetching = fetch(req)
+        .then((res) => {
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => hit);
+      return hit || fetching;
+    }),
   );
 });

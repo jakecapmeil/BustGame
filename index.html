@@ -24,9 +24,18 @@
   <div class="stack">
     <h1 class="logo">BUST<span class="logo-dot"></span></h1>
     <p class="tagline">Load a tile past three.<br>Watch the board go up.</p>
+    <button class="rank-strip" id="rank-strip" data-goto="screen-ranked" hidden>
+      <span class="rank-badge" id="strip-badge"></span>
+      <span class="rank-strip-main">
+        <span class="rank-strip-name" id="strip-name">Woodline</span>
+        <span class="rank-strip-bar"><span class="rank-strip-fill" id="strip-fill"></span></span>
+      </span>
+      <span class="rank-strip-trophies"><span class="trophy-ico"></span><span id="strip-count">0</span></span>
+    </button>
     <nav class="menu">
-      <button class="btn btn-primary" data-goto="screen-solo">Solo</button>
-      <button class="btn" data-goto="screen-local">Pass &amp; Play</button>
+      <button class="btn btn-primary" data-goto="screen-ranked">Ranked</button>
+      <button class="btn" data-goto="screen-solo">Solo</button>
+      <button class="btn" data-goto="screen-local">Local Game</button>
       <button class="btn" data-goto="screen-online">Online</button>
       <button class="btn btn-ghost" data-goto="screen-rules">How to play</button>
     </nav>
@@ -49,10 +58,11 @@
       </div>
     </fieldset>
     <fieldset class="opt"><legend>Difficulty</legend>
-      <div class="seg" id="solo-diff">
+      <div class="seg seg-tight" id="solo-diff">
         <button class="seg-btn" data-v="easy">Easy</button>
         <button class="seg-btn is-on" data-v="medium">Medium</button>
         <button class="seg-btn" data-v="hard">Hard</button>
+        <button class="seg-btn" data-v="expert">Expert</button>
         <button class="seg-btn" data-v="brutal">Brutal</button>
       </div>
     </fieldset>
@@ -67,17 +77,42 @@
   </div>
 </section>
 
+<!-- ---------------------------------------------------------------- ranked -- -->
+<section class="screen" id="screen-ranked">
+  <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back">‹</button><h2>Ranked</h2></header>
+  <div class="stack setup">
+    <div class="rank-hero">
+      <span class="rank-badge rank-badge-lg" id="rank-hero-badge"></span>
+      <div class="rank-hero-name" id="rank-hero-name">Woodline</div>
+      <div class="rank-hero-trophies"><span class="trophy-ico"></span><span id="rank-hero-count">0</span></div>
+      <div class="rank-hero-bar"><span class="rank-hero-fill" id="rank-hero-fill"></span></div>
+      <div class="rank-hero-next hint" id="rank-hero-next">—</div>
+    </div>
+    <p class="hint" id="rank-preview">—</p>
+    <button class="btn btn-primary" id="ranked-play">Play match</button>
+    <p class="err" id="ranked-err" role="alert"></p>
+
+    <fieldset class="opt"><legend>Ladder</legend>
+      <ol class="ladder" id="ladder-list"></ol>
+    </fieldset>
+    <p class="hint rank-record" id="rank-record"></p>
+  </div>
+</section>
+
 <!-- ----------------------------------------------------------------- local -- -->
 <section class="screen" id="screen-local">
-  <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back">‹</button><h2>Pass &amp; Play</h2></header>
+  <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back">‹</button><h2>Local Game</h2></header>
   <div class="stack setup">
-    <p class="hint">One phone, passed around. Each player gets their own corner of the screen.</p>
-    <fieldset class="opt"><legend>Players</legend>
+    <p class="hint">One phone, passed around. Fill the seats with any mix of people and bots.</p>
+    <fieldset class="opt"><legend>Seats</legend>
       <div class="seg" id="local-count">
         <button class="seg-btn is-on" data-v="2">2</button>
         <button class="seg-btn" data-v="3">3</button>
         <button class="seg-btn" data-v="4">4</button>
       </div>
+    </fieldset>
+    <fieldset class="opt"><legend>Line-up</legend>
+      <ul class="roster" id="local-roster"></ul>
     </fieldset>
     <fieldset class="opt"><legend>Board</legend>
       <div class="seg" id="local-size">
@@ -86,6 +121,7 @@
         <button class="seg-btn" data-v="large">Large</button>
       </div>
     </fieldset>
+    <p class="err" id="local-err" role="alert"></p>
     <button class="btn btn-primary" id="local-start">Start</button>
   </div>
 </section>
@@ -165,9 +201,11 @@
 
   <button class="icon-btn game-menu" id="btn-pause" aria-label="Menu">≡</button>
   <div class="board-area" id="board-area">
-    <canvas id="board" aria-label="Game board"></canvas>
+    <canvas id="board" tabindex="0" role="application"
+            aria-label="Game board. Arrow keys to move the cursor, Enter or Space to play the highlighted tile."></canvas>
   </div>
   <div class="turn-banner" id="turn-banner"><span id="turn-text">—</span></div>
+  <p id="a11y-live" class="sr-only" role="status" aria-live="polite"></p>
 </section>
 
 <!-- -------------------------------------------------------------- overlays -- -->
@@ -185,6 +223,19 @@
     <div class="winner-disc" id="over-disc"></div>
     <h2 id="over-title">—</h2>
     <p id="over-sub" class="hint"></p>
+
+    <div class="trophy-result" id="over-trophies" hidden>
+      <div class="trophy-delta" id="over-delta">+0</div>
+      <div class="trophy-count-row">
+        <span class="trophy-ico"></span>
+        <span id="over-troph-count">0</span>
+        <span class="rank-badge" id="over-troph-badge"></span>
+      </div>
+      <div class="rank-hero-bar"><span class="rank-hero-fill" id="over-troph-fill"></span></div>
+      <div class="rank-jump" id="over-rank-jump" hidden></div>
+      <ul class="trophy-breakdown" id="over-breakdown"></ul>
+    </div>
+
     <button class="btn btn-primary" id="over-again">Play again</button>
     <button class="btn btn-ghost" id="over-menu">Menu</button>
   </div>

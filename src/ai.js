@@ -10,12 +10,21 @@ import {
   legalMoves, legalPlacements, applyMove, neighbors, outDegree, idxOf,
 } from './engine.js';
 
+/**
+ * Five rungs, strictly increasing in strength. `easy`/`medium`/`hard`/`brutal`
+ * are the original measured ladder, untouched; `expert` is the new rung between
+ * hard and brutal — a full ply deeper than hard, on a shorter clock than brutal.
+ */
 export const DIFFICULTIES = {
-  easy:   { depth: 0, noise: 3.5,  blunder: 0.22, budgetMs: 60,  label: 'Easy' },
-  medium: { depth: 1, noise: 1.0,  blunder: 0.06, budgetMs: 220, label: 'Medium' },
-  hard:   { depth: 2, noise: 0.15, blunder: 0.0,  budgetMs: 700, label: 'Hard' },
+  easy:   { depth: 0, noise: 3.5,  blunder: 0.22, budgetMs: 60,   label: 'Easy' },
+  medium: { depth: 1, noise: 1.0,  blunder: 0.06, budgetMs: 220,  label: 'Medium' },
+  hard:   { depth: 2, noise: 0.15, blunder: 0.0,  budgetMs: 700,  label: 'Hard' },
+  expert: { depth: 3, noise: 0.0,  blunder: 0.0,  budgetMs: 1100, label: 'Expert' },
   brutal: { depth: 3, noise: 0.0,  blunder: 0.0,  budgetMs: 1600, label: 'Brutal' },
 };
+
+/** Difficulty keys, weakest first — the order menus should present them in. */
+export const DIFFICULTY_ORDER = ['easy', 'medium', 'hard', 'expert', 'brutal'];
 
 const WIN = 1e6;
 

@@ -6,8 +6,9 @@
  * to how you play it (solo / local / online) and to ranked scoring.
  *
  * Each mode also names a theme, which swaps the whole app's palette via
- * `document.documentElement.dataset.theme`. Modes are data, not code — adding
- * one is a single entry here plus a `[data-theme]` block in styles.css.
+ * `document.documentElement.dataset.theme`, and an `icon`, which is the key of
+ * a hand-drawn mark in `icons.js`. Modes are data, not code — adding one is a
+ * single entry here, a `[data-theme]` block in styles.css, and one icon.
  *
  * Wall generation lives here rather than in the engine so the engine stays
  * free of randomness: `makeWalls` is seeded and deterministic, and the caller
@@ -22,37 +23,37 @@ export const MODES = {
   duel: {
     key: 'duel', name: 'Duel', tagline: 'One on one',
     blurb: 'The purest version. Two colours, a small board, nowhere to hide.',
-    seats: 2, board: [7, 7], teams: null, wallDensity: 0, theme: 'ember', glyph: '⚔',
+    seats: 2, board: [7, 7], teams: null, wallDensity: 0, theme: 'ember', icon: 'duel',
   },
   rumble: {
     key: 'rumble', name: 'Rumble', tagline: '4-player free-for-all',
     blurb: 'Four colours, one board. Everyone for themselves.',
-    seats: 4, board: [8, 8], teams: null, wallDensity: 0, theme: 'tide', glyph: '✦',
+    seats: 4, board: [8, 8], teams: null, wallDensity: 0, theme: 'tide', icon: 'rumble',
   },
   arena: {
     key: 'arena', name: 'Big Arena', tagline: '4 players · big map',
     blurb: 'The same four-way brawl with room to manoeuvre — and longer chains.',
-    seats: 4, board: [10, 10], teams: null, wallDensity: 0, theme: 'orchid', glyph: '◆',
+    seats: 4, board: [10, 10], teams: null, wallDensity: 0, theme: 'orchid', icon: 'arena',
   },
   mayhem: {
     key: 'mayhem', name: 'Mayhem', tagline: '8 players · big map',
     blurb: 'Eight colours on a huge board. Total chaos, and only one survivor.',
-    seats: 8, board: [12, 12], teams: null, wallDensity: 0, theme: 'blaze', glyph: '✷',
+    seats: 8, board: [12, 12], teams: null, wallDensity: 0, theme: 'blaze', icon: 'mayhem',
   },
   duos: {
     key: 'duos', name: 'Duos', tagline: '2 v 2 teams',
     blurb: 'Partners share a win. Busts feed your team-mate instead of stealing from them.',
-    seats: 4, board: [10, 10], teams: [0, 1, 0, 1], wallDensity: 0, theme: 'gild', glyph: '⧗',
+    seats: 4, board: [10, 10], teams: [0, 1, 0, 1], wallDensity: 0, theme: 'gild', icon: 'duos',
   },
   chaos: {
     key: 'chaos', name: 'Chaos', tagline: 'Walls · big map',
     blurb: 'A mirrored maze of walls. Balls fired into a wall are gone — pick your angles.',
-    seats: 4, board: [10, 10], teams: null, wallDensity: 0.13, theme: 'toxic', glyph: '☣',
+    seats: 4, board: [10, 10], teams: null, wallDensity: 0.13, theme: 'toxic', icon: 'chaos',
   },
   custom: {
     key: 'custom', name: 'Custom', tagline: 'Your rules',
     blurb: 'Set the table size, the board, teams and walls yourself.',
-    seats: 4, board: [8, 8], teams: null, wallDensity: 0, theme: 'slate', glyph: '⚙',
+    seats: 4, board: [8, 8], teams: null, wallDensity: 0, theme: 'slate', icon: 'custom',
   },
 };
 

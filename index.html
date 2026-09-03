@@ -30,14 +30,14 @@
     <button class="rank-strip" id="rank-strip" data-goto="screen-ranked" aria-label="Your rank">
       <span class="rank-badge" id="strip-badge" aria-hidden="true"></span>
       <span class="rank-strip-main">
-        <span class="rank-strip-name" id="strip-name">Woodline</span>
+        <span class="rank-strip-name" id="strip-name">Firecracker</span>
         <span class="track"><i id="strip-fill"></i></span>
       </span>
-      <span class="rank-strip-trophies num"><span class="trophy-ico"></span><span id="strip-count">0</span></span>
+      <span class="rank-strip-trophies num"><span class="trophy-ico" data-icon="trophy"></span><span id="strip-count">0</span></span>
     </button>
 
     <button class="mode-hero" id="mode-hero" data-goto="screen-modes" aria-label="Change game mode">
-      <span class="mode-glyph" id="hero-glyph" aria-hidden="true">⚔</span>
+      <span class="mode-glyph" id="hero-glyph" aria-hidden="true"></span>
       <span>
         <span class="mode-hero-name" id="hero-name">Duel</span><br>
         <span class="mode-hero-sub" id="hero-sub">One on one · 7×7</span>
@@ -64,7 +64,7 @@
 
 <!-- ----------------------------------------------------------------- modes -- -->
 <section class="screen" id="screen-modes">
-  <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back">‹</button><h2>Game mode</h2></header>
+  <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back" data-icon="back"></button><h2>Game mode</h2></header>
   <div class="scroller">
     <p class="hint" id="modes-blurb">Pick a shape of match. You choose solo, local or online after.</p>
     <div class="mode-grid" id="mode-grid"></div>
@@ -108,7 +108,7 @@
 
 <!-- ------------------------------------------------------------------ solo -- -->
 <section class="screen" id="screen-solo">
-  <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back">‹</button><h2>Solo</h2></header>
+  <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back" data-icon="back"></button><h2>Solo</h2></header>
   <div class="stack setup">
     <p class="hint" id="solo-shape">—</p>
     <fieldset class="field"><legend>Bot difficulty</legend>
@@ -127,7 +127,7 @@
 
 <!-- ----------------------------------------------------------------- local -- -->
 <section class="screen" id="screen-local">
-  <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back">‹</button><h2>Local</h2></header>
+  <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back" data-icon="back"></button><h2>Local</h2></header>
   <div class="scroller">
     <p class="hint" id="local-shape">One device, passed around. Fill the seats with any mix of people and bots.</p>
     <fieldset class="field"><legend>Line-up</legend>
@@ -140,7 +140,7 @@
 
 <!-- ---------------------------------------------------------------- online -- -->
 <section class="screen" id="screen-online">
-  <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back">‹</button><h2>Online</h2></header>
+  <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back" data-icon="back"></button><h2>Online</h2></header>
   <div class="stack setup" id="online-setup">
     <p class="hint" id="online-shape">Play across devices. One player hosts and shares the room code.</p>
     <button class="btn btn-primary" id="online-host">Host a room</button>
@@ -168,14 +168,14 @@
 <!-- ---------------------------------------------------------------- ranked -- -->
 <section class="screen" id="screen-ranked">
   <header class="bar">
-    <button class="icon-btn" data-goto="screen-home" aria-label="Back">‹</button>
+    <button class="icon-btn" data-goto="screen-home" aria-label="Back" data-icon="back"></button>
     <h2>Ranked</h2>
   </header>
   <div class="scroller">
     <div class="rank-hero">
       <span class="rank-badge rank-badge-xl" id="rank-hero-badge" aria-hidden="true"></span>
-      <div class="rank-hero-name" id="rank-hero-name">Woodline</div>
-      <div class="rank-hero-count num"><span class="trophy-ico"></span><span id="rank-hero-count">0</span></div>
+      <div class="rank-hero-name" id="rank-hero-name">Firecracker</div>
+      <div class="rank-hero-count num"><span class="trophy-ico" data-icon="trophy"></span><span id="rank-hero-count">0</span></div>
       <span class="track track-lg"><i id="rank-hero-fill"></i></span>
       <div class="rank-hero-next" id="rank-hero-next">—</div>
     </div>
@@ -187,7 +187,7 @@
     </div>
 
     <button class="mode-hero" id="ranked-mode-hero" data-goto="screen-modes" aria-label="Change game mode">
-      <span class="mode-glyph" id="ranked-hero-glyph" aria-hidden="true">⚔</span>
+      <span class="mode-glyph" id="ranked-hero-glyph" aria-hidden="true"></span>
       <span>
         <span class="mode-hero-name" id="ranked-hero-name">Duel</span><br>
         <span class="mode-hero-sub" id="ranked-hero-sub">—</span>
@@ -204,7 +204,7 @@
 
 <!-- ----------------------------------------------------------------- rules -- -->
 <section class="screen" id="screen-rules">
-  <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back">‹</button><h2>How to play</h2></header>
+  <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back" data-icon="back"></button><h2>How to play</h2></header>
   <div class="scroller rules">
     <h3>The goal</h3>
     <p>Wipe every other colour off the board. Last side standing wins.</p>
@@ -238,7 +238,7 @@
   <div class="seat seat-right"  data-seat="right"></div>
   <div class="seat seat-bottom" data-seat="bottom"></div>
 
-  <button class="icon-btn game-menu" id="btn-pause" aria-label="Menu">≡</button>
+  <button class="icon-btn game-menu" id="btn-pause" aria-label="Menu" data-icon="menu"></button>
   <div class="board-area" id="board-area">
     <canvas id="board" tabindex="0" role="application" aria-label="Game board"></canvas>
   </div>
@@ -265,7 +265,7 @@
     <div class="tally" id="over-trophies" hidden>
       <div class="tally-delta num" id="over-delta">+0</div>
       <div class="tally-total num">
-        <span class="trophy-ico"></span><span id="over-troph-count">0</span>
+        <span class="trophy-ico" data-icon="trophy"></span><span id="over-troph-count">0</span>
         <span class="rank-badge" id="over-troph-badge" aria-hidden="true"></span>
       </div>
       <span class="track"><i id="over-troph-fill"></i></span>

@@ -27,7 +27,7 @@
 >
 > **Added after the first pass (trophy ladder):**
 > - **Ranked mode** — a Clash-Royale-style trophy ladder vs matchmade bots.
->   `src/rank.js` (pure, 12 tests in `test/rank.test.mjs`): 10 ranks Woodline→Legend,
+>   `src/rank.js` (pure, 12 tests in `test/rank.test.mjs`): 10 ranks Firecracker→Tsar Bomba,
 >   Elo scoring folded over every opponent, a margin multiplier so a blowout win pays
 >   more and getting wiped early costs more, soft rank floors, promotion/demotion
 >   detection, `localStorage` profile. New `#screen-ranked` (badge, trophy bar,
@@ -58,6 +58,25 @@
 > - **Animation**: balls now visibly *land* — flight occupies the first 72% of a
 >   wave, then the post-wave board snaps in with a shock ring per tile; flyers have
 >   motion trails and the bursting tile collapses outward.
+>
+> **Added in the pacing + icon pass:**
+> - **Pacing.** Bots pause ~0.9 s before playing (was 0.4 s) and the cascade runs at
+>   roughly half speed: a wave opens at 440 ms and ramps down to a 190 ms floor, so a
+>   typical 6-wave chain takes 2.3 s instead of 1.2 s. Placements and settles slowed
+>   to match. All of it is in `_durationFor` and the `AI_THINK*` constants — one place
+>   each.
+> - **Balls are bigger**: disc radius went 0.34 → 0.40 of a tile (`DISC_R` in
+>   `render.js`), with the pips and the loaded-tile ring rescaled to suit.
+> - **`src/icons.js` — every mark in the app, hand-drawn.** No emoji anywhere. The
+>   ten ranks are now a yield ladder of real ordnance (firecracker → dynamite →
+>   grenade → shell → bombshell → airstrike → MOAB → Fat Man → hydrogen → Tsar
+>   Bomba), each badge visibly bigger than the last, the top three carrying an atom
+>   mark that gains an orbit per rank. The trophy is a custom cup with a blast spark
+>   struck into the bowl. Mode glyphs were unicode characters that sat off-centre in
+>   their tiles; they are now diagrams of the match each mode starts, composed
+>   symmetrically about the grid centre and sized as a percentage of their container,
+>   so nothing needs per-icon nudging. 6 tests in `test/icons.test.mjs` lock the rank
+>   and mode maps together and assert no icon smuggles in a text glyph.
 >
 > **Still needs a live test (could not be done here):**
 > - **Online multiplayer** — still never had two clients connected. One real bug fixed

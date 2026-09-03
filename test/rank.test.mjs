@@ -25,10 +25,10 @@ test('rank thresholds are strictly increasing and start at zero', () => {
 });
 
 test('rankFor / nextRank / progress track the trophy count', () => {
-  assert.equal(rankFor(0).key, 'wood');
-  assert.equal(rankFor(119).key, 'wood');
-  assert.equal(rankFor(120).key, 'stone');
-  assert.equal(nextRank(0).key, 'stone');
+  assert.equal(rankFor(0).key, 'firecracker');
+  assert.equal(rankFor(119).key, 'firecracker');
+  assert.equal(rankFor(120).key, 'dynamite');
+  assert.equal(nextRank(0).key, 'dynamite');
   assert.equal(nextRank(RANKS[RANKS.length - 1].min), null);
   const p = progressToNext(60); // halfway from wood(0) to stone(120)
   assert.equal(p.frac, 0.5);
@@ -39,7 +39,7 @@ test('matchmake fills every seat with rank-appropriate bots', () => {
   assert.equal(m.players.length, 2, 'one bot for a two-seat mode');
   assert.equal(m.players[0].kind, 'human');
   assert.equal(m.players[1].kind, 'ai');
-  assert.equal(m.players[1].difficulty, 'easy', 'Woodline draws from the easy pool');
+  assert.equal(m.players[1].difficulty, 'easy', 'Firecracker draws from the easy pool');
   assert.equal(m.ratings[0], 0, 'my rating is my trophy count');
 
   const gold = matchmake(1200, 4, () => 0.5);
@@ -131,7 +131,7 @@ test('recordMatch folds the result into the profile and flags promotion', () => 
   assert.equal(up.profile.played, 5);
   assert.equal(up.profile.won, 3);
   assert.equal(up.profile.streak, 2);
-  assert.equal(up.promotedTo.key, 'stone', 'crossed 120 into Stoneworks');
+  assert.equal(up.promotedTo.key, 'dynamite', 'crossed 120 into Dynamite');
 
   const flat = recordMatch(up.profile, { delta: -10, win: false });
   assert.equal(flat.promotedTo, null);

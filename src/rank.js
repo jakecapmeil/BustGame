@@ -18,18 +18,23 @@
  * The ladder. A rank sets only *how strong* your opponents are — the shape of
  * the match (seats, board, teams, walls) belongs to the selected mode, so you
  * climb the same ladder whichever mode you prefer to play.
+ *
+ * The ranks are a yield ladder: ten real classes of explosive, each one an
+ * order of magnitude past the last, from a two-gram firecracker to the 50 Mt
+ * Tsar Bomba. `key` doubles as the icon name in `icons.js` and as the tint key
+ * in the app's RANK_COLORS, so a rank is named once and picked up everywhere.
  */
 export const RANKS = [
-  { key: 'wood',     name: 'Woodline',   min: 0,    pool: ['easy'] },
-  { key: 'stone',    name: 'Stoneworks', min: 120,  pool: ['easy', 'medium'] },
-  { key: 'bronze',   name: 'Bronze',     min: 300,  pool: ['medium'] },
-  { key: 'iron',     name: 'Ironhold',   min: 520,  pool: ['medium', 'hard'] },
-  { key: 'silver',   name: 'Silver',     min: 800,  pool: ['hard'] },
-  { key: 'gold',     name: 'Gold',       min: 1150, pool: ['hard', 'expert'] },
-  { key: 'platinum', name: 'Platinum',   min: 1550, pool: ['expert'] },
-  { key: 'diamond',  name: 'Diamond',    min: 2000, pool: ['expert', 'brutal'] },
-  { key: 'master',   name: 'Master',     min: 2600, pool: ['brutal'] },
-  { key: 'legend',   name: 'Legend',     min: 3300, pool: ['brutal'] },
+  { key: 'firecracker', name: 'Firecracker', min: 0,    pool: ['easy'] },
+  { key: 'dynamite',    name: 'Dynamite',    min: 120,  pool: ['easy', 'medium'] },
+  { key: 'grenade',     name: 'Grenade',     min: 300,  pool: ['medium'] },
+  { key: 'shell',       name: 'Shell',       min: 520,  pool: ['medium', 'hard'] },
+  { key: 'bombshell',   name: 'Bombshell',   min: 800,  pool: ['hard'] },
+  { key: 'airstrike',   name: 'Airstrike',   min: 1150, pool: ['hard', 'expert'] },
+  { key: 'moab',        name: 'MOAB',        min: 1550, pool: ['expert'] },
+  { key: 'fatman',      name: 'Fat Man',     min: 2000, pool: ['expert', 'brutal'] },
+  { key: 'hydrogen',    name: 'Hydrogen',    min: 2600, pool: ['brutal'] },
+  { key: 'tsar',        name: 'Tsar Bomba',  min: 3300, pool: ['brutal'] },
 ];
 
 export function rankIndexFor(trophies) {
@@ -119,7 +124,7 @@ const expectedScore = (mine, theirs) => 1 / (1 + 10 ** ((theirs - mine) / 400));
 
 function kFactor(trophies, played) {
   if (played < 10) return 60;      // placement games move fast
-  if (trophies >= RANKS[8].min) return 28; // Master+
+  if (trophies >= RANKS[8].min) return 28; // Hydrogen and above
   return 40;
 }
 

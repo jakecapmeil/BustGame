@@ -18,6 +18,7 @@ import {
 } from './rank.js';
 import { BoardAnimator, PLAYER_COLORS, hitTest, blockedPlacementTiles, setBoardSkin } from './render.js';
 import { MODES, MODE_ORDER, modeFor, buildSetup, describeSetup } from './modes.js';
+import { icon, paintIcons } from './icons.js';
 import { sfx, unlock as unlockAudio, setEnabled as setSoundEnabled, buzz } from './audio.js';
 import { hostRoom, joinRoom, normaliseCode } from './net.js';
 
@@ -83,11 +84,13 @@ function applyTheme(theme) {
   if (session) refreshBoardOnly();
 }
 
-// Badge tints per rank, weakest → strongest.
+// Badge tints per rank, smallest charge → largest. The run walks from paper
+// and kraft, through gunmetal and ordnance orange, into the nuclear end of the
+// ladder — so the colour alone tells you roughly how far up you are.
 const RANK_COLORS = {
-  wood: '#8A5A3C', stone: '#8C8C94', bronze: '#B87333', iron: '#6E7B8B',
-  silver: '#AEB6BD', gold: '#E7B023', platinum: '#3FB6C6',
-  diamond: '#4C7DF0', master: '#9B72E0', legend: '#F24BA0',
+  firecracker: '#E0543F', dynamite: '#C4862F', grenade: '#5E7A43',
+  shell: '#78838F', bombshell: '#3D424E', airstrike: '#2A6E96',
+  moab: '#D97B22', fatman: '#6E4FCF', hydrogen: '#1FA9B8', tsar: '#E5A82B',
 };
 
 /** @type {object} persisted trophy profile */
@@ -414,6 +417,11 @@ async function animateMove(frames) {
 
 /* ----------------------------------------------------------------- AI turns -- */
 
+// How long a bot pauses before it plays. Openings get a little longer, because
+// a placement changes the map more than a single ball does.
+const AI_THINK = 900;
+const AI_THINK_OPEN = 1050;
+
 function scheduleAI() {
   if (!session || session.over) return;
   const s = session.state;
@@ -425,13 +433,15 @@ function scheduleAI() {
 
   clearTimeout(session.aiTimer);
   const myEpoch = epoch;
-  // A beat of "thinking" so moves don't teleport past the player.
+  // A real beat of "thinking" before a bot commits. Long enough that a table of
+  // bots reads as a sequence of decisions you can follow rather than a blur —
+  // this is the single biggest lever on how fast the game *feels*.
   session.aiTimer = setTimeout(() => {
     if (!session || epoch !== myEpoch) return;
     const move = chooseMove(session.state, p.difficulty);
     if (move === null || move === undefined) return;
     enqueue(move, 'ai');
-  }, s.phase === PHASE_PLACE ? 520 : 400);
+  }, s.phase === PHASE_PLACE ? AI_THINK_OPEN : AI_THINK);
 }
 
 /* -------------------------------------------------------------------- input -- */
@@ -577,7 +587,9 @@ function settleRanked() {
   const up = result.delta >= 0;
   const dEl = $('#over-delta');
   dEl.textContent = `${up ? '+' : ''}${result.delta}`;
-  dEl.className = `trophy-delta ${up ? 'up' : 'down'}`;
+  // Keep `tally-delta num` — overwriting them drops the 44px tabular styling
+  // that makes the delta the hero of this card.
+  dEl.className = `tally-delta num ${up ? 'up' : 'down'}`;
   countTo($('#over-troph-count'), profile.trophies, 900);
   paintBadge($('#over-troph-badge'), rankFor(profile.trophies));
   $('#over-troph-fill').style.width = `${Math.round(progressToNext(profile.trophies).frac * 100)}%`;
@@ -598,8 +610,10 @@ function settleRanked() {
   result.breakdown.forEach((b) => {
     const li = document.createElement('li');
     const beat = b.result > b.expected;
-    li.innerHTML = `<span>${escapeHtml(playerLabel(s.players[b.oppId]))} · ${Math.round(b.oppRating)} 🏆</span>`
-      + `<span>${b.result === 1 ? 'beat' : b.result === 0 ? 'lost to' : 'tied'}${beat ? ' ↑' : ''}</span>`;
+    li.innerHTML = `<span>${escapeHtml(playerLabel(s.players[b.oppId]))} · ${Math.round(b.oppRating)}`
+      + `${icon('trophy', 'ico-inline')}</span>`
+      + `<span>${b.result === 1 ? 'beat' : b.result === 0 ? 'lost to' : 'tied'}`
+      + `${beat ? icon('rise', 'ico-inline') : ''}</span>`;
     bd.appendChild(li);
   });
   return bundle;
@@ -607,9 +621,10 @@ function settleRanked() {
 
 /* ------------------------------------------------------------------ ranked -- */
 
+/** A rank badge: the rank's own bomb, on the rank's own tint. */
 function paintBadge(el, rank) {
   if (!el) return;
-  el.textContent = rank.name[0];
+  el.innerHTML = icon(rank.key);
   el.style.background = RANK_COLORS[rank.key] || '#8A5A3C';
   el.setAttribute('aria-hidden', 'true');
 }
@@ -684,7 +699,7 @@ function renderRankedScreen() {
     li.appendChild(name);
     const min = document.createElement('span');
     min.className = 'lad-min';
-    min.textContent = `${r.min} 🏆`;
+    min.innerHTML = `${r.min}${icon('trophy', 'ico-inline')}`;
     li.appendChild(min);
     list.appendChild(li);
   });
@@ -769,7 +784,7 @@ function paintModeHero(prefix, mode, subOverride) {
   const g = $(`#${prefix}-glyph`);
   const n = $(`#${prefix}-name`);
   const sub = $(`#${prefix}-sub`);
-  if (g) g.textContent = mode.glyph;
+  if (g) g.innerHTML = icon(mode.icon);
   if (n) n.textContent = mode.name;
   if (sub) sub.textContent = subOverride || `${mode.tagline} · ${describeSetup(mode)}`;
 }
@@ -787,12 +802,12 @@ function renderModeGrid() {
     // Each card previews the palette it will switch the app to.
     b.dataset.theme = MODES[key].theme;
     b.innerHTML = `
-      <span class="mode-glyph" aria-hidden="true">${MODES[key].glyph}</span>
+      <span class="mode-glyph" aria-hidden="true">${icon(MODES[key].icon)}</span>
       <span>
         <span class="mode-card-name">${escapeHtml(MODES[key].name)}</span><br>
         <span class="mode-card-tag">${escapeHtml(MODES[key].tagline)} · ${escapeHtml(describeSetup(m))}</span>
       </span>
-      <span class="mode-card-check" aria-hidden="true">✓</span>`;
+      <span class="mode-card-check" aria-hidden="true">${icon('check')}</span>`;
     grid.appendChild(b);
   }
   $('#modes-blurb').textContent = MODES[modeKey].blurb;
@@ -1127,6 +1142,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+paintIcons();               // fill the static chrome's icon slots once
 applyTheme(MODES[modeKey].theme);
 renderModeGrid();
 syncRosterToMode();

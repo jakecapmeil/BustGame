@@ -80,10 +80,13 @@ get matchmade to your level.
   for your first ten placement matches and tightens at the top ranks.
 - **Margin matters.** A crushing win (you hold most of the board, game ended fast)
   pays a bonus; getting wiped out early loses more than scraping a narrow defeat.
-- **Ranks.** Ten tiers from Woodline to Legend, each at a higher trophy threshold.
-  Your rank sets how *hard* the bots play; the selected **mode** sets the shape of
-  the match. So you climb one ladder whichever mode you prefer. Cross a threshold
-  and you're promoted.
+- **Ranks.** Ten tiers, each at a higher trophy threshold, run as a *yield ladder*
+  of real explosives — Firecracker, Dynamite, Grenade, Shell, Bombshell, Airstrike,
+  MOAB, Fat Man, Hydrogen, Tsar Bomba — and every badge is that rank's own bomb,
+  visibly larger than the one below it. The last three go nuclear and pick up an
+  extra orbit on their atom mark apiece. Your rank sets how *hard* the bots play;
+  the selected **mode** sets the shape of the match. So you climb one ladder
+  whichever mode you prefer. Cross a threshold and you're promoted.
 - **Teams count as one result.** In Duos a partner's win is your win, team-mates
   never appear in your Elo maths, and both partners share first place.
 - **Soft floor.** A loss can dip you one band below your rank's threshold but can't
@@ -165,6 +168,7 @@ in the background (stale-while-revalidate), so an update lands on the next load.
 | `src/rank.js` | Trophy ladder: ranks, Elo + margin scoring, matchmaking, profile storage. |
 | `src/modes.js` | Mode table, seeded mirrored wall generation, per-mode setup. |
 | `src/render.js` | Canvas renderer and the cascade animator. |
+| `src/icons.js` | Every mark in the app, hand-drawn on one 24×24 grid. No emoji. |
 | `src/main.js` | Screens, input, the serial move queue, AI scheduling, online glue. |
 | `src/net.js` | PeerJS host/join, room codes, move relay. |
 | `src/audio.js` | Synthesised WebAudio SFX — zero audio assets. |
@@ -188,6 +192,11 @@ in the background (stale-while-revalidate), so an update lands on the next load.
    screen, always tabular so they don't jitter while counting.
 6. **Motion is physical.** Things overshoot slightly and settle. Nothing is linear.
    `prefers-reduced-motion` removes all of it.
+7. **Every mark is drawn here.** No emoji, anywhere — they size and centre
+   differently on every platform and ignore `color`. `src/icons.js` holds all of
+   them on one 24×24 grid, two tones (`currentColor` plus one black wash), sized
+   by their container rather than a font size. That is why a 92px rank hero and a
+   28px ladder badge are optically identical.
 
 Themes swap only a palette block via `<html data-theme>`; nothing else in the sheet
 knows which mode is active. The canvas reads the same custom properties back out

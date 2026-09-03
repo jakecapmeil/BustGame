@@ -41,6 +41,14 @@ export function setBoardSkin(next) {
 
 const PIP = '#FFFFFF';
 
+/**
+ * Disc radius as a share of the tile. The balls are the thing you actually read
+ * the board by — their colour, and how many pips they carry — so they take the
+ * majority of the tile and leave just enough bed showing for the territory tint
+ * and the legal-move ring to register.
+ */
+const DISC_R = 0.40;
+
 const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
@@ -112,7 +120,7 @@ function drawDisc(ctx, cx, cy, r, color, count, scale = 1) {
   ctx.fill();
 
   if (count > 0) {
-    const pr = Math.max(1, rr * 0.155);
+    const pr = Math.max(1, rr * 0.148);
     ctx.fillStyle = PIP;
     for (const [ox, oy] of pipOffsets(count, rr)) {
       ctx.beginPath();
@@ -170,7 +178,7 @@ export function drawBoard(ctx, L, view) {
   const land = view.land || null;     // tiles mid-landing: index -> 0..1
   const legal = view.legal || null;
   const radius = L.tile * 0.22;
-  const discR = L.tile * 0.34;
+  const discR = L.tile * DISC_R;
 
   for (let i = 0; i < owner.length; i++) {
     const x = L.x0 + (i % L.cols) * (L.tile + L.gap);
@@ -248,7 +256,7 @@ export function drawBoard(ctx, L, view) {
     if (c === MAX_BALLS) {
       ctx.save();
       ctx.beginPath();
-      ctx.arc(x + L.tile / 2, y + L.tile / 2, discR * (1.18 + 0.05 * (view.pulse || 0)), 0, Math.PI * 2);
+      ctx.arc(x + L.tile / 2, y + L.tile / 2, discR * (1.13 + 0.045 * (view.pulse || 0)), 0, Math.PI * 2);
       ctx.strokeStyle = PLAYER_COLORS[o].ball;
       ctx.globalAlpha = 0.35 + 0.25 * (view.pulse || 0);
       ctx.lineWidth = Math.max(1.5, L.tile * 0.03);
@@ -263,8 +271,8 @@ const LAND_AT = 0.72;
 
 /** Balls in flight during a bust wave, with a motion trail behind each. */
 function drawFlyers(ctx, L, busts, t) {
-  const discR = L.tile * 0.34;
-  const r = discR * 0.52;
+  const discR = L.tile * DISC_R;
+  const r = discR * 0.50;
   const flight = Math.min(1, t / LAND_AT);
   const e = easeOut(flight);
 
@@ -446,11 +454,20 @@ export class BoardAnimator {
     });
   }
 
+  /**
+   * How long one frame of the script is held.
+   *
+   * A cascade is the whole point of the game, so it is paced to be *watchable*:
+   * a wave lasts long enough to see which tiles went, where the balls flew, and
+   * whose colour they landed in. Later waves still tighten up — a 30-wave chain
+   * would outstay its welcome at full length — but the ramp is gentle and the
+   * floor is high enough that the tail of a long chain is never a blur.
+   */
   _durationFor(f, k) {
     const s = this.speed || 1;
-    if (f.kind === 'place' || f.kind === 'open') return 170 / s;
-    if (f.kind === 'settle') return 120 / s;
-    return Math.max(85, 230 - k * 14) / s;
+    if (f.kind === 'place' || f.kind === 'open') return 300 / s;
+    if (f.kind === 'settle') return 240 / s;
+    return Math.max(190, 440 - k * 20) / s;
   }
 
   _advance(now) {

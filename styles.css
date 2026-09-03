@@ -220,7 +220,6 @@ body::before {
   border-radius: var(--r-1);
   background: var(--panel);
   color: var(--on-bg);
-  font-size: 24px; font-weight: 900; line-height: 1;
   display: grid; place-items: center;
   cursor: pointer;
   transition: transform var(--t-fast) var(--e-out);
@@ -298,6 +297,26 @@ body::before {
 .menu-row { display: flex; gap: var(--s-2); }
 .menu-row .btn { flex: 1; }
 
+/* -------------------------------------------------------------------- icons
+
+   Every mark in the app is an inline <svg class="ico"> from icons.js. They are
+   sized by their container, never by a font size — which is the whole reason
+   they sit dead centre in a badge, a button or a 46px hero tile. `currentColor`
+   does the tinting, so an icon never needs its own palette. */
+
+.ico { display: block; width: 100%; height: 100%; fill: none; }
+
+/* An icon set inside a line of text — the trophy beside a number, the little
+   rise arrow. Sized off the type and nudged onto its optical baseline. */
+.ico-inline {
+  display: inline-block; width: 1em; height: 1em;
+  vertical-align: -.14em; margin-left: .28em;
+}
+
+/* Icon-only buttons: the mark is a fixed share of the hit target, so a 44px
+   button reads the same as a 30px badge. */
+.icon-btn .ico { width: 22px; height: 22px; }
+
 /* -------------------------------------------------------------- mode cards */
 
 /* The home screen's "what am I playing" hero. */
@@ -313,10 +332,13 @@ body::before {
 .mode-hero:active { transform: translateY(4px); box-shadow: var(--lift-1); }
 .mode-glyph {
   width: 46px; height: 46px; border-radius: var(--r-1);
-  display: grid; place-items: center; font-size: 22px;
+  display: grid; place-items: center;
   background: var(--accent); color: var(--on-accent);
   box-shadow: var(--lift-1);
 }
+/* The mark keeps a constant share of its tile at every size, so the optical
+   padding around it never drifts between the hero and the picker cards. */
+.mode-glyph .ico { width: 62%; height: 62%; }
 .mode-hero > span:nth-child(2) { min-width: 0; }
 .mode-hero-name { font-size: var(--fs-head); font-weight: 900; line-height: 1.15; }
 .mode-hero-sub { font-size: 12.5px; font-weight: 800; color: var(--on-bg-faint); line-height: 1.35; }
@@ -337,10 +359,10 @@ body::before {
 }
 .mode-card:active { transform: translateY(4px); box-shadow: var(--lift-1); }
 .mode-card.is-on { outline: 3px solid #fff; outline-offset: 2px; }
-.mode-card .mode-glyph { width: 44px; height: 44px; font-size: 21px; }
+.mode-card .mode-glyph { width: 44px; height: 44px; }
 .mode-card-name { font-size: 16px; font-weight: 900; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
 .mode-card-tag { font-size: 12.5px; font-weight: 800; color: rgba(255,255,255,.78); }
-.mode-card-check { font-size: 18px; font-weight: 900; opacity: 0; }
+.mode-card-check { width: 20px; height: 20px; opacity: 0; }
 .mode-card.is-on .mode-card-check { opacity: 1; }
 .mode-blurb {
   margin: 0; font-size: 13.5px; font-weight: 700; line-height: 1.5;
@@ -394,17 +416,24 @@ body::before {
 
 /* ------------------------------------------------------------------ ranked */
 
-.trophy-ico::before { content: '🏆'; font-size: .92em; }
+/* The trophy rides with the number it belongs to, so it scales with the type
+   from the 13px ladder row up to the 40px hero count. */
+.trophy-ico { display: inline-block; width: .92em; height: .92em; }
+.trophy-ico .ico { color: inherit; }
 
+/* A rank badge is a tinted tile carrying that rank's bomb. Same 60% inset at
+   every size — 28px in the ladder, 92px in the hero — so the ten bombs read as
+   one set rather than ten differently-cropped drawings. */
 .rank-badge {
   display: inline-grid; place-items: center; flex: none;
   width: 36px; height: 36px; border-radius: var(--r-1);
-  font-size: 15px; font-weight: 900; color: #fff;
+  color: #fff;
   background: var(--wall);
   box-shadow: inset 0 -3px 0 rgba(0,0,0,.22);
 }
+.rank-badge .ico { width: 76%; height: 76%; }
 .rank-badge-xl {
-  width: 92px; height: 92px; border-radius: 28px; font-size: 42px;
+  width: 92px; height: 92px; border-radius: 28px;
   box-shadow: inset 0 -6px 0 rgba(0,0,0,.22), var(--lift-3);
 }
 
@@ -419,7 +448,7 @@ body::before {
   transition: transform var(--t-fast) var(--e-out);
 }
 .rank-strip:active { transform: translateY(3px); }
-.rank-strip .rank-badge { width: 30px; height: 30px; font-size: 13px; border-radius: 9px; }
+.rank-strip .rank-badge { width: 30px; height: 30px; border-radius: 9px; }
 .rank-strip-main { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 .rank-strip-name { font-size: 13px; font-weight: 900; }
 .rank-strip-trophies { display: flex; align-items: center; gap: 5px; font-size: 16px; font-weight: 900; }
@@ -466,8 +495,11 @@ body::before {
   color: var(--on-bg-dim); font-weight: 800; font-size: 13.5px;
   transition: background var(--t-base) var(--e-out);
 }
-.ladder li .rank-badge { width: 28px; height: 28px; border-radius: 8px; font-size: 12px; }
-.ladder li .lad-min { margin-left: auto; font-size: 12px; color: var(--on-bg-faint); }
+.ladder li .rank-badge { width: 28px; height: 28px; border-radius: 8px; }
+.ladder li .lad-min {
+  margin-left: auto; display: flex; align-items: center; gap: 4px;
+  font-size: 12px; color: var(--on-bg-faint);
+}
 .ladder li.is-here { background: var(--panel-3); color: var(--on-bg); box-shadow: var(--lift-1); }
 .ladder li.is-locked { opacity: .42; }
 
@@ -623,7 +655,7 @@ body::before {
   .btn { min-height: 48px; padding: 12px 16px; font-size: 16px; }
   .rank-hero { padding: var(--s-3); }
   .rank-hero-count { font-size: 30px; }
-  .rank-badge-xl { width: 60px; height: 60px; font-size: 28px; border-radius: 20px; }
+  .rank-badge-xl { width: 60px; height: 60px; border-radius: 20px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

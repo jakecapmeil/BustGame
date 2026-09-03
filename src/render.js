@@ -129,7 +129,7 @@ function drawDisc(ctx, cx, cy, r, color, count, scale = 1) {
   ctx.fill();
 
   if (count > 0) {
-    const pr = Math.max(1, rr * 0.148);
+    const pr = Math.max(1, rr * 0.175);
     ctx.fillStyle = PIP;
     for (const [ox, oy] of pipOffsets(count, rr)) {
       ctx.beginPath();

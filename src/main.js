@@ -430,8 +430,8 @@ async function animateMove(frames) {
 
 // How long a bot pauses before it plays. Openings get a little longer, because
 // a placement changes the map more than a single ball does.
-const AI_THINK = 900;
-const AI_THINK_OPEN = 1050;
+const AI_THINK = 550;
+const AI_THINK_OPEN = 650;
 
 function scheduleAI() {
   if (!session || session.over) return;

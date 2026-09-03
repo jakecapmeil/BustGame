@@ -1,0 +1,14 @@
+{
+  "name": "bustgame",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BUST — chain-reaction board game (PWA)",
+  "scripts": {
+    "test": "node --test test/",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}

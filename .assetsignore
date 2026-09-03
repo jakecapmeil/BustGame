@@ -1,0 +1,13 @@
+# Repo-root files that are not part of the deployed site.
+# Everything else (index.html, styles.css, sw.js, manifest, src/, assets/) ships.
+**/node_modules
+**/.DS_Store
+**/.git
+.claude
+test
+package.json
+package-lock.json
+wrangler.jsonc
+.assetsignore
+.gitignore
+*.md

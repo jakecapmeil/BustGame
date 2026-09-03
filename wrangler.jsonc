@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "bustgame",
+  "compatibility_date": "2026-09-03",
+  // Assets-only Worker: no `main`, no Worker script. Cloudflare serves the
+  // repo root as-is — same files GitHub Pages serves, same no-build-step deal.
+  // `.assetsignore` keeps the non-site files (docs, tests, tooling) out of the
+  // upload.
+  "assets": {
+    "directory": "./",
+    // BUST is one page; unknown paths just fall through to a plain 404, which
+    // the service worker already handles offline. No SPA rewrite needed.
+    "html_handling": "auto-trailing-slash"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

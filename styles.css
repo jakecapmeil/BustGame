@@ -637,6 +637,23 @@ body::before {
 .winner-team { display: flex; gap: 8px; justify-content: center; }
 .winner-team .dot { width: 20px; height: 20px; border-radius: 50%; }
 
+/* Knocked out. The one card in the app that shouts — it is the only moment the
+   player is told something they did not choose, so it gets the biggest type on
+   screen and stops bobbing: the disc drops and stays down. */
+.lose-title {
+  font-size: 40px; font-weight: 900; letter-spacing: .02em; line-height: 1;
+  color: var(--accent-deep);
+}
+#overlay-out .winner-disc {
+  animation: sink var(--t-slow) var(--e-out) both;
+  opacity: .55;
+  filter: grayscale(.35);
+}
+@keyframes sink {
+  from { transform: translateY(-14px) scale(1.08); opacity: 1; }
+  to { transform: translateY(0) scale(1); opacity: .55; }
+}
+
 /* ----------------------------------------------------------------- a11y */
 
 .sr-only {

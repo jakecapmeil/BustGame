@@ -78,6 +78,30 @@
 >   so nothing needs per-icon nudging. 6 tests in `test/icons.test.mjs` lock the rank
 >   and mode maps together and assert no icon smuggles in a text glyph.
 >
+> **Added in the elimination + bust-feel pass:**
+> - **The overlay buttons were never bound.** `#btn-pause`, Resume, Restart, Quit,
+>   Play again and Menu had no listeners at all — `restartGame()` and
+>   `quitToMenu()` were dead code, so the result card trapped you and only a
+>   reload got you out. All six are wired now.
+> - **"You lose" card.** Losing your last tile while the board is still live now
+>   raises `#overlay-out` with **Spectate** or **Exit to menu**. `offerSpectate()`
+>   returns true to `pump()`, which then declines to schedule the next bot — not
+>   scheduling is what holds the game behind the card, so there is no separate
+>   paused flag to get out of step. `mySeats()` covers pass-and-play too: the card
+>   waits until *every* seat this device plays is out.
+> - **The bust has a wind-up.** `pipOffsets` gained a fourth face — a 2x2 square —
+>   so the over-capacity instant is finally visible: three pips in a triangle, the
+>   fourth snaps them into a square, then it goes. A placement that is about to
+>   bust is held 520ms instead of 300ms, and during that beat the disc swells and
+>   shakes while a ring winds inward onto it.
+> - **The opening board is clean.** Placement used to grey out every illegal tile,
+>   which shaded two thirds of an untouched board and read as damage. Nothing is
+>   shaded now; the legal tiles already pulse, and reaching into a seated player's
+>   3x3 zone flashes *their* zone red with your attempted zone outlined over it.
+>   New pure helpers `openingMask` / `blockingStarts` in the engine, and the
+>   animator owns the flash clock so `drawBoard` stays a pure function of its view.
+>   `blockedPlacementTiles` is gone.
+>
 > **Still needs a live test (could not be done here):**
 > - **Online multiplayer** — still never had two clients connected. One real bug fixed
 >   on inspection: the client forced `serialization: 'json'` while the host used the

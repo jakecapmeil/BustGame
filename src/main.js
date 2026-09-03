@@ -9,6 +9,7 @@
 
 import {
   createGame, applyMove, isLegalMove, legalMoves, scores, winnersOf,
+  openingMask, blockingStarts,
   PHASE_PLACE, PHASE_PLAY, PHASE_OVER,
 } from './engine.js';
 import { chooseMove, difficultyLabel, DIFFICULTY_ORDER } from './ai.js';
@@ -16,7 +17,7 @@ import {
   RANKS, rankFor, rankIndexFor, progressToNext, nextRank,
   matchmake, scoreResult, recordMatch, loadProfile, saveProfile,
 } from './rank.js';
-import { BoardAnimator, PLAYER_COLORS, hitTest, blockedPlacementTiles, setBoardSkin } from './render.js';
+import { BoardAnimator, PLAYER_COLORS, hitTest, setBoardSkin } from './render.js';
 import { MODES, MODE_ORDER, modeFor, buildSetup, describeSetup } from './modes.js';
 import { icon, paintIcons } from './icons.js';
 import { sfx, unlock as unlockAudio, setEnabled as setSoundEnabled, buzz } from './audio.js';
@@ -135,6 +136,7 @@ function show(id) {
 
 function closeOverlays() {
   $('#overlay-pause').hidden = true;
+  $('#overlay-out').hidden = true;
   $('#overlay-over').hidden = true;
 }
 
@@ -192,6 +194,8 @@ function startGame({
     pumping: false,
     aiTimer: 0,
     over: false,
+    outShown: false,   // the "you lose" card has had its one chance to appear
+    spectating: false, // knocked out, chose to watch the rest
   };
 
   keyCursor = Math.floor((rows * cols) / 2);
@@ -287,8 +291,11 @@ function fitBoard() {
 
 function chrome() {
   const s = session.state;
+  // Nothing is greyed out during the opening round. Shading two thirds of the
+  // board before anyone has touched it read as damage rather than as a rule;
+  // the legal tiles already pulse, and a collision now announces itself when
+  // you actually cause one (see `showMaskClash`).
   const view = { walls: s.blocked, teams: s.teams };
-  if (s.phase === PHASE_PLACE) view.blocked = blockedPlacementTiles(s);
   if (s.phase !== PHASE_OVER && controlsPlayer(s.turn)) {
     view.legal = new Set(legalMoves(s));
     if (keyActive && keyCursor >= 0) view.cursor = keyCursor;
@@ -334,6 +341,7 @@ function hexToSoft(hex) {
 function bannerText() {
   const s = session.state;
   if (s.phase === PHASE_OVER) return 'Game over';
+  if (session.spectating) return `Spectating · ${playerLabel(s.players[s.turn])}`;
   const p = s.players[s.turn];
   const mine = controlsPlayer(s.turn);
   if (s.phase === PHASE_PLACE) {
@@ -395,6 +403,9 @@ async function pump() {
       refresh();
 
       if (r.state.phase === PHASE_OVER) { finish(); return; }
+      // Knocked out with the board still live: stop here and let them choose.
+      // Not scheduling the next bot is what holds the game behind the card.
+      if (offerSpectate()) return;
       scheduleAI();
     }
   } finally {
@@ -456,10 +467,33 @@ function canActNow() {
   return true;
 }
 
+/**
+ * Show why an opening was refused: the seated player's 3x3 zone you ran into,
+ * filled red, with the zone you reached for outlined on top of it. Returns
+ * false when the tile was illegal for some other reason (taking it would strand
+ * a player still to open), where there is no zone to point at.
+ */
+function showMaskClash(idx) {
+  const s = session.state;
+  const clashes = blockingStarts(s, idx);
+  if (!clashes.length) return false;
+  const tiles = new Map();
+  for (const t of openingMask(s, idx)) tiles.set(t, 'own');
+  // The clash wins wherever the two zones overlap — that overlap is the reason.
+  for (const c of clashes) for (const t of openingMask(s, c.at)) tiles.set(t, 'clash');
+  animator.flashMasks(tiles);
+  announce(`That overlaps ${clashes.map((c) => playerLabel(s.players[c.pid])).join(' and ')}'s opening.`);
+  return true;
+}
+
 /** Send a chosen tile through the same path a tap would take. */
 function commitTile(idx) {
   const s = session.state;
-  if (!isLegalMove(s, idx)) { sfx.deny(); haptic(26); return; }
+  if (!isLegalMove(s, idx)) {
+    if (s.phase === PHASE_PLACE) showMaskClash(idx);
+    sfx.deny(); haptic(26);
+    return;
+  }
   if (session.mode === 'online' && !session.room?.isHost) {
     // Clients propose; they apply only when the host echoes it back.
     session.room.sendMove(idx);
@@ -514,6 +548,56 @@ function onBoardKey(ev) {
 canvas.addEventListener('pointerup', onBoardPointer);
 canvas.addEventListener('keydown', onBoardKey);
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+/* ---------------------------------------------------------- knocked out -- */
+
+/** Seats this device is playing. Pass-and-play holds several. */
+function mySeats() {
+  const s = session.state;
+  if (session.mode === 'online') return [session.localSeat];
+  return s.players.filter((p) => p.kind !== 'ai').map((p) => p.id);
+}
+
+/**
+ * Raise the "you lose" card when every seat this device plays is out but the
+ * board is still live — in a four-way brawl that can happen twenty moves before
+ * anyone wins, and until now the game simply carried on without you.
+ *
+ * Returns true if the card went up, which is the caller's signal to stop
+ * scheduling turns until Spectate or Exit is pressed.
+ */
+function offerSpectate() {
+  if (!session || session.outShown || session.spectating) return false;
+  const s = session.state;
+  if (s.phase !== PHASE_PLAY) return false;
+  const seats = mySeats();
+  if (!seats.length || seats.some((pid) => s.players[pid].alive)) return false;
+
+  session.outShown = true;
+  const dead = seats[seats.length - 1];
+  $('#out-disc').style.background = PLAYER_COLORS[dead].ball;
+
+  const alive = s.players.filter((p) => p.alive);
+  const lasted = Math.max(...seats.map((pid) => session.elimTurn[pid] || s.turnNumber));
+  $('#out-sub').textContent = seats.length > 1
+    ? `Every seat is out after ${lasted} moves. ${alive.length} bots left standing.`
+    : `Wiped out on move ${lasted}. ${alive.length} still standing.`;
+
+  $('#overlay-out').hidden = false;
+  sfx.lose();
+  haptic(60);
+  announce(`You lose. ${$('#out-sub').textContent}`);
+  return true;
+}
+
+/** Stay and watch. The board runs to a finish; the result card still shows. */
+function spectate() {
+  if (!session) return;
+  session.spectating = true;
+  $('#overlay-out').hidden = true;
+  refresh();
+  scheduleAI();
+}
 
 /* ------------------------------------------------------------------ ending -- */
 
@@ -754,6 +838,30 @@ syncRosterToMode();
 refreshShapeLines();
 show('screen-home');
 }
+
+/* ----------------------------------------------------------------- overlays -- */
+
+/** Every in-game overlay button. None of these were bound before. */
+const tap = (sel, fn) => $(sel)?.addEventListener('click', () => {
+  unlockAudio(); sfx.ui(); haptic(8);
+  fn();
+});
+
+tap('#btn-pause', () => {
+  if (!session || session.over) return;
+  // An online game keeps running for everyone else, so there is nothing to pause.
+  if (session.mode === 'online') { quitToMenu(); return; }
+  $('#overlay-pause').hidden = false;
+});
+tap('#pause-resume', () => { $('#overlay-pause').hidden = true; });
+tap('#pause-restart', () => { $('#overlay-pause').hidden = true; restartGame(); });
+tap('#pause-quit', quitToMenu);
+
+tap('#out-spectate', spectate);
+tap('#out-exit', quitToMenu);
+
+tap('#over-again', restartGame);
+tap('#over-menu', quitToMenu);
 
 /* ----------------------------------------------------------------- segments -- */
 

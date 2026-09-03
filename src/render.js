@@ -6,7 +6,7 @@
  * handed boards and told to show them.
  */
 
-import { EMPTY, MAX_BALLS, neighbors, legalPlacements, PHASE_PLACE } from './engine.js';
+import { EMPTY, MAX_BALLS, neighbors } from './engine.js';
 
 /**
  * Eight seat colours. The first four are the original palette and must not
@@ -102,12 +102,21 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-/** Pip layout inside a disc, matching the die-face look. */
+/**
+ * Pip layout inside a disc, matching the die-face look.
+ *
+ * Four is the *over-capacity* face. A tile only ever holds four balls for the
+ * instant before it blows, and drawing that instant is the whole tell: three
+ * pips sit in a triangle, and the fourth snaps them into a square. You see the
+ * square, then it goes.
+ */
 function pipOffsets(n, r) {
   const d = r * 0.42;
   if (n <= 1) return [[0, 0]];
   if (n === 2) return [[-d, 0], [d, 0]];
-  return [[-d, -d * 0.72], [d, -d * 0.72], [0, d * 0.86]];
+  if (n === 3) return [[-d, -d * 0.72], [d, -d * 0.72], [0, d * 0.86]];
+  const q = r * 0.40;
+  return [[-q, -q], [q, -q], [-q, q], [q, q]];
 }
 
 function drawDisc(ctx, cx, cy, r, color, count, scale = 1) {
@@ -177,6 +186,8 @@ export function drawBoard(ctx, L, view) {
   const walls = view.walls || null;   // permanent obstacles
   const land = view.land || null;     // tiles mid-landing: index -> 0..1
   const legal = view.legal || null;
+  const charge = view.charge || null;   // the tile mid-wind-up, { at, t }
+  const flash = view.maskFlash || null; // opening-collision flash, { tiles, t }
   const radius = L.tile * 0.22;
   const discR = L.tile * DISC_R;
 
@@ -206,6 +217,30 @@ export function drawBoard(ctx, L, view) {
       ctx.fill();
     }
 
+    // Opening collision. Nothing is greyed out during the opening round — the
+    // board stays clean and you learn a zone exists at the moment you try to
+    // take it. `own` is the 3x3 you just reached for, drawn as an outline;
+    // `clash` is the seated player's zone you ran into, filled red.
+    if (flash && flash.tiles.has(i)) {
+      const kind = flash.tiles.get(i);
+      const a = flash.t;
+      ctx.save();
+      if (kind === 'clash') {
+        roundRect(ctx, x, y, L.tile, L.tile, radius);
+        ctx.fillStyle = `rgba(214, 40, 30, ${0.78 * a})`;
+        ctx.fill();
+      }
+      roundRect(ctx, x + 1.5, y + 1.5, L.tile - 3, L.tile - 3, radius - 1.5);
+      // White reads on the red fill; on a bare cream tile it vanishes, so the
+      // half of your zone that missed is outlined in ink instead.
+      ctx.strokeStyle = kind === 'clash'
+        ? `rgba(255, 236, 232, ${0.9 * a})`
+        : `rgba(62, 32, 21, ${0.5 * a})`;
+      ctx.lineWidth = Math.max(1.5, L.tile * 0.04);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Playable hint for the local player.
     if (legal && legal.has(i)) {
       const p = view.pulse || 0;
@@ -232,10 +267,24 @@ export function drawBoard(ctx, L, view) {
     if (o === EMPTY || c === 0) continue;
 
     let scale = 1;
+    let ox = 0;
+    let oy = 0;
     if (view.popAt === i && view.popT !== undefined) {
       // Overshoot then settle, so a placed ball reads as impact.
       const t = view.popT;
       scale = t < 1 ? 1 + 0.28 * Math.sin(Math.PI * t) : 1;
+    }
+    // The charge beat: this tile just took its fourth ball and is holding it
+    // for a moment before it goes. It swells and shakes, harder the closer it
+    // gets — the wind-up that makes the bust land as a release.
+    const chg = charge && charge.at === i ? charge.t : -1;
+    if (chg >= 0) {
+      const wind = easeOut(Math.min(1, chg / 0.55));   // impact, then hold
+      const tension = Math.max(0, (chg - 0.3) / 0.7);  // builds to the burst
+      scale = Math.max(scale, 1 + 0.10 * wind + 0.14 * tension * tension);
+      const shake = L.tile * 0.028 * tension * tension;
+      ox = Math.sin(chg * 58) * shake;
+      oy = Math.cos(chg * 47) * shake;
     }
     if (land && land.has(i)) {
       // A ball just touched down here: snap up from small, with a shock ring.
@@ -250,16 +299,33 @@ export function drawBoard(ctx, L, view) {
       ctx.stroke();
       ctx.restore();
     }
-    drawDisc(ctx, x + L.tile / 2, y + L.tile / 2, discR, PLAYER_COLORS[o].ball, c, scale);
+    drawDisc(ctx, x + L.tile / 2 + ox, y + L.tile / 2 + oy, discR, PLAYER_COLORS[o].ball, c, scale);
 
-    // A loaded tile gets a ring — the "about to blow" tell.
-    if (c === MAX_BALLS) {
+    if (chg >= 0) {
+      // A ring winding inward onto the disc — a fuse burning down, not a pulse.
+      const tension = Math.max(0, (chg - 0.3) / 0.7);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x + L.tile / 2 + ox, y + L.tile / 2 + oy,
+        discR * (1.85 - 0.6 * easeOut(tension)), 0, Math.PI * 2);
+      ctx.strokeStyle = PLAYER_COLORS[o].ball;
+      ctx.globalAlpha = 0.15 + 0.6 * tension;
+      ctx.lineWidth = Math.max(1.5, L.tile * (0.02 + 0.045 * tension));
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // A full tile gets a ring — the "one more and it goes" tell. A tile that is
+    // already *over* capacity is a different state entirely: it is going, and
+    // it draws a second ring closing in on it.
+    if (c >= MAX_BALLS) {
+      const over = c > MAX_BALLS;
       ctx.save();
       ctx.beginPath();
       ctx.arc(x + L.tile / 2, y + L.tile / 2, discR * (1.13 + 0.045 * (view.pulse || 0)), 0, Math.PI * 2);
       ctx.strokeStyle = PLAYER_COLORS[o].ball;
-      ctx.globalAlpha = 0.35 + 0.25 * (view.pulse || 0);
-      ctx.lineWidth = Math.max(1.5, L.tile * 0.03);
+      ctx.globalAlpha = over ? 0.9 : 0.35 + 0.25 * (view.pulse || 0);
+      ctx.lineWidth = Math.max(1.5, L.tile * (over ? 0.05 : 0.03));
       ctx.stroke();
       ctx.restore();
     }
@@ -347,6 +413,7 @@ export class BoardAnimator {
     this._looping = false;
     this._lastTick = 0;
     this._wd = 0; // watchdog interval — drives playback when rAF is starved
+    this._flash = null; // opening-collision flash, { tiles, at, dur }
     this._play = null; // { frames, chrome, onEvent, idx, waveNo, announced, frameStart, resolve }
   }
 
@@ -362,6 +429,34 @@ export class BoardAnimator {
     return this.L;
   }
 
+  /**
+   * Flash an opening collision for `ms`. The animator owns the clock so
+   * `drawBoard` stays a pure function of the view it is handed, and so the
+   * flash keeps decaying across both the idle loop and a playback.
+   *
+   * @param {Map<number, 'clash'|'own'>} tiles
+   */
+  flashMasks(tiles, ms = 950) {
+    this._flash = tiles && tiles.size ? { tiles, at: nowMs(), dur: ms } : null;
+    this.startIdle();
+  }
+
+  /**
+   * The time-driven bits of a view: the breathing legal-move pulse, and the
+   * opening-collision flash if one is still fading. Merged into every draw so
+   * the idle loop and playback can't disagree about them.
+   */
+  _overlays() {
+    const out = { pulse: 0.5 + 0.5 * Math.sin(nowMs() / 480) };
+    const f = this._flash;
+    if (f) {
+      const k = (nowMs() - f.at) / f.dur;
+      if (k >= 1) this._flash = null;
+      else out.maskFlash = { tiles: f.tiles, t: 1 - easeOut(k) };
+    }
+    return out;
+  }
+
   /** Show a board with no animation running. */
   setView(view) {
     this.staticView = view;
@@ -372,8 +467,7 @@ export class BoardAnimator {
     if (!this.L || !this.staticView) return;
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    const pulse = 0.5 + 0.5 * Math.sin(nowMs() / 480);
-    drawBoard(ctx, this.L, { ...this.staticView, pulse });
+    drawBoard(ctx, this.L, { ...this.staticView, ...this._overlays() });
   }
 
   /* -- the single loop -------------------------------------------------- */
@@ -463,9 +557,13 @@ export class BoardAnimator {
    * would outstay its welcome at full length — but the ramp is gentle and the
    * floor is high enough that the tail of a long chain is never a blur.
    */
-  _durationFor(f, k) {
+  _durationFor(f, k, next) {
     const s = this.speed || 1;
-    if (f.kind === 'place' || f.kind === 'open') return 300 / s;
+    if (f.kind === 'place' || f.kind === 'open') {
+      // A placement that is about to blow holds longer: that pause is the beat
+      // where the fourth ball squares up and the tile visibly winds itself up.
+      return (next && next.kind === 'wave' ? 520 : 300) / s;
+    }
     if (f.kind === 'settle') return 240 / s;
     return Math.max(190, 440 - k * 20) / s;
   }
@@ -486,7 +584,7 @@ export class BoardAnimator {
         try { p.onEvent?.({ type: f.kind, wave: p.waveNo, busts: f.busts, frame: f }); } catch { /* sfx/haptics are cosmetic */ }
       }
 
-      const dur = Math.max(1, this._durationFor(f, p.waveNo));
+      const dur = Math.max(1, this._durationFor(f, p.waveNo, p.frames[p.idx + 1]));
       let t = (now - p.frameStart) / dur;
       if (!(t >= 0)) t = 0; // NaN, or a clock that jumped backwards
 
@@ -503,26 +601,31 @@ export class BoardAnimator {
     if (!this.L) return;
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    const pulse = 0.5 + 0.5 * Math.sin(nowMs() / 480);
+    const over = this._overlays();
 
     if (f.kind === 'wave') {
       const prev = p.frames[p.idx - 1];
       if (t < LAND_AT) {
         // Balls still in the air: the pre-wave board, minus the tiles mid-bust.
         const hidden = new Set(f.busts.map((b) => b.at));
-        drawBoard(ctx, this.L, { owner: prev.owner, count: prev.count, hidden, pulse, ...p.chrome });
+        drawBoard(ctx, this.L, { owner: prev.owner, count: prev.count, hidden, ...over, ...p.chrome });
       } else {
         // Touchdown: the post-wave board, with every tile that just took a ball
         // snapping up into place.
         const lt = (t - LAND_AT) / (1 - LAND_AT);
         const land = new Map();
         for (const b of f.busts) for (const target of b.to) land.set(target, lt);
-        drawBoard(ctx, this.L, { owner: f.owner, count: f.count, land, pulse, ...p.chrome });
+        drawBoard(ctx, this.L, { owner: f.owner, count: f.count, land, ...over, ...p.chrome });
       }
       drawFlyers(ctx, this.L, f.busts, t);
     } else {
-      const view = { owner: f.owner, count: f.count, pulse, ...p.chrome };
-      if (f.kind === 'place' || f.kind === 'open') { view.popAt = f.at; view.popT = t; }
+      const view = { owner: f.owner, count: f.count, ...over, ...p.chrome };
+      if (f.kind === 'place' || f.kind === 'open') {
+        view.popAt = f.at;
+        view.popT = t;
+        // Only wind up if this placement is actually the one that goes off.
+        if (p.frames[p.idx + 1]?.kind === 'wave') view.charge = { at: f.at, t };
+      }
       drawBoard(ctx, this.L, view);
     }
   }
@@ -554,14 +657,5 @@ export class BoardAnimator {
 }
 
 /* ------------------------------------------------------------------ chrome -- */
-
-/** Tiles a player may not open on, for the placement-phase shading. */
-export function blockedPlacementTiles(state) {
-  if (state.phase !== PHASE_PLACE) return null;
-  const legal = new Set(legalPlacements(state));
-  const blocked = new Set();
-  for (let i = 0; i < state.owner.length; i++) if (!legal.has(i)) blocked.add(i);
-  return blocked;
-}
 
 export { neighbors };

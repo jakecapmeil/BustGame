@@ -159,3 +159,71 @@ test('a zero clock delta cannot wedge playback', async () => {
   await p;
   assert.equal(a._mode, 'idle');
 });
+
+/* ------------------------------------------------------- the charge beat -- */
+
+const { drawBoard, computeLayout } = await import('../src/render.js');
+
+/** A ctx that records the arcs drawn, so pip counts are observable. */
+function recordingCtx() {
+  const arcs = [];
+  const ctx = new Proxy({ arcs }, {
+    get: (t, k) => (k === 'arcs' ? arcs : k === 'arc'
+      ? (x, y, r) => arcs.push({ x, y, r })
+      : () => {}),
+    set: () => true,
+  });
+  return ctx;
+}
+
+/** One 1x1 board holding `count` balls for player 0. */
+function oneTile(count) {
+  const ctx = recordingCtx();
+  const L = computeLayout(100, 100, 1, 1);
+  drawBoard(ctx, L, { owner: Int8Array.of(0), count: Uint8Array.of(count) });
+  return ctx.arcs;
+}
+
+test('a full tile draws three pips; an over-capacity one squares up to four', () => {
+  // disc + pips (+ the loaded ring, which both of these get)
+  assert.equal(oneTile(3).length, 1 + 3 + 1);
+  assert.equal(oneTile(4).length, 1 + 4 + 1, 'the fourth ball must be visible before it goes');
+  assert.equal(oneTile(2).length, 1 + 2, 'two balls is not loaded, so no ring');
+});
+
+test('the four pips sit in a square, not a triangle', () => {
+  const pips = oneTile(4).slice(1, 5);
+  const xs = new Set(pips.map((p) => Math.round(p.x)));
+  const ys = new Set(pips.map((p) => Math.round(p.y)));
+  assert.equal(xs.size, 2, 'two distinct columns');
+  assert.equal(ys.size, 2, 'two distinct rows');
+});
+
+test('a placement that is about to bust is held longer than one that is not', () => {
+  const a = makeAnimator();
+  const place = { kind: 'place' };
+  const quiet = a._durationFor(place, 0, { kind: 'settle' });
+  const charged = a._durationFor(place, 0, { kind: 'wave' });
+  assert.ok(charged > quiet, 'the wind-up needs its own beat');
+  a.cancel();
+});
+
+test('a mask flash decays to nothing and then clears itself', () => {
+  const a = makeAnimator();
+  const tiles = new Map([[0, 'clash'], [1, 'own']]);
+  a.flashMasks(tiles, 200);
+  assert.equal(a._overlays().maskFlash.tiles, tiles);
+  assert.ok(a._overlays().maskFlash.t > 0);
+
+  clock += 400;
+  assert.equal(a._overlays().maskFlash, undefined, 'expired');
+  assert.equal(a._flash, null, 'and released');
+  a.cancel();
+});
+
+test('flashing an empty set is a no-op rather than a stuck overlay', () => {
+  const a = makeAnimator();
+  a.flashMasks(new Map());
+  assert.equal(a._overlays().maskFlash, undefined);
+  a.cancel();
+});

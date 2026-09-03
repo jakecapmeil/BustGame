@@ -211,7 +211,7 @@
 
     <h3>Opening</h3>
     <p>Everyone picks one tile on the empty board. It <b>busts immediately</b>, throwing a ball to each of its four neighbours — so you start with up to four tiles.</p>
-    <p>Openings claim a <b>3×3 zone</b> and no two zones may overlap, so nobody can crowd anyone out on move one. Shaded tiles are the ones you can't take.</p>
+    <p>Openings claim a <b>3×3 zone</b> and no two zones may overlap, so nobody can crowd anyone out on move one. Reach for a tile inside someone's zone and it <b>flashes red</b> at you.</p>
 
     <h3>Your turn</h3>
     <p>Tap any tile you own to add a ball. Tiles hold <b>three</b>.</p>
@@ -252,6 +252,18 @@
     <button class="btn btn-primary" id="pause-resume">Resume</button>
     <button class="btn" id="pause-restart">Restart</button>
     <button class="btn btn-ghost" id="pause-quit">Quit to menu</button>
+  </div>
+</div>
+
+<!-- Knocked out, but the board plays on: the one moment the player has to be
+     given a choice rather than just watched. -->
+<div class="overlay" id="overlay-out" hidden>
+  <div class="card">
+    <div class="winner-disc" id="out-disc"></div>
+    <h2 class="lose-title">YOU LOSE</h2>
+    <p id="out-sub" class="hint"></p>
+    <button class="btn btn-primary" id="out-spectate">Spectate</button>
+    <button class="btn btn-ghost" id="out-exit">Exit to menu</button>
   </div>
 </div>
 

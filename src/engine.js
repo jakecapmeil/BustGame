@@ -149,6 +149,45 @@ function masksOverlap(cols, a, b) {
   return dx <= 2 && dy <= 2;
 }
 
+/**
+ * The 3x3 block an opening on `i` would claim, clipped to the board. Walls are
+ * left out — they are drawn as walls and were never claimable.
+ *
+ * The UI uses this to *show* a collision rather than pre-emptively greying out
+ * two thirds of the board: an opening round reads better when the board is
+ * clean and the conflict only appears at the moment you cause one.
+ */
+export function openingMask(state, i) {
+  const { cols, rows } = state;
+  const cx = i % cols;
+  const cy = (i / cols) | 0;
+  const out = [];
+  for (let y = Math.max(0, cy - 1); y <= Math.min(rows - 1, cy + 1); y++) {
+    for (let x = Math.max(0, cx - 1); x <= Math.min(cols - 1, cx + 1); x++) {
+      const t = y * cols + x;
+      if (!isBlocked(state, t)) out.push(t);
+    }
+  }
+  return out;
+}
+
+/**
+ * Which already-seated players an opening on `i` would collide with.
+ * Empty when `i` is illegal for some other reason — chiefly that taking it
+ * would strand a player still to open (see `placementFeasible`).
+ *
+ * @returns {Array<{pid:number, at:number}>}
+ */
+export function blockingStarts(state, i) {
+  const out = [];
+  for (let pid = 0; pid < state.starts.length; pid++) {
+    const s = state.starts[pid];
+    if (s === null || s === undefined) continue;
+    if (masksOverlap(state.cols, i, s)) out.push({ pid, at: s });
+  }
+  return out;
+}
+
 function conflictsWithStarts(state, i) {
   for (const s of state.starts) {
     if (s !== null && s !== undefined && masksOverlap(state.cols, i, s)) return true;

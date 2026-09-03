@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createGame, applyMove, legalPlacements, legalMoves, neighbors, outDegree,
   scores, idxOf, EMPTY, MAX_BALLS, PHASE_PLACE, PHASE_PLAY, PHASE_OVER,
-  teamOf, sameTeam, winnersOf, isBlocked,
+  teamOf, sameTeam, winnersOf, isBlocked, openingMask, blockingStarts,
 } from '../src/engine.js';
 
 const P2 = [
@@ -396,4 +396,44 @@ test('legalPlacements stays fast with a full table', () => {
   const t0 = Date.now();
   legalPlacements(s);
   assert.ok(Date.now() - t0 < 500, 'opening legality must not wedge the UI thread');
+});
+
+/* --------------------------------------------------- opening-mask reporting */
+
+test('openingMask is the 3x3 block around a tile, clipped to the board', () => {
+  const s = createGame({ cols: 5, rows: 5, players: P2 });
+  assert.deepEqual(openingMask(s, 12).sort((a, b) => a - b), [6, 7, 8, 11, 12, 13, 16, 17, 18]);
+  // A corner keeps only the quarter that is on the board.
+  assert.deepEqual(openingMask(s, 0).sort((a, b) => a - b), [0, 1, 5, 6]);
+});
+
+test('openingMask leaves walls out — they were never claimable', () => {
+  const blocked = new Uint8Array(25);
+  blocked[6] = 1;
+  const s = createGame({ cols: 5, rows: 5, players: P2, blocked });
+  assert.ok(!openingMask(s, 12).includes(6));
+  assert.equal(openingMask(s, 12).length, 8);
+});
+
+test('blockingStarts names exactly the players an opening would collide with', () => {
+  let s = createGame({ cols: 9, rows: 9, players: P4.slice(0, 3) });
+  s = applyMove(s, 30).state;            // A opens at (3,3)
+
+  // Within two tiles on both axes => the 3x3 zones overlap.
+  const clash = blockingStarts(s, 31);
+  assert.equal(clash.length, 1);
+  assert.deepEqual(clash[0], { pid: 0, at: 30 });
+
+  // Three tiles away on either axis clears it.
+  assert.deepEqual(blockingStarts(s, 33), []);
+  assert.deepEqual(blockingStarts(s, 57), []);
+});
+
+test('blockingStarts is empty for a tile that is illegal for another reason', () => {
+  // A 5x5 board seats three openings only in the corners; the centre is legal
+  // by overlap but would strand the third player, so `legalPlacements` refuses
+  // it while `blockingStarts` correctly reports no collision to point at.
+  let s = createGame({ cols: 5, rows: 5, players: P4.slice(0, 3) });
+  assert.deepEqual(blockingStarts(s, 12), [], 'nobody has opened yet');
+  assert.ok(!legalPlacements(s).includes(12), 'but the centre still strands a seat');
 });

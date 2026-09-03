@@ -20,11 +20,13 @@ GitHub Pages from the repo root as-is.
   and one ball falls off the board; bust in a corner and two do. Edges are cheap to
   hold and expensive to attack from — this is the game's main strategic texture.
 - **Opening round:** each player picks one tile on the empty board, which busts on
-  the spot. An opening claims a **3×3 zone** and no two zones may overlap. An opening
-  that would leave a later player with nowhere legal to go is also barred — so on a
-  5×5 board the exact centre is not a legal opening.
+  the spot. An opening claims a **3×3 zone** and no two zones may overlap — the
+  board is not shaded to show this; reach into someone's zone and it flashes red.
+  An opening that would leave a later player with nowhere legal to go is also
+  barred — so on a 5×5 board the exact centre is not a legal opening.
 - A player is eliminated when they have no tiles left (only once the opening round is
-  over). Last colour standing wins.
+  over). Last colour standing wins. Losing your last tile with the board still live
+  raises a **you lose** card offering to spectate the rest or quit.
 
 This is *not* Chain Reaction: capacity is a uniform 3 (not neighbour-count critical
 mass), and busts always throw four balls.
@@ -191,7 +193,9 @@ in the background (stale-while-revalidate), so an update lands on the next load.
 5. **Numbers are the hero.** Scores, trophies and deltas get the largest type on
    screen, always tabular so they don't jitter while counting.
 6. **Motion is physical.** Things overshoot slightly and settle. Nothing is linear.
-   `prefers-reduced-motion` removes all of it.
+   `prefers-reduced-motion` removes all of it. A bust is the clearest case: the
+   fourth ball squares the pips up, the tile swells and shakes while a ring winds
+   in on it, and only then does it go.
 7. **Every mark is drawn here.** No emoji, anywhere — they size and centre
    differently on every platform and ignore `color`. `src/icons.js` holds all of
    them on one 24×24 grid, two tones (`currentColor` plus one black wash), sized

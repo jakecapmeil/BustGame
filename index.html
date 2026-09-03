@@ -7,7 +7,10 @@
 <meta name="description" content="BUST — a fast tactical board game of chain reactions. Load a tile past three balls and it bursts, flinging one ball to every neighbour and stealing whatever they land on.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<!-- Translucent so the status bar shows the page background and always tracks
+     the active theme. iOS ignores live theme-color changes in a standalone
+     PWA, which otherwise leaves the bar frozen on the launch colour. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>BUST</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
@@ -109,7 +112,7 @@
 <!-- ------------------------------------------------------------------ solo -- -->
 <section class="screen" id="screen-solo">
   <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back" data-icon="back"></button><h2>Solo</h2></header>
-  <div class="stack setup">
+  <div class="scroller">
     <p class="hint" id="solo-shape">—</p>
     <fieldset class="field"><legend>Bot difficulty</legend>
       <div class="seg seg-tight" id="solo-diff">
@@ -120,9 +123,9 @@
         <button class="seg-btn" type="button" data-v="brutal">Brutal</button>
       </div>
     </fieldset>
-    <button class="btn btn-primary" id="solo-start">Start</button>
     <button class="btn btn-ghost btn-sm" data-goto="screen-modes">Change mode</button>
   </div>
+  <button class="btn btn-primary" id="solo-start">Start</button>
 </section>
 
 <!-- ----------------------------------------------------------------- local -- -->
@@ -141,17 +144,20 @@
 <!-- ---------------------------------------------------------------- online -- -->
 <section class="screen" id="screen-online">
   <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back" data-icon="back"></button><h2>Online</h2></header>
-  <div class="stack setup" id="online-setup">
-    <p class="hint" id="online-shape">Play across devices. One player hosts and shares the room code.</p>
-    <button class="btn btn-primary" id="online-host">Host a room</button>
-    <div class="divider"><span>or</span></div>
-    <div class="join-row">
-      <input id="online-code" class="code-input" inputmode="text" autocapitalize="characters"
-             autocomplete="off" spellcheck="false" maxlength="5" placeholder="CODE" aria-label="Room code">
-      <button class="btn" id="online-join">Join</button>
+  <div class="pane" id="online-setup">
+    <div class="scroller">
+      <p class="hint" id="online-shape">Play across devices. One player hosts and shares the room code.</p>
+      <fieldset class="field"><legend>Join a room</legend>
+        <div class="join-row">
+          <input id="online-code" class="code-input" inputmode="text" autocapitalize="characters"
+                 autocomplete="off" spellcheck="false" maxlength="5" placeholder="CODE" aria-label="Room code">
+          <button class="btn" id="online-join">Join</button>
+        </div>
+      </fieldset>
+      <p class="err" id="online-err" role="alert"></p>
+      <button class="btn btn-ghost btn-sm" data-goto="screen-modes">Change mode</button>
     </div>
-    <p class="err" id="online-err" role="alert"></p>
-    <button class="btn btn-ghost btn-sm" data-goto="screen-modes">Change mode</button>
+    <button class="btn btn-primary" id="online-host">Host a room</button>
   </div>
 
   <div class="stack setup is-hidden" id="online-lobby">

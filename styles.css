@@ -183,10 +183,19 @@ body::before {
 .scroller {
   flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
   display: flex; flex-direction: column; gap: var(--s-3);
-  padding-bottom: var(--s-4);
+  padding-bottom: var(--s-5);
   scrollbar-width: none;
 }
 .scroller::-webkit-scrollbar { display: none; }
+
+/* A screen whose body is a scroller but that also carries its own pinned
+   footer button (rather than the button being a direct child of .screen). */
+.pane { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--s-3); }
+
+/* The one primary action on a setup screen sits in the thumb zone: last child
+   of the screen (or its .pane), never scrolling away with the content. */
+.screen > .btn-primary,
+.pane > .btn-primary { flex: none; margin-top: var(--s-3); }
 
 /* -------------------------------------------------------------------- bar */
 
@@ -246,7 +255,7 @@ body::before {
 .seg-tight .seg-btn { font-size: 12.5px; padding: 11px 2px; }
 
 /* labelled group */
-.field { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+.field { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: var(--s-2); }
 .field > legend, .label {
   font-size: var(--fs-label); font-weight: 900; letter-spacing: .12em; text-transform: uppercase;
   color: var(--on-bg-faint); padding: 0;
@@ -390,8 +399,6 @@ body::before {
 
 /* ------------------------------------------------------------------ online */
 
-.divider { display: flex; align-items: center; gap: var(--s-3); color: var(--on-bg-faint); font-size: 13px; }
-.divider::before, .divider::after { content: ''; flex: 1; height: 2px; background: var(--hairline); border-radius: 2px; }
 .join-row { display: flex; gap: var(--s-2); }
 .code-input {
   flex: 1; min-width: 0; font: inherit; font-size: 24px; font-weight: 900;

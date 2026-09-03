@@ -567,7 +567,10 @@ body::before {
 .seat-left .score-chip { transform: rotate(90deg); }
 .seat-right .score-chip { transform: rotate(-90deg); }
 
-/* Five or more players: no rotation, just tight rails top and bottom. */
+/* No rotated edge seats: used past four players, and for every solo / online
+   game (the device isn't being passed around). Chips sit in the screen's
+   corners rather than in two rails huddled at the centre — the middle is
+   handed back to the board and each player's score keeps a fixed spot. */
 .screen-game.is-crowded { grid-template-columns: 1fr; grid-template-areas: "top" "board" "bottom"; }
 .screen-game.is-crowded .seat-left, .screen-game.is-crowded .seat-right { display: none; }
 .screen-game.is-crowded .seat { flex-wrap: wrap; gap: 4px; }
@@ -575,6 +578,22 @@ body::before {
 .screen-game.is-crowded .score-chip .val { font-size: 15px; }
 .screen-game.is-crowded .score-chip .who { display: none; }
 .screen-game.is-crowded .score-chip .dot { width: 14px; height: 14px; }
+
+.screen-game.is-crowded .seat-top,
+.screen-game.is-crowded .seat-bottom {
+  flex-wrap: nowrap;
+  justify-content: space-between;
+  gap: var(--s-2);
+  padding-left: var(--s-2);
+  padding-right: var(--s-2);
+}
+/* The top corners have to clear the menu button and the turn banner. */
+.screen-game.is-crowded .seat-top { padding-top: 52px; }
+.screen-game.is-crowded .seat-bottom { padding-bottom: 6px; }
+/* A rail holding one chip — two players, or the odd chip on an odd count —
+   keeps it centred instead of shoved into a single corner. */
+.screen-game.is-crowded .seat-top > .score-chip:only-child,
+.screen-game.is-crowded .seat-bottom > .score-chip:only-child { margin-inline: auto; }
 
 .score-chip {
   display: flex; align-items: center; gap: 8px;

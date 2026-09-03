@@ -8,7 +8,7 @@
  */
 
 import {
-  createGame, applyMove, isLegalMove, legalMoves, scores,
+  createGame, applyMove, isLegalMove, legalMoves, scores, winnersOf,
   PHASE_PLACE, PHASE_PLAY, PHASE_OVER,
 } from './engine.js';
 import { chooseMove, difficultyLabel, DIFFICULTY_ORDER } from './ai.js';
@@ -16,7 +16,8 @@ import {
   RANKS, rankFor, rankIndexFor, progressToNext, nextRank,
   matchmake, scoreResult, recordMatch, loadProfile, saveProfile,
 } from './rank.js';
-import { BoardAnimator, PLAYER_COLORS, hitTest, blockedPlacementTiles } from './render.js';
+import { BoardAnimator, PLAYER_COLORS, hitTest, blockedPlacementTiles, setBoardSkin } from './render.js';
+import { MODES, MODE_ORDER, modeFor, buildSetup, describeSetup } from './modes.js';
 import { sfx, unlock as unlockAudio, setEnabled as setSoundEnabled, buzz } from './audio.js';
 import { hostRoom, joinRoom, normaliseCode } from './net.js';
 
@@ -26,7 +27,7 @@ const SETTINGS_KEY = 'bust.settings.v1';
 const settings = loadSettings();
 
 function loadSettings() {
-  const base = { sound: true, haptics: true };
+  const base = { sound: true, haptics: true, mode: 'duel', custom: null };
   try {
     return { ...base, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') };
   } catch { return base; }
@@ -37,15 +38,10 @@ function saveSettings() {
 
 const haptic = (ms) => { if (settings.haptics) buzz(ms); };
 
-/* ------------------------------------------------------------------ boards -- */
+/* ------------------------------------------------------------------- modes -- */
 
-// Bigger boards for more players so nobody is fighting for elbow room, and so
-// the non-overlapping opening masks always have somewhere to sit.
-const BOARD_SIZES = {
-  2: { small: [5, 5], medium: [6, 6], large: [7, 7] },
-  3: { small: [6, 6], medium: [7, 7], large: [8, 8] },
-  4: { small: [6, 6], medium: [7, 7], large: [8, 8] },
-};
+// Up to four players get their own screen edge, rotated to face them. Beyond
+// that the chips go into flat rails top and bottom — see `.is-crowded`.
 const SEAT_ORDER = {
   1: ['bottom'],
   2: ['bottom', 'top'],
@@ -53,7 +49,39 @@ const SEAT_ORDER = {
   4: ['bottom', 'top', 'left', 'right'],
 };
 
-const boardFor = (count, size) => BOARD_SIZES[count][size];
+/** The mode the player has selected; drives every play screen and the theme. */
+let modeKey = settings.mode && MODES[settings.mode] ? settings.mode : 'duel';
+let customCfg = { seats: 4, board: [9, 9], teams: null, wallDensity: 0 };
+if (settings.custom) customCfg = { ...customCfg, ...settings.custom };
+
+function currentMode() {
+  return modeKey === 'custom' ? { ...modeFor('custom'), ...customCfg } : modeFor(modeKey);
+}
+
+/** Everything `createGame` needs for the selected mode, with fresh walls. */
+function currentSetup(seed = Date.now()) {
+  return buildSetup(modeKey, modeKey === 'custom' ? customCfg : null, seed);
+}
+
+/**
+ * Repaint the whole app in the mode's palette. The board reads its colours back
+ * out of the same custom properties, so canvas and DOM never drift apart.
+ */
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const cs = getComputedStyle(document.documentElement);
+  const v = (name, fallback) => (cs.getPropertyValue(name) || '').trim() || fallback;
+  setBoardSkin({
+    tile: v('--tile', '#F8EBDA'),
+    tileDim: v('--tile-dim', '#E0C6B4'),
+    wall: v('--wall', '#8B6B57'),
+    wallInk: 'rgba(0,0,0,0.22)',
+    shadow: 'rgba(0,0,0,0.16)',
+  });
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', v('--bg', '#D98E74'));
+  if (session) refreshBoardOnly();
+}
 
 // Badge tints per rank, weakest → strongest.
 const RANK_COLORS = {
@@ -141,18 +169,22 @@ function makePlayers(mode, count, difficulty) {
  * @param {object} [opts.room] net room handle (online)
  * @param {number[]} [opts.ratings] trophy-equivalent rating per player id (ranked)
  */
-function startGame({ mode, cols, rows, players, localSeat = 0, room = null, ratings = null }) {
+function startGame({
+  mode, cols, rows, players, localSeat = 0, room = null, ratings = null,
+  teams = null, blocked = null, modeKey: mk = modeKey,
+}) {
   epoch++;
   animator.cancel();
   closeOverlays();
 
   session = {
     mode,
+    modeKey: mk,
     room,
     localSeat,
     ratings,
     elimTurn: {},   // pid -> state.turnNumber it was knocked out on
-    state: createGame({ cols, rows, players }),
+    state: createGame({ cols, rows, players, teams, blocked }),
     queue: [],
     pumping: false,
     aiTimer: 0,
@@ -181,28 +213,53 @@ function controlsPlayer(pid) {
 
 /* -------------------------------------------------------------------- seats -- */
 
+function chipHtml(state, pid) {
+  const team = state.teams ? ` <span class="who">T${state.teams[pid] + 1}</span>` : '';
+  return `
+    <div class="score-chip" data-pid="${pid}">
+      <span class="dot" style="background:${PLAYER_COLORS[pid].ball}"></span>
+      <span class="val num">0</span>
+      <span class="who">${escapeHtml(playerLabel(state.players[pid]))}</span>${team}
+    </div>`;
+}
+
 function buildSeats() {
   const { state, localSeat } = session;
   const n = state.players.length;
-  const order = SEAT_ORDER[n] || SEAT_ORDER[4];
-
-  // 3+ players use the left/right edges, so the board yields a lane each side.
-  $('#screen-game').classList.toggle('has-sides', order.includes('left') || order.includes('right'));
+  const screen = $('#screen-game');
 
   $$('.seat').forEach((el) => { el.classList.remove('is-shown'); el.innerHTML = ''; });
 
+  // Rotated edge seats exist so a phone on a table reads right-way-up for
+  // everyone — that only matters when the device is actually being passed
+  // around. Everywhere else (and always past four players) the chips go into
+  // flat rails, which hands the board back the ~25% of width the side columns
+  // would have eaten.
+  const crowded = n > 4 || session.mode !== 'local';
+  screen.classList.toggle('is-crowded', crowded);
+
+  if (crowded) {
+    const rot = (pid) => (pid - localSeat + n) % n;   // you always sit first
+    const ordered = [...state.players].sort((a, b) => rot(a.id) - rot(b.id)).map((p) => p.id);
+    const half = Math.ceil(n / 2);
+    const rails = { bottom: ordered.slice(0, half), top: ordered.slice(half) };
+    for (const [slot, ids] of Object.entries(rails)) {
+      const el = document.querySelector(`.seat-${slot}`);
+      if (!el || !ids.length) continue;
+      el.classList.add('is-shown');
+      el.innerHTML = ids.map((pid) => chipHtml(state, pid)).join('');
+    }
+    return;
+  }
+
+  const order = SEAT_ORDER[n] || SEAT_ORDER[4];
   for (let pid = 0; pid < n; pid++) {
     // Rotate so the device's own player always sits at the bottom edge.
     const slot = order[(pid - localSeat + n) % n];
     const el = document.querySelector(`.seat-${slot}`);
     if (!el) continue;
     el.classList.add('is-shown');
-    el.innerHTML = `
-      <div class="score-chip" data-pid="${pid}">
-        <span class="dot" style="background:${PLAYER_COLORS[pid].ball}"></span>
-        <span class="val">0</span>
-        <span class="who">${escapeHtml(playerLabel(state.players[pid]))}</span>
-      </div>`;
+    el.innerHTML = chipHtml(state, pid);
   }
 }
 
@@ -216,10 +273,10 @@ function escapeHtml(s) {
 
 function fitBoard() {
   if (!session) return;
+  // The side seat columns have a fixed width in CSS, so whatever the board area
+  // reports is already clear of them.
   const r = boardArea.getBoundingClientRect();
-  // 3–4 players put a score chip on each side edge; keep the board clear of them.
-  const sideLane = $('#screen-game').classList.contains('has-sides') ? 44 : 0;
-  const w = Math.max(80, r.width - sideLane * 2);
+  const w = Math.max(80, r.width);
   const h = Math.max(80, r.height);
   animator.resize(w, h, session.state.cols, session.state.rows);
   refreshBoardOnly();
@@ -227,7 +284,7 @@ function fitBoard() {
 
 function chrome() {
   const s = session.state;
-  const view = {};
+  const view = { walls: s.blocked, teams: s.teams };
   if (s.phase === PHASE_PLACE) view.blocked = blockedPlacementTiles(s);
   if (s.phase !== PHASE_OVER && controlsPlayer(s.turn)) {
     view.legal = new Set(legalMoves(s));
@@ -455,12 +512,24 @@ function finish() {
   session.over = true;
   const s = session.state;
   const w = s.winner;
-  const won = controlsPlayer(w) || (session.mode === 'local' && s.players[w].kind !== 'ai');
+  const won = controlsPlayer(w)
+    || (session.mode === 'local' && winnersOf(s).some((pid) => s.players[pid].kind !== 'ai'));
 
+  const winners = winnersOf(s);
+  const teamEl = $('#over-team');
+  if (winners.length > 1) {
+    // A team win: show every colour on the winning side, not one disc.
+    $('#over-disc').classList.add('is-hidden');
+    teamEl.classList.remove('is-hidden');
+    teamEl.innerHTML = winners
+      .map((pid) => `<span class="dot" style="background:${PLAYER_COLORS[pid].ball}"></span>`).join('');
+  } else {
+    $('#over-disc').classList.remove('is-hidden');
+    teamEl.classList.add('is-hidden');
+  }
   $('#over-disc').style.background = PLAYER_COLORS[w].ball;
-  const isSelf = (session.mode === 'solo' && w === 0)
-    || (session.mode === 'ranked' && w === 0)
-    || (session.mode === 'online' && w === session.localSeat);
+  const isSelf = ((session.mode === 'solo' || session.mode === 'ranked') && winners.includes(0))
+    || (session.mode === 'online' && winners.includes(session.localSeat));
   $('#over-title').textContent = isSelf ? 'You win!'
     : session.mode === 'local' ? `${playerLabel(s.players[w])} wins!`
     : `${playerLabel(s.players[w])} wins`;
@@ -509,7 +578,7 @@ function settleRanked() {
   const dEl = $('#over-delta');
   dEl.textContent = `${up ? '+' : ''}${result.delta}`;
   dEl.className = `trophy-delta ${up ? 'up' : 'down'}`;
-  $('#over-troph-count').textContent = profile.trophies;
+  countTo($('#over-troph-count'), profile.trophies, 900);
   paintBadge($('#over-troph-badge'), rankFor(profile.trophies));
   $('#over-troph-fill').style.width = `${Math.round(progressToNext(profile.trophies).frac * 100)}%`;
 
@@ -545,6 +614,27 @@ function paintBadge(el, rank) {
   el.setAttribute('aria-hidden', 'true');
 }
 
+/**
+ * Roll a number up or down instead of snapping it. Cheap, self-cancelling, and
+ * a no-op under `prefers-reduced-motion`.
+ */
+const REDUCED = typeof matchMedia === 'function'
+  && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function countTo(el, to, ms = 700) {
+  if (!el) return;
+  const from = Number(el.textContent.replace(/[^0-9-]/g, '')) || 0;
+  if (REDUCED || from === to) { el.textContent = to; return; }
+  clearInterval(el._ticker);
+  const t0 = performance.now();
+  el._ticker = setInterval(() => {
+    const k = Math.min(1, (performance.now() - t0) / ms);
+    const e = 1 - Math.pow(1 - k, 3);
+    el.textContent = Math.round(from + (to - from) * e);
+    if (k >= 1) clearInterval(el._ticker);
+  }, 16);
+}
+
 /** The persistent trophy pill on the home screen. */
 function renderHomeStrip() {
   const strip = $('#rank-strip');
@@ -553,37 +643,30 @@ function renderHomeStrip() {
   const rank = rankFor(profile.trophies);
   paintBadge($('#strip-badge'), rank);
   $('#strip-name').textContent = rank.name;
-  $('#strip-count').textContent = profile.trophies;
+  countTo($('#strip-count'), profile.trophies);
   $('#strip-fill').style.width = `${Math.round(progressToNext(profile.trophies).frac * 100)}%`;
-}
-
-function matchShape(rank) {
-  const total = Math.min(3, rank.opponents) + 1;
-  const label = rank.opponents === 1 ? '1 v 1' : `1 v ${rank.opponents}`;
-  const [cols, rows] = boardFor(total, rank.board);
-  const pool = rank.pool.map(difficultyLabel).join(' / ');
-  return `${label} · ${pool} · ${cols}×${rows} board`;
+  paintModeHero('hero', currentMode());
 }
 
 function renderRankedScreen() {
   const rank = rankFor(profile.trophies);
   paintBadge($('#rank-hero-badge'), rank);
   $('#rank-hero-name').textContent = rank.name;
-  $('#rank-hero-count').textContent = profile.trophies;
+  countTo($('#rank-hero-count'), profile.trophies);
   const prog = progressToNext(profile.trophies);
   $('#rank-hero-fill').style.width = `${Math.round(prog.frac * 100)}%`;
   const nxt = nextRank(profile.trophies);
   $('#rank-hero-next').textContent = nxt
     ? `${prog.need - prog.have} to ${nxt.name}`
     : 'Top rank reached';
-  $('#rank-preview').textContent = `Next match: ${matchShape(rank)}`;
 
-  const wr = profile.played ? Math.round((profile.won / profile.played) * 100) : 0;
-  const streak = profile.streak > 1 ? ` · ${profile.streak} win streak`
-    : profile.streak < -1 ? ` · ${-profile.streak} loss streak` : '';
-  $('#rank-record').textContent = profile.played
-    ? `${profile.won}/${profile.played} won (${wr}%) · best ${profile.best} 🏆${streak}`
-    : 'No ranked matches yet.';
+  $('#stat-played').textContent = profile.played;
+  $('#stat-rate').textContent = profile.played
+    ? `${Math.round((profile.won / profile.played) * 100)}%` : '—';
+  $('#stat-best').textContent = profile.best;
+
+  const mode = currentMode();
+  paintModeHero('ranked-hero', mode, `${describeSetup(mode)} · ${rank.pool.map(difficultyLabel).join('/')} bots`);
 
   const here = rankIndexFor(profile.trophies);
   const list = $('#ladder-list');
@@ -607,11 +690,17 @@ function renderRankedScreen() {
   });
 }
 
+/**
+ * The mode decides the shape of the match, the rank decides how hard the bots
+ * play — so you climb one ladder whichever mode you prefer.
+ */
 function startRankedMatch() {
-  const m = matchmake(profile.trophies, boardFor);
+  const setup = currentSetup();
+  const m = matchmake(profile.trophies, setup.seats);
   startGame({
     mode: 'ranked',
-    cols: m.cols, rows: m.rows,
+    cols: setup.cols, rows: setup.rows,
+    teams: setup.teams, blocked: setup.blocked,
     players: m.players,
     ratings: m.ratings,
   });
@@ -644,7 +733,11 @@ function quitToMenu() {
   if (session) clearTimeout(session.aiTimer);
   session = null;
   closeOverlays();
-  show('screen-home');
+  applyTheme(MODES[modeKey].theme);
+renderModeGrid();
+syncRosterToMode();
+refreshShapeLines();
+show('screen-home');
 }
 
 /* ----------------------------------------------------------------- segments -- */
@@ -670,11 +763,114 @@ $$('[data-goto]').forEach((b) => b.addEventListener('click', () => {
   show(b.dataset.goto);
 }));
 
+/* ------------------------------------------------------------- mode picker -- */
+
+function paintModeHero(prefix, mode, subOverride) {
+  const g = $(`#${prefix}-glyph`);
+  const n = $(`#${prefix}-name`);
+  const sub = $(`#${prefix}-sub`);
+  if (g) g.textContent = mode.glyph;
+  if (n) n.textContent = mode.name;
+  if (sub) sub.textContent = subOverride || `${mode.tagline} · ${describeSetup(mode)}`;
+}
+
+function renderModeGrid() {
+  const grid = $('#mode-grid');
+  grid.innerHTML = '';
+  for (const key of MODE_ORDER) {
+    const m = key === 'custom' ? { ...MODES.custom, ...customCfg } : MODES[key];
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mode-card' + (key === modeKey ? ' is-on' : '');
+    b.dataset.mode = key;
+    b.setAttribute('aria-pressed', String(key === modeKey));
+    // Each card previews the palette it will switch the app to.
+    b.dataset.theme = MODES[key].theme;
+    b.innerHTML = `
+      <span class="mode-glyph" aria-hidden="true">${MODES[key].glyph}</span>
+      <span>
+        <span class="mode-card-name">${escapeHtml(MODES[key].name)}</span><br>
+        <span class="mode-card-tag">${escapeHtml(MODES[key].tagline)} · ${escapeHtml(describeSetup(m))}</span>
+      </span>
+      <span class="mode-card-check" aria-hidden="true">✓</span>`;
+    grid.appendChild(b);
+  }
+  $('#modes-blurb').textContent = MODES[modeKey].blurb;
+  $('#custom-panel').classList.toggle('is-hidden', modeKey !== 'custom');
+}
+
+function selectMode(key) {
+  modeKey = key;
+  settings.mode = key;
+  saveSettings();
+  applyTheme(MODES[key].theme);
+  renderModeGrid();
+  renderHomeStrip();
+  syncRosterToMode();
+  refreshShapeLines();
+}
+
+$('#mode-grid').addEventListener('click', (e) => {
+  const card = e.target.closest('.mode-card');
+  if (!card) return;
+  unlockAudio(); sfx.ui(); haptic(10);
+  selectMode(card.dataset.mode);
+});
+
+$('#modes-done').addEventListener('click', () => { sfx.ui(); applyTheme(MODES[modeKey].theme);
+renderModeGrid();
+syncRosterToMode();
+refreshShapeLines();
+show('screen-home'); });
+
+/* custom setup ------------------------------------------------------------- */
+
+function readCustom() {
+  const seats = Number(segValue('custom-seats')) || 4;
+  const n = Number(segValue('custom-board')) || 9;
+  const wallDensity = Number(segValue('custom-walls')) || 0;
+  const wantTeams = segValue('custom-teams') === 'on';
+  // Teams need an even table; seats alternate so turn order alternates sides.
+  const teams = wantTeams && seats % 2 === 0
+    ? Array.from({ length: seats }, (_, i) => i % 2) : null;
+  customCfg = { seats, board: [n, n], teams, wallDensity };
+  settings.custom = customCfg;
+  saveSettings();
+  $('#custom-err').textContent = wantTeams && seats % 2
+    ? 'Teams need an even number of seats — playing free-for-all.' : '';
+  renderModeGrid();
+  refreshShapeLines();
+  syncRosterToMode();
+}
+
+['custom-seats', 'custom-board', 'custom-teams', 'custom-walls'].forEach((id) => {
+  $(`#${id}`).addEventListener('click', (e) => { if (e.target.closest('.seg-btn')) readCustom(); });
+});
+
+/* ------------------------------------------------------------- play screens -- */
+
+/** The "here's what you're about to play" line on every play screen. */
+function refreshShapeLines() {
+  const m = currentMode();
+  const shape = `${m.name} · ${describeSetup(m)}`;
+  $('#solo-shape').textContent = `${shape}. You against ${m.seats - 1} bot${m.seats > 2 ? 's' : ''}.`;
+  $('#local-shape').textContent = `${shape}. One device — fill the seats with any mix of people and bots.`;
+  $('#online-shape').textContent = `${shape}. One player hosts and shares the room code.`;
+  paintModeHero('hero', m);
+}
+
 $('#solo-start').addEventListener('click', () => {
-  const count = Number(segValue('solo-count'));
+  const setup = currentSetup();
   const diff = segValue('solo-diff');
-  const [cols, rows] = BOARD_SIZES[count][segValue('solo-size')];
-  startGame({ mode: 'solo', cols, rows, players: makePlayers('solo', count, diff) });
+  const players = Array.from({ length: setup.seats }, (_, i) => ({
+    name: i === 0 ? 'You' : (setup.seats === 2 ? 'Bot' : `Bot ${i}`),
+    kind: i === 0 ? 'human' : 'ai',
+    difficulty: diff,
+  }));
+  startGame({
+    mode: 'solo', cols: setup.cols, rows: setup.rows,
+    teams: setup.teams, blocked: setup.blocked, players,
+  });
 });
 
 /* -------------------------------------------------------- local line-up -- */
@@ -687,20 +883,18 @@ let localRoster = [
   { kind: 'human', difficulty: 'medium' },
 ];
 
-function localSeatCount() {
-  return Number(segValue('local-count')) || 2;
-}
-
-function syncRosterLength() {
-  const n = localSeatCount();
+/** The mode owns the seat count, so the roster grows and shrinks with it. */
+function syncRosterToMode() {
+  const n = currentMode().seats;
   while (localRoster.length < n) localRoster.push({ kind: 'ai', difficulty: 'medium' });
   localRoster.length = n;
+  buildRoster();
 }
 
 function buildRoster() {
-  syncRosterLength();
   const ul = $('#local-roster');
   if (!ul) return;
+  const teams = currentMode().teams;
   ul.innerHTML = '';
   localRoster.forEach((seat, i) => {
     const li = document.createElement('li');
@@ -709,10 +903,12 @@ function buildRoster() {
     const diffBtns = DIFFICULTY_ORDER.map((k) => (
       `<button class="seg-btn${seat.difficulty === k ? ' is-on' : ''}" type="button" data-diff="${k}">${escapeHtml(difficultyLabel(k))}</button>`
     )).join('');
+    const teamTag = teams ? `<span class="team-tag">Team ${teams[i] + 1}</span>` : '';
     li.innerHTML = `
       <div class="roster-main">
         <span class="dot" style="background:${PLAYER_COLORS[i].ball}"></span>
         <span class="who">${escapeHtml(PLAYER_COLORS[i].name)}</span>
+        ${teamTag}
         <div class="seg kind" role="group" aria-label="Seat ${i + 1} type">
           <button class="seg-btn${seat.kind === 'human' ? ' is-on' : ''}" type="button" data-kind="human">Human</button>
           <button class="seg-btn${seat.kind === 'ai' ? ' is-on' : ''}" type="button" data-kind="ai">Bot</button>
@@ -735,56 +931,38 @@ $('#local-roster').addEventListener('click', (e) => {
   buildRoster();
 });
 
-$('#local-count').addEventListener('click', (e) => {
-  if (e.target.closest('.seg-btn')) buildRoster();
-});
-
-buildRoster();
-
 $('#local-start').addEventListener('click', () => {
-  syncRosterLength();
-  const count = localRoster.length;
-  const [cols, rows] = BOARD_SIZES[count][segValue('local-size')];
-  const players = localRoster.map((seat, i) => ({
+  const setup = currentSetup();
+  const players = localRoster.slice(0, setup.seats).map((seat, i) => ({
     name: seat.kind === 'ai' ? `${PLAYER_COLORS[i].name} bot` : PLAYER_COLORS[i].name,
     kind: seat.kind,
     difficulty: seat.difficulty,
   }));
-  startGame({ mode: 'local', cols, rows, players });
+  startGame({
+    mode: 'local', cols: setup.cols, rows: setup.rows,
+    teams: setup.teams, blocked: setup.blocked, players,
+  });
 });
-
-$('#btn-pause').addEventListener('click', () => {
-  sfx.ui(); haptic(8);
-  $('#overlay-pause').hidden = false;
-});
-$('#pause-resume').addEventListener('click', () => { sfx.ui(); $('#overlay-pause').hidden = true; });
-$('#pause-restart').addEventListener('click', () => { sfx.ui(); restartGame(); });
-$('#pause-quit').addEventListener('click', () => { sfx.ui(); quitToMenu(); });
-$('#over-again').addEventListener('click', () => { sfx.ui(); restartGame(); });
-$('#over-menu').addEventListener('click', () => { sfx.ui(); quitToMenu(); });
-
-const soundBtn = $('#toggle-sound');
-const hapticBtn = $('#toggle-haptics');
-function syncToggles() {
-  soundBtn.setAttribute('aria-pressed', String(settings.sound));
-  soundBtn.textContent = settings.sound ? 'Sound on' : 'Sound off';
-  hapticBtn.setAttribute('aria-pressed', String(settings.haptics));
-  hapticBtn.textContent = settings.haptics ? 'Haptics on' : 'Haptics off';
-  setSoundEnabled(settings.sound);
-}
-soundBtn.addEventListener('click', () => {
-  settings.sound = !settings.sound; saveSettings(); syncToggles();
-  unlockAudio(); if (settings.sound) sfx.ui();
-});
-hapticBtn.addEventListener('click', () => {
-  settings.haptics = !settings.haptics; saveSettings(); syncToggles(); haptic(14);
-});
-syncToggles();
 
 /* ------------------------------------------------------------------- online -- */
 
 let room = null;
 let lobbyInfo = { count: 0, capacity: 0, seat: 0 };
+let onlineSetup = null;   // host: the setup this room was opened with
+
+/** Join a game the host has described; the theme follows their chosen mode. */
+function startOnline(config, players, seat) {
+  if (config.modeKey && MODES[config.modeKey]) {
+    modeKey = config.modeKey;
+    applyTheme(MODES[modeKey].theme);
+  }
+  startGame({
+    mode: 'online', cols: config.cols, rows: config.rows,
+    teams: config.teams || null,
+    blocked: config.blocked || null,
+    players, localSeat: seat, room,
+  });
+}
 
 const onlineErr = $('#online-err');
 const lobbyMsg = $('#online-lobby-msg');
@@ -842,12 +1020,8 @@ function netFail(err) {
 
 const clientHandlers = () => ({
   onLobby: (info) => { lobbyInfo = info; renderLobby(); },
-  onStart: ({ config, players, seat }) => {
-    startGame({ mode: 'online', cols: config.cols, rows: config.rows, players, localSeat: seat, room });
-  },
-  onRestart: ({ config, players, seat }) => {
-    startGame({ mode: 'online', cols: config.cols, rows: config.rows, players, localSeat: seat, room });
-  },
+  onStart: ({ config, players, seat }) => startOnline(config, players, seat),
+  onRestart: ({ config, players, seat }) => startOnline(config, players, seat),
   onMove: ({ idx }) => enqueue(idx, 'net'),
   onError: netFail,
   onClose: ({ mid }) => { if (mid) netFail(new Error('A player left the game')); },
@@ -856,13 +1030,19 @@ const clientHandlers = () => ({
 $('#online-host').addEventListener('click', async () => {
   unlockAudio(); sfx.ui();
   onlineErr.textContent = 'Connecting…';
-  const capacity = Number(segValue('online-count'));
-  const [cols, rows] = BOARD_SIZES[capacity][segValue('online-size')];
+  const setup = currentSetup();
+  const capacity = setup.seats;
+  onlineSetup = setup;
   try {
     teardownRoom();
     room = await hostRoom({
       capacity,
-      config: { cols, rows },
+      // Everything a client needs to build a byte-identical board.
+      config: {
+        cols: setup.cols, rows: setup.rows, modeKey,
+        teams: setup.teams ? Array.from(setup.teams) : null,
+        blocked: setup.blocked ? Array.from(setup.blocked) : null,
+      },
       handlers: {
         onLobby: (info) => { lobbyInfo = info; renderLobby(); },
         onMove: ({ idx, from }) => {
@@ -900,11 +1080,14 @@ $('#online-code').addEventListener('input', (e) => {
 $('#online-begin').addEventListener('click', () => {
   if (!room?.isHost) return;
   sfx.ui();
+  const setup = onlineSetup || currentSetup();
   const players = makePlayers('online', lobbyInfo.capacity);
-  const cols = Number(segValue('online-count'));
-  const [c, r] = BOARD_SIZES[cols][segValue('online-size')];
   room.start(players);
-  startGame({ mode: 'online', cols: c, rows: r, players, localSeat: 0, room });
+  startGame({
+    mode: 'online', cols: setup.cols, rows: setup.rows,
+    teams: setup.teams, blocked: setup.blocked,
+    players, localSeat: 0, room,
+  });
 });
 
 $('#online-copy').addEventListener('click', async () => {
@@ -944,4 +1127,8 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+applyTheme(MODES[modeKey].theme);
+renderModeGrid();
+syncRosterToMode();
+refreshShapeLines();
 show('screen-home');

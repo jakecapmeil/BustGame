@@ -29,16 +29,45 @@ GitHub Pages from the repo root as-is.
 This is *not* Chain Reaction: capacity is a uniform 3 (not neighbour-count critical
 mass), and busts always throw four balls.
 
-## Modes
+## How it's organised
 
-- **Ranked** — a Clash-Royale-style trophy ladder (see below).
-- **Solo** — you against 1–3 bots at one difficulty. No trophies at stake.
-- **Local Game** — one device, passed around. Fill 2–4 seats with **any mix of
-  people and bots**; each bot picks its own difficulty. All humans is classic
-  pass-and-play; all bots is a spectator match.
-- **Online** — play across devices over WebRTC (PeerJS). One player hosts and shares
-  a 5-character room code. Because the engine is deterministic, only move indices
-  cross the wire; the host referees and every client replays the same stream.
+Two independent choices: **what** you play (the mode) and **who** you play it with.
+
+### Modes — the shape of a match
+
+Pick one on the mode screen; it applies everywhere and repaints the whole app in
+that mode's palette.
+
+| Mode | Shape | Board |
+|---|---|---|
+| **Duel** | 1 v 1 | 7×7 |
+| **Rumble** | 4-player free-for-all | 8×8 |
+| **Big Arena** | 4 players, room to move | 10×10 |
+| **Mayhem** | 8 players | 12×12 |
+| **Duos** | 2 v 2 teams | 10×10 |
+| **Chaos** | 4 players + a mirrored maze of walls | 10×10 |
+| **Custom** | 2–8 seats, board size, teams and wall density all yours | up to 13×13 |
+
+Two modes change the rules, not just the numbers:
+
+- **Duos.** Partners alternate seats so turn order alternates sides. A bust
+  **reinforces** a team-mate's tile instead of stealing it, and your side is only
+  out when *both* of you are wiped. Territory is tinted by team; discs stay per
+  player, so you read sides at a glance and still know who owns what.
+- **Chaos.** Walls are mirrored across both axes so no seat gets a better corner.
+  A ball fired into a wall is **gone** — walls tax a bust exactly the way the
+  board edge does, which is the whole tactical point.
+
+### Then: solo, local or online
+
+- **Ranked** — the current mode, against matchmade bots, for trophies (below).
+- **Solo** — the current mode against bots at one difficulty. No trophies.
+- **Local** — one device, passed around. Fill every seat with **any mix of people
+  and bots**. All humans is classic pass-and-play; all bots is a spectator match.
+- **Online** — across devices over WebRTC (PeerJS). One player hosts and shares a
+  5-character room code; the mode, board, teams and wall map all ride along in the
+  start packet so every client builds a byte-identical board. Because the engine is
+  deterministic, only move indices cross the wire after that.
 
 ## Ranked ladder
 
@@ -52,8 +81,11 @@ get matchmade to your level.
 - **Margin matters.** A crushing win (you hold most of the board, game ended fast)
   pays a bonus; getting wiped out early loses more than scraping a narrow defeat.
 - **Ranks.** Ten tiers from Woodline to Legend, each at a higher trophy threshold.
-  Your rank sets the opponents: difficulty pool, how many of them (1-v-1 up to 1-v-3),
-  and the board size. Cross a threshold and you're promoted.
+  Your rank sets how *hard* the bots play; the selected **mode** sets the shape of
+  the match. So you climb one ladder whichever mode you prefer. Cross a threshold
+  and you're promoted.
+- **Teams count as one result.** In Duos a partner's win is your win, team-mates
+  never appear in your Elo maths, and both partners share first place.
 - **Soft floor.** A loss can dip you one band below your rank's threshold but can't
   drop you a whole rank in one match.
 - Progress is stored locally (`localStorage`). It is a **single-player ladder** — a
@@ -99,7 +131,7 @@ opening `index.html` from the filesystem will not work.
 Pure engine and animator logic run under Node's test runner, no dependencies:
 
 ```bash
-node --test test/engine.test.mjs test/render.test.mjs
+node --test test/*.mjs
 ```
 
 - `engine.test.mjs` — rules, placement legality, cascades, elimination, plus a
@@ -131,9 +163,32 @@ in the background (stale-while-revalidate), so an update lands on the next load.
 | `src/engine.js` | Pure rules. Deterministic — no DOM, no randomness, no timers. |
 | `src/ai.js` | The five bots: positional eval + alpha-beta on a time budget. |
 | `src/rank.js` | Trophy ladder: ranks, Elo + margin scoring, matchmaking, profile storage. |
+| `src/modes.js` | Mode table, seeded mirrored wall generation, per-mode setup. |
 | `src/render.js` | Canvas renderer and the cascade animator. |
 | `src/main.js` | Screens, input, the serial move queue, AI scheduling, online glue. |
 | `src/net.js` | PeerJS host/join, room codes, move relay. |
 | `src/audio.js` | Synthesised WebAudio SFX — zero audio assets. |
 | `index.html` / `styles.css` | Mobile-first shell. |
 | `sw.js` / `manifest.webmanifest` / `assets/` | PWA offline cache, installable manifest, icons. |
+
+## Design language
+
+`styles.css` opens with the full statement of it; the short version is six rules:
+
+1. **Extruded, not flat.** Controls sit on a hard, unblurred bottom shadow and
+   collapse into it on press. Blur is reserved for things genuinely floating —
+   modals, and the board's tiles.
+2. **One accent per screen.** The active mode owns the palette. The only other
+   saturated colours in the chrome are the eight seat colours, and those belong to
+   the board.
+3. **Big, round, confident.** Radii step 12 / 18 / 26 / pill. Nunito 700–900 only.
+4. **Invert to focus.** The app is a coloured field carrying near-white text;
+   anything that demands attention becomes a cream card with dark text.
+5. **Numbers are the hero.** Scores, trophies and deltas get the largest type on
+   screen, always tabular so they don't jitter while counting.
+6. **Motion is physical.** Things overshoot slightly and settle. Nothing is linear.
+   `prefers-reduced-motion` removes all of it.
+
+Themes swap only a palette block via `<html data-theme>`; nothing else in the sheet
+knows which mode is active. The canvas reads the same custom properties back out
+through `setBoardSkin`, so board and DOM can never drift apart.

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createGame, applyMove, legalPlacements, legalMoves, neighbors, outDegree,
   scores, idxOf, EMPTY, MAX_BALLS, PHASE_PLACE, PHASE_PLAY, PHASE_OVER,
+  teamOf, sameTeam, winnersOf, isBlocked,
 } from '../src/engine.js';
 
 const P2 = [
@@ -261,4 +262,138 @@ test('applyMove does not mutate the previous state', () => {
   assert.deepEqual(s.owner, ownerBefore);
   assert.deepEqual(s.count, countBefore);
   assert.equal(s.turn, turnBefore);
+});
+
+/* ------------------------------------------------------- walls (chaos mode) -- */
+
+function walled(cols, rows, wallIdx, players = P2) {
+  const blocked = new Uint8Array(cols * rows);
+  for (const i of wallIdx) blocked[i] = 1;
+  return createGame({ cols, rows, players, blocked });
+}
+
+test('walls are not neighbours, so busts next to them lose balls', () => {
+  const s = walled(5, 5, [idxOf({ cols: 5 }, 2, 1)]); // wall directly above centre
+  const centre = idxOf(s, 2, 2);
+  assert.deepEqual(neighbors(s, centre), [11, 13, 17], 'the walled direction is gone');
+  assert.equal(outDegree(s, centre), 3, 'a wall taxes a bust like the board edge');
+});
+
+test('walls can never be opened on or owned', () => {
+  const wall = 12; // (2,2) on 5x5
+  const s = walled(5, 5, [wall]);
+  assert.ok(!legalPlacements(s).includes(wall));
+  assert.equal(applyMove(s, wall).ok, false);
+});
+
+test('a cascade never puts a ball on a walled tile', () => {
+  const wall = idxOf({ cols: 6 }, 3, 2);
+  let s = walled(6, 6, [wall], P2);
+  s = play(s, idxOf(s, 1, 1), idxOf(s, 5, 5));
+  const attacker = idxOf(s, 2, 2); // sits directly left of the wall
+  s.owner[attacker] = 0; s.count[attacker] = 3;
+  s.turn = 0;
+  const r = applyMove(s, attacker);
+  assert.ok(r.ok);
+  assert.equal(r.state.owner[wall], EMPTY, 'wall stays unowned');
+  assert.equal(r.state.count[wall], 0, 'wall never holds a ball');
+});
+
+/* --------------------------------------------------------------- 2v2 teams -- */
+
+const P4T = ['A1', 'B1', 'A2', 'B2'].map((name) => ({ name, kind: 'human' }));
+const TEAMS = [0, 1, 0, 1]; // seats alternate so turn order alternates sides
+
+function teamGame(cols = 8, rows = 8) {
+  return createGame({ cols, rows, players: P4T, teams: TEAMS });
+}
+
+test('teamOf / sameTeam / winnersOf read the team map', () => {
+  const s = teamGame();
+  assert.equal(teamOf(s, 0), 0);
+  assert.equal(teamOf(s, 2), 0);
+  assert.equal(teamOf(s, 1), 1);
+  assert.ok(sameTeam(s, 0, 2));
+  assert.ok(!sameTeam(s, 0, 1));
+  assert.ok(!sameTeam(s, 0, EMPTY), 'nobody teams up with an empty tile');
+  // With no team map everyone is their own side.
+  const ffa = game(5, 5, P2);
+  assert.ok(!sameTeam(ffa, 0, 1));
+  assert.ok(sameTeam(ffa, 1, 1));
+});
+
+test("a bust reinforces a team-mate's tile instead of stealing it", () => {
+  let s = teamGame();
+  s = play(s, idxOf(s, 1, 1), idxOf(s, 6, 1), idxOf(s, 1, 6), idxOf(s, 6, 6));
+  const mate = idxOf(s, 3, 3);
+  const attacker = idxOf(s, 2, 3);
+  s.owner[mate] = 2; s.count[mate] = 1;      // partner's tile (same team as p0)
+  s.owner[attacker] = 0; s.count[attacker] = 3;
+  s.turn = 0;
+  const r = applyMove(s, attacker);
+  assert.ok(r.ok);
+  assert.equal(r.state.owner[mate], 2, 'partner keeps the tile');
+  assert.equal(r.state.count[mate], 2, 'but it gains the ball');
+});
+
+test('a bust still captures an opponent tile in a team game', () => {
+  let s = teamGame();
+  s = play(s, idxOf(s, 1, 1), idxOf(s, 6, 1), idxOf(s, 1, 6), idxOf(s, 6, 6));
+  const enemy = idxOf(s, 3, 3);
+  const attacker = idxOf(s, 2, 3);
+  s.owner[enemy] = 1; s.count[enemy] = 1;    // other team
+  s.owner[attacker] = 0; s.count[attacker] = 3;
+  s.turn = 0;
+  const r = applyMove(s, attacker);
+  assert.equal(r.state.owner[enemy], 0, 'enemy tile is captured');
+});
+
+test('a team survives while any one member still holds tiles', () => {
+  let s = teamGame();
+  s = play(s, idxOf(s, 1, 1), idxOf(s, 6, 1), idxOf(s, 1, 6), idxOf(s, 6, 6));
+  // Wipe team 0's second player entirely; the game must continue.
+  for (let i = 0; i < s.owner.length; i++) if (s.owner[i] === 2) { s.owner[i] = EMPTY; s.count[i] = 0; }
+  s.turn = 1;
+  const r = applyMove(s, legalMoves(s)[0]);
+  assert.equal(r.state.players[2].alive, false, 'the wiped player is out');
+  assert.notEqual(r.state.phase, PHASE_OVER, 'their partner keeps the team alive');
+});
+
+test('the game ends when a whole team is wiped out, and both partners win', () => {
+  let s = teamGame();
+  s = play(s, idxOf(s, 1, 1), idxOf(s, 6, 1), idxOf(s, 1, 6), idxOf(s, 6, 6));
+  // Leave team 1 (players 1 and 3) with a single tile that team 0 is about to eat.
+  for (let i = 0; i < s.owner.length; i++) {
+    if (s.owner[i] === 1 || s.owner[i] === 3) { s.owner[i] = EMPTY; s.count[i] = 0; }
+  }
+  const lone = idxOf(s, 3, 3);
+  s.owner[lone] = 1; s.count[lone] = 1;
+  const attacker = idxOf(s, 2, 3);
+  s.owner[attacker] = 0; s.count[attacker] = 3;
+  s.turn = 0;
+  const r = applyMove(s, attacker);
+  assert.equal(r.state.phase, PHASE_OVER);
+  assert.deepEqual(winnersOf(r.state).sort(), [0, 2], 'the whole winning side is returned');
+});
+
+/* -------------------------------------------------------------- 8 players -- */
+
+test('eight players can all be seated on a big board', () => {
+  const P8 = Array.from({ length: 8 }, (_, i) => ({ name: `P${i}`, kind: 'human' }));
+  let s = createGame({ cols: 12, rows: 12, players: P8 });
+  for (let k = 0; k < 8; k++) {
+    const opts = legalPlacements(s);
+    assert.ok(opts.length > 0, `player ${k} has nowhere to open`);
+    s = applyMove(s, opts[0]).state;
+  }
+  assert.equal(s.phase, PHASE_PLAY, 'opening round completes for all eight');
+  assert.equal(s.turn, 0);
+});
+
+test('legalPlacements stays fast with a full table', () => {
+  const P8 = Array.from({ length: 8 }, (_, i) => ({ name: `P${i}`, kind: 'human' }));
+  const s = createGame({ cols: 12, rows: 12, players: P8 });
+  const t0 = Date.now();
+  legalPlacements(s);
+  assert.ok(Date.now() - t0 < 500, 'opening legality must not wedge the UI thread');
 });

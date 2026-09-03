@@ -8,15 +8,37 @@
 
 import { EMPTY, MAX_BALLS, neighbors, legalPlacements, PHASE_PLACE } from './engine.js';
 
+/**
+ * Eight seat colours. The first four are the original palette and must not
+ * move — saved games, screenshots and the seat chips all key off the index.
+ * The last four were chosen for hue separation from those, so an eight-player
+ * Mayhem board stays readable.
+ */
 export const PLAYER_COLORS = [
   { ball: '#F2564B', tint: 'rgba(242, 86, 75, 0.20)', ink: '#C6392F', name: 'Red' },
   { ball: '#25B7E8', tint: 'rgba(37, 183, 232, 0.20)', ink: '#1487B0', name: 'Blue' },
   { ball: '#F0A430', tint: 'rgba(240, 164, 48, 0.22)', ink: '#C07A14', name: 'Amber' },
   { ball: '#9B72E0', tint: 'rgba(155, 114, 224, 0.20)', ink: '#6F49B4', name: 'Violet' },
+  { ball: '#3EB56B', tint: 'rgba(62, 181, 107, 0.20)', ink: '#2A8850', name: 'Green' },
+  { ball: '#EE4B96', tint: 'rgba(238, 75, 150, 0.20)', ink: '#BB2E6E', name: 'Pink' },
+  { ball: '#0FA8A0', tint: 'rgba(15, 168, 160, 0.20)', ink: '#0B7B75', name: 'Teal' },
+  { ball: '#6B7A99', tint: 'rgba(107, 122, 153, 0.22)', ink: '#4B5770', name: 'Slate' },
 ];
 
-const TILE_FILL = '#F8EBDA';
-const TILE_BLOCKED = '#E0C6B4';
+// Repainted from CSS custom properties whenever the theme changes, so the
+// board always sits in the same world as the rest of the app.
+export const BOARD_SKIN = {
+  tile: '#F8EBDA',
+  tileDim: '#E0C6B4',
+  wall: '#8B6B57',
+  wallInk: 'rgba(0,0,0,0.20)',
+  shadow: 'rgba(90, 45, 25, 0.16)',
+};
+
+export function setBoardSkin(next) {
+  Object.assign(BOARD_SKIN, next);
+}
+
 const PIP = '#FFFFFF';
 
 const easeOut = (t) => 1 - Math.pow(1 - t, 3);
@@ -103,6 +125,32 @@ function drawDisc(ctx, cx, cy, r, color, count, scale = 1) {
 
 /* ---------------------------------------------------------------- drawing -- */
 
+/** Territory tint by side: partners share one, so you read teams at a glance. */
+function tintFor(view, o) {
+  const teams = view.teams;
+  if (!teams) return PLAYER_COLORS[o].tint;
+  const lead = Array.prototype.indexOf.call(teams, teams[o]);
+  return PLAYER_COLORS[lead >= 0 ? lead : o].tint;
+}
+
+/** A wall: solid, hatched, and visibly not a tile you could ever play. */
+function drawWall(ctx, L, x, y, radius) {
+  ctx.save();
+  roundRect(ctx, x, y, L.tile, L.tile, radius);
+  ctx.fillStyle = BOARD_SKIN.wall;
+  ctx.fill();
+  ctx.clip();
+  ctx.strokeStyle = BOARD_SKIN.wallInk;
+  ctx.lineWidth = Math.max(1, L.tile * 0.06);
+  ctx.beginPath();
+  for (let k = -1; k < 3; k++) {
+    ctx.moveTo(x + k * L.tile * 0.44, y + L.tile);
+    ctx.lineTo(x + k * L.tile * 0.44 + L.tile, y);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 /**
  * @param {object} view
  * @param {Int8Array} view.owner
@@ -117,7 +165,9 @@ function drawDisc(ctx, cx, cy, r, color, count, scale = 1) {
 export function drawBoard(ctx, L, view) {
   const { owner, count } = view;
   const hidden = view.hidden || null;
-  const blocked = view.blocked || null;
+  const dim = view.blocked || null;   // placement-phase "you can't open here"
+  const walls = view.walls || null;   // permanent obstacles
+  const land = view.land || null;     // tiles mid-landing: index -> 0..1
   const legal = view.legal || null;
   const radius = L.tile * 0.22;
   const discR = L.tile * 0.34;
@@ -125,23 +175,26 @@ export function drawBoard(ctx, L, view) {
   for (let i = 0; i < owner.length; i++) {
     const x = L.x0 + (i % L.cols) * (L.tile + L.gap);
     const y = L.y0 + ((i / L.cols) | 0) * (L.tile + L.gap);
+
+    if (walls && walls[i]) { drawWall(ctx, L, x, y, radius); continue; }
+
     const o = hidden && hidden.has(i) ? EMPTY : owner[i];
     const c = hidden && hidden.has(i) ? 0 : count[i];
 
     // Tile bed.
     ctx.save();
-    ctx.shadowColor = 'rgba(90, 45, 25, 0.16)';
+    ctx.shadowColor = BOARD_SKIN.shadow;
     ctx.shadowBlur = L.tile * 0.09;
     ctx.shadowOffsetY = L.tile * 0.035;
     roundRect(ctx, x, y, L.tile, L.tile, radius);
-    ctx.fillStyle = blocked && blocked.has(i) ? TILE_BLOCKED : TILE_FILL;
+    ctx.fillStyle = dim && dim.has(i) ? BOARD_SKIN.tileDim : BOARD_SKIN.tile;
     ctx.fill();
     ctx.restore();
 
-    // Owner tint behind the disc.
+    // Territory tint behind the disc — partners share a tint in team modes.
     if (o !== EMPTY) {
       roundRect(ctx, x, y, L.tile, L.tile, radius);
-      ctx.fillStyle = PLAYER_COLORS[o].tint;
+      ctx.fillStyle = tintFor(view, o);
       ctx.fill();
     }
 
@@ -172,9 +225,22 @@ export function drawBoard(ctx, L, view) {
 
     let scale = 1;
     if (view.popAt === i && view.popT !== undefined) {
-      // Overshoot then settle, so a landing ball reads as impact.
+      // Overshoot then settle, so a placed ball reads as impact.
       const t = view.popT;
       scale = t < 1 ? 1 + 0.28 * Math.sin(Math.PI * t) : 1;
+    }
+    if (land && land.has(i)) {
+      // A ball just touched down here: snap up from small, with a shock ring.
+      const t = land.get(i);
+      scale = 0.45 + 0.55 * easeOut(t) + 0.20 * Math.sin(Math.PI * t);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x + L.tile / 2, y + L.tile / 2, discR * (1 + 1.4 * t), 0, Math.PI * 2);
+      ctx.strokeStyle = PLAYER_COLORS[o].ball;
+      ctx.globalAlpha = 0.55 * (1 - t);
+      ctx.lineWidth = Math.max(1.5, L.tile * 0.05 * (1 - t));
+      ctx.stroke();
+      ctx.restore();
     }
     drawDisc(ctx, x + L.tile / 2, y + L.tile / 2, discR, PLAYER_COLORS[o].ball, c, scale);
 
@@ -192,22 +258,53 @@ export function drawBoard(ctx, L, view) {
   }
 }
 
-/** Balls in flight during a bust wave. */
+// Flight occupies the first LAND_AT of a wave; the rest is the landing pop.
+const LAND_AT = 0.72;
+
+/** Balls in flight during a bust wave, with a motion trail behind each. */
 function drawFlyers(ctx, L, busts, t) {
   const discR = L.tile * 0.34;
   const r = discR * 0.52;
+  const flight = Math.min(1, t / LAND_AT);
+  const e = easeOut(flight);
+
   for (const b of busts) {
     const from = cellCentre(L, b.at);
+    const colour = PLAYER_COLORS[b.player].ball;
+
+    // The tile that just burst collapses outward as its balls leave.
+    if (flight < 1) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(from.cx, from.cy, discR * (0.7 + 1.5 * flight), 0, Math.PI * 2);
+      ctx.strokeStyle = colour;
+      ctx.globalAlpha = 0.45 * (1 - flight);
+      ctx.lineWidth = Math.max(1.5, L.tile * 0.06 * (1 - flight));
+      ctx.stroke();
+      ctx.restore();
+    }
+    if (flight >= 1) continue; // landed; drawBoard draws the pop from here
+
     for (const target of b.to) {
       const to = cellCentre(L, target);
-      const e = easeOut(t);
       const cx = from.cx + (to.cx - from.cx) * e;
       const cy = from.cy + (to.cy - from.cy) * e;
       // Slight arc so the throw has some weight to it.
-      const lift = Math.sin(Math.PI * t) * L.tile * 0.10;
+      const lift = Math.sin(Math.PI * flight) * L.tile * 0.12;
+
       ctx.save();
-      ctx.globalAlpha = t > 0.88 ? 1 - (t - 0.88) / 0.12 * 0.15 : 1;
-      drawDisc(ctx, cx, cy - lift, r, PLAYER_COLORS[b.player].ball, 0, 1);
+      // Trail: a couple of ghosts along the path already travelled.
+      for (let k = 1; k <= 2; k++) {
+        const te = easeOut(Math.max(0, flight - k * 0.09));
+        const tx = from.cx + (to.cx - from.cx) * te;
+        const ty = from.cy + (to.cy - from.cy) * te;
+        const tl = Math.sin(Math.PI * Math.max(0, flight - k * 0.09)) * L.tile * 0.12;
+        ctx.globalAlpha = 0.20 / k;
+        drawDisc(ctx, tx, ty - tl, r * (1 - 0.16 * k), colour, 0, 1);
+      }
+      ctx.globalAlpha = 1;
+      // Squash along the direction of travel, eased out as it arrives.
+      drawDisc(ctx, cx, cy - lift, r, colour, 0, 1 + 0.12 * Math.sin(Math.PI * flight));
       ctx.restore();
     }
   }
@@ -393,8 +490,18 @@ export class BoardAnimator {
 
     if (f.kind === 'wave') {
       const prev = p.frames[p.idx - 1];
-      const hidden = new Set(f.busts.map((b) => b.at));
-      drawBoard(ctx, this.L, { owner: prev.owner, count: prev.count, hidden, pulse, ...p.chrome });
+      if (t < LAND_AT) {
+        // Balls still in the air: the pre-wave board, minus the tiles mid-bust.
+        const hidden = new Set(f.busts.map((b) => b.at));
+        drawBoard(ctx, this.L, { owner: prev.owner, count: prev.count, hidden, pulse, ...p.chrome });
+      } else {
+        // Touchdown: the post-wave board, with every tile that just took a ball
+        // snapping up into place.
+        const lt = (t - LAND_AT) / (1 - LAND_AT);
+        const land = new Map();
+        for (const b of f.busts) for (const target of b.to) land.set(target, lt);
+        drawBoard(ctx, this.L, { owner: f.owner, count: f.count, land, pulse, ...p.chrome });
+      }
       drawFlyers(ctx, this.L, f.busts, t);
     } else {
       const view = { owner: f.owner, count: f.count, pulse, ...p.chrome };

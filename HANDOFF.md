@@ -39,6 +39,26 @@
 >   results). `rank.js` takes opponent ratings as input, so an online result could
 >   feed the same scorer later.
 >
+> **Added in the modes + design pass:**
+> - **Seven game modes** (`src/modes.js`): Duel 1v1, Rumble 4-way, Big Arena,
+>   Mayhem (8 players, 12×12), Duos (2v2 teams), Chaos (mirrored walls), Custom.
+>   Mode is chosen first and is orthogonal to solo/local/online; it repaints the
+>   app via `<html data-theme>`.
+> - **Engine gained teams and walls** — both additive and fully back-compatible
+>   (all 17 original tests untouched and passing). `createGame({ teams, blocked })`.
+>   A bust reinforces a team-mate instead of stealing; balls fired into a wall are
+>   lost like balls fired off the edge. 10 new engine tests.
+> - **Eight seat colours.** Indices 0–3 are the original palette and must not move.
+>   Past four players the score chips drop the rotated edge layout for flat rails —
+>   which also hands the board back ~25% of its width outside pass-and-play.
+> - **Design language** stated at the top of `styles.css` and mirrored in the
+>   README: a token layer (`--lift-*`, `--r-*`, `--s-*`, motion easings) plus seven
+>   theme palette blocks. The canvas reads its skin back out of the same custom
+>   properties (`setBoardSkin`), so board and DOM can't drift.
+> - **Animation**: balls now visibly *land* — flight occupies the first 72% of a
+>   wave, then the post-wave board snaps in with a shock ring per tile; flyers have
+>   motion trails and the bursting tile collapses outward.
+>
 > **Still needs a live test (could not be done here):**
 > - **Online multiplayer** — still never had two clients connected. One real bug fixed
 >   on inspection: the client forced `serialization: 'json'` while the host used the

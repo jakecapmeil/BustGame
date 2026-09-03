@@ -36,25 +36,51 @@ export function yOf(state, i) {
   return (i / state.cols) | 0;
 }
 
-/** Orthogonal in-bounds neighbours, always in ascending index order. */
+/** True if this tile is a wall — it can never hold a ball or be owned. */
+export function isBlocked(state, i) {
+  return state.blocked ? state.blocked[i] === 1 : false;
+}
+
+/**
+ * Orthogonal neighbours that can actually receive a ball, ascending.
+ * Off-board *and* walled directions are both simply missing, so a ball aimed
+ * that way is lost — walls tax a bust exactly the way the board edge does.
+ */
 export function neighbors(state, i) {
   const { cols, rows } = state;
   const x = i % cols;
   const y = (i / cols) | 0;
+  const b = state.blocked;
   const out = [];
-  if (y > 0) out.push(i - cols);
-  if (x > 0) out.push(i - 1);
-  if (x < cols - 1) out.push(i + 1);
-  if (y < rows - 1) out.push(i + cols);
+  if (y > 0 && (!b || !b[i - cols])) out.push(i - cols);
+  if (x > 0 && (!b || !b[i - 1])) out.push(i - 1);
+  if (x < cols - 1 && (!b || !b[i + 1])) out.push(i + 1);
+  if (y < rows - 1 && (!b || !b[i + cols])) out.push(i + cols);
   return out;
 }
 
-/** How many balls a bust on this tile actually keeps on the board (2..4). */
+/** How many balls a bust on this tile actually keeps on the board (0..4). */
 export function outDegree(state, i) {
-  const { cols, rows } = state;
-  const x = i % cols;
-  const y = (i / cols) | 0;
-  return (x > 0 ? 1 : 0) + (x < cols - 1 ? 1 : 0) + (y > 0 ? 1 : 0) + (y < rows - 1 ? 1 : 0);
+  return neighbors(state, i).length;
+}
+
+/* ------------------------------------------------------------------ teams -- */
+
+/** Team a player fights for. With no teams set, everyone is their own side. */
+export function teamOf(state, pid) {
+  return state.teams ? state.teams[pid] : pid;
+}
+
+/** Do these two player ids fight on the same side? EMPTY is nobody's friend. */
+export function sameTeam(state, a, b) {
+  return a !== EMPTY && b !== EMPTY && teamOf(state, a) === teamOf(state, b);
+}
+
+/** Every player id sharing the winner's side (just the winner in a free-for-all). */
+export function winnersOf(state) {
+  if (state.winner === null || state.winner === undefined) return [];
+  const t = teamOf(state, state.winner);
+  return state.players.filter((p) => teamOf(state, p.id) === t).map((p) => p.id);
 }
 
 /* ------------------------------------------------------------------ setup -- */
@@ -64,14 +90,18 @@ export function outDegree(state, i) {
  * @param {number} opts.cols
  * @param {number} opts.rows
  * @param {Array<{name:string, kind:'human'|'ai', difficulty?:string}>} opts.players
+ * @param {number[]} [opts.teams]     team id per player; omit for a free-for-all
+ * @param {ArrayLike<number>} [opts.blocked] 1 per walled tile; omit for an open board
  */
-export function createGame({ cols, rows, players }) {
+export function createGame({ cols, rows, players, teams = null, blocked = null }) {
   const n = cols * rows;
   return {
     cols,
     rows,
     owner: new Int8Array(n).fill(EMPTY),
     count: new Uint8Array(n),
+    blocked: blocked ? Uint8Array.from(blocked) : null,
+    teams: teams ? Int8Array.from(teams) : null,
     players: players.map((p, i) => ({
       id: i,
       name: p.name,
@@ -94,6 +124,9 @@ export function cloneGame(s) {
     rows: s.rows,
     owner: s.owner.slice(),
     count: s.count.slice(),
+    // Walls and team assignment never change mid-game, so they are shared.
+    blocked: s.blocked,
+    teams: s.teams,
     players: s.players.map((p) => ({ ...p })),
     turn: s.turn,
     phase: s.phase,
@@ -128,24 +161,32 @@ function conflictsWithStarts(state, i) {
  * taken? Backtracking search — the board is small (<= 81 tiles) and remaining
  * is at most 3, so this is cheap and runs on every legality query.
  */
-function placementFeasible(cols, rows, starts, remaining) {
+function placementFeasible(cols, rows, blocked, starts, remaining, budget) {
   if (remaining <= 0) return true;
   const n = cols * rows;
   for (let i = 0; i < n; i++) {
+    if (blocked && blocked[i]) continue;
+    if (budget.left-- <= 0) return true; // give up and allow, rather than hang
     let ok = true;
     for (const s of starts) {
       if (masksOverlap(cols, i, s)) { ok = false; break; }
     }
     if (!ok) continue;
     starts.push(i);
-    const feasible = placementFeasible(cols, rows, starts, remaining - 1);
+    const feasible = placementFeasible(cols, rows, blocked, starts, remaining - 1, budget);
     starts.pop();
     if (feasible) return true;
   }
   return false;
 }
 
-/** Tiles the current player may open on. */
+/**
+ * Tiles the current player may open on.
+ *
+ * The scan is greedy-first (it always tries the lowest free index), which seats
+ * a full table on the first descent in every realistic position; the node
+ * budget only exists so a pathological board can never wedge the UI thread.
+ */
 export function legalPlacements(state) {
   const n = state.cols * state.rows;
   const taken = state.starts.filter((s) => s !== null && s !== undefined);
@@ -153,9 +194,13 @@ export function legalPlacements(state) {
   const remaining = state.players.length - taken.length - 1;
   const out = [];
   for (let i = 0; i < n; i++) {
+    if (isBlocked(state, i)) continue;
     if (conflictsWithStarts(state, i)) continue;
     // Don't let an opening strand a later player with nowhere legal to go.
-    if (remaining > 0 && !placementFeasible(state.cols, state.rows, [...taken, i], remaining)) continue;
+    if (remaining > 0) {
+      const budget = { left: 20000 };
+      if (!placementFeasible(state.cols, state.rows, state.blocked, [...taken, i], remaining, budget)) continue;
+    }
     out.push(i);
   }
   return out;
@@ -198,14 +243,15 @@ export function scores(state) {
   return { tiles, balls };
 }
 
-/** Index of the only surviving player, or -1 if more than one is left. */
-function soleSurvivor(state) {
+/** The only team still holding tiles, or -1 if more than one is left. */
+function soleSurvivingTeam(state) {
   let found = -1;
   for (let i = 0; i < state.owner.length; i++) {
     const o = state.owner[i];
     if (o === EMPTY) continue;
-    if (found === -1) found = o;
-    else if (found !== o) return -1;
+    const t = teamOf(state, o);
+    if (found === -1) found = t;
+    else if (found !== t) return -1;
   }
   return found;
 }
@@ -261,10 +307,10 @@ export function applyMove(prev, moveIdx) {
   let waves = 0;
 
   while (pending.length && waves++ < MAX_WAVES) {
-    // Once a single player holds every ball on the board the cascade is
+    // Once a single side holds every ball on the board the cascade is
     // decided; stopping here also rules out a runaway loop on a full board,
     // where interior busts conserve balls and could otherwise ping-pong.
-    if (soleSurvivor(state) !== -1 && !opening) break;
+    if (soleSurvivingTeam(state) !== -1 && !opening) break;
 
     const wave = [...new Set(pending)].sort((a, b) => a - b);
     const busts = wave.map((i) => ({ at: i, player: state.owner[i], to: neighbors(state, i) }));
@@ -276,7 +322,9 @@ export function applyMove(prev, moveIdx) {
     const next = new Set();
     for (const b of busts) {
       for (const t of b.to) {
-        state.owner[t] = b.player;
+        // A ball landing on a team-mate reinforces their tile without stealing
+        // it; anything else is captured outright.
+        if (!sameTeam(state, state.owner[t], b.player)) state.owner[t] = b.player;
         state.count[t] += 1;
         if (state.count[t] > MAX_BALLS) next.add(t);
       }
@@ -312,9 +360,14 @@ export function applyMove(prev, moveIdx) {
       if (p.alive && tilesOwnedBy(state, p.id) === 0) p.alive = false;
     }
     const alive = state.players.filter((p) => p.alive);
-    if (alive.length <= 1) {
+    // A side is out only when every one of its players is out, so a partner can
+    // carry the team.
+    const aliveTeams = new Set(alive.map((p) => teamOf(state, p.id)));
+    if (aliveTeams.size <= 1) {
       state.phase = PHASE_OVER;
-      state.winner = alive.length === 1 ? alive[0].id : player;
+      // `winner` is a representative of the winning side; `winnersOf(state)`
+      // expands it to the whole team.
+      state.winner = alive.length ? alive[0].id : player;
     }
   }
 

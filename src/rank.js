@@ -15,20 +15,21 @@
 /* ------------------------------------------------------------------ ranks -- */
 
 /**
- * `opponents` is the number of BOTS (total players = opponents + 1, capped at 4).
- * `board` indexes BOARD_SIZES[totalPlayers]. `pool` is the difficulty draw.
+ * The ladder. A rank sets only *how strong* your opponents are — the shape of
+ * the match (seats, board, teams, walls) belongs to the selected mode, so you
+ * climb the same ladder whichever mode you prefer to play.
  */
 export const RANKS = [
-  { key: 'wood',     name: 'Woodline',   min: 0,    opponents: 1, board: 'small',  pool: ['easy'] },
-  { key: 'stone',    name: 'Stoneworks', min: 120,  opponents: 1, board: 'medium', pool: ['easy', 'medium'] },
-  { key: 'bronze',   name: 'Bronze',     min: 300,  opponents: 2, board: 'small',  pool: ['medium'] },
-  { key: 'iron',     name: 'Ironhold',   min: 520,  opponents: 2, board: 'medium', pool: ['medium', 'hard'] },
-  { key: 'silver',   name: 'Silver',     min: 800,  opponents: 2, board: 'large',  pool: ['hard'] },
-  { key: 'gold',     name: 'Gold',       min: 1150, opponents: 3, board: 'small',  pool: ['hard', 'expert'] },
-  { key: 'platinum', name: 'Platinum',   min: 1550, opponents: 3, board: 'medium', pool: ['expert'] },
-  { key: 'diamond',  name: 'Diamond',    min: 2000, opponents: 3, board: 'medium', pool: ['expert', 'brutal'] },
-  { key: 'master',   name: 'Master',     min: 2600, opponents: 3, board: 'large',  pool: ['brutal'] },
-  { key: 'legend',   name: 'Legend',     min: 3300, opponents: 3, board: 'large',  pool: ['brutal'] },
+  { key: 'wood',     name: 'Woodline',   min: 0,    pool: ['easy'] },
+  { key: 'stone',    name: 'Stoneworks', min: 120,  pool: ['easy', 'medium'] },
+  { key: 'bronze',   name: 'Bronze',     min: 300,  pool: ['medium'] },
+  { key: 'iron',     name: 'Ironhold',   min: 520,  pool: ['medium', 'hard'] },
+  { key: 'silver',   name: 'Silver',     min: 800,  pool: ['hard'] },
+  { key: 'gold',     name: 'Gold',       min: 1150, pool: ['hard', 'expert'] },
+  { key: 'platinum', name: 'Platinum',   min: 1550, pool: ['expert'] },
+  { key: 'diamond',  name: 'Diamond',    min: 2000, pool: ['expert', 'brutal'] },
+  { key: 'master',   name: 'Master',     min: 2600, pool: ['brutal'] },
+  { key: 'legend',   name: 'Legend',     min: 3300, pool: ['brutal'] },
 ];
 
 export function rankIndexFor(trophies) {
@@ -75,21 +76,19 @@ const mulberry32 = (seed) => () => {
 };
 
 /**
- * Build the next ranked match for a player sitting on `trophies`.
+ * Field the bots for a ranked match. The mode has already decided how many
+ * seats there are; the rank decides how hard each bot plays and what rating it
+ * carries into the Elo maths.
  *
  * @param {number} trophies
- * @param {(count:number)=>[number,number]} boardFor  maps player count -> [cols, rows]
- *        using the app's BOARD_SIZES + a size key.
+ * @param {number} seats   total players including the human
  * @param {() => number} [rnd]
- * @returns {{ rankKey:string, cols:number, rows:number,
- *             players:Array<{name,kind,difficulty}>, ratings:number[] }}
+ * @returns {{ rankKey:string, players:Array<{name,kind,difficulty}>, ratings:number[] }}
  *          `players[0]` / `ratings[0]` are the human.
  */
-export function matchmake(trophies, boardFor, rnd = Math.random) {
+export function matchmake(trophies, seats, rnd = Math.random) {
   const rank = rankFor(trophies);
-  const botCount = Math.min(3, rank.opponents);
-  const total = botCount + 1;
-  const [cols, rows] = boardFor(total, rank.board);
+  const botCount = Math.max(1, seats - 1);
 
   const players = [{ name: 'You', kind: 'human', difficulty: 'medium' }];
   const ratings = [trophies];
@@ -106,12 +105,12 @@ export function matchmake(trophies, boardFor, rnd = Math.random) {
     });
     ratings.push(rating);
   }
-  return { rankKey: rank.key, cols, rows, players, ratings };
+  return { rankKey: rank.key, players, ratings };
 }
 
 /** Deterministic matchmaking for a given match number — keeps tests stable. */
-export function matchmakeSeeded(trophies, boardFor, matchNo) {
-  return matchmake(trophies, boardFor, mulberry32((trophies | 0) * 2654435761 + matchNo));
+export function matchmakeSeeded(trophies, seats, matchNo) {
+  return matchmake(trophies, seats, mulberry32((trophies | 0) * 2654435761 + matchNo));
 }
 
 /* ----------------------------------------------------------------- scoring -- */
@@ -124,21 +123,42 @@ function kFactor(trophies, played) {
   return 40;
 }
 
+/** Which side a player is on. Mirrors engine.teamOf without importing it. */
+function teamOf(state, pid) {
+  return state.teams ? state.teams[pid] : pid;
+}
+
+/** Everyone sharing the winner's side — the whole team in a Duos match. */
+function winnerSet(state) {
+  if (state.winner === null || state.winner === undefined) return new Set();
+  const t = teamOf(state, state.winner);
+  return new Set(state.players.filter((p) => teamOf(state, p.id) === t).map((p) => p.id));
+}
+
 /**
  * Finishing order, best first. `placement[pid]` = 1 (winner) .. n (first out).
- * Losers are ranked by how long they lasted (`elimTurn`, higher = later).
+ * Every member of the winning side shares first place; losers are ranked by how
+ * long they lasted (`elimTurn`, higher = later).
  */
 export function placements(state, elimTurn) {
   const n = state.players.length;
+  const won = winnerSet(state);
   const ids = [];
   for (let i = 0; i < n; i++) ids.push(i);
   ids.sort((a, b) => {
-    if (a === state.winner) return -1;
-    if (b === state.winner) return 1;
+    const wa = won.has(a) ? 1 : 0;
+    const wb = won.has(b) ? 1 : 0;
+    if (wa !== wb) return wb - wa;
     return (elimTurn[b] || 0) - (elimTurn[a] || 0); // lasted longer => better
   });
   const place = new Array(n).fill(n);
-  ids.forEach((pid, i) => { place[pid] = i + 1; });
+  let rank = 0;
+  ids.forEach((pid, i) => {
+    // Team-mates who won together tie for first rather than 1st and 2nd.
+    if (i > 0 && won.has(pid) && won.has(ids[i - 1])) { place[pid] = place[ids[i - 1]]; return; }
+    rank = i + 1;
+    place[pid] = rank;
+  });
   return place;
 }
 
@@ -160,26 +180,37 @@ export function scoreResult({ state, myId, ratings, elimTurn, trophies, played }
   const n = state.players.length;
   const place = placements(state, elimTurn);
   const myPlace = place[myId];
-  const win = state.winner === myId;
+  const win = winnerSet(state).has(myId);   // a partner's win is your win
   const myRating = ratings[myId];
+  const myTeam = teamOf(state, myId);
 
   // Elo, averaged over every opponent as an implicit 1v1 (placed above => 1).
+  // Team-mates are not opponents, so they never enter the maths.
   const breakdown = [];
   let sum = 0;
   for (let pid = 0; pid < n; pid++) {
-    if (pid === myId) continue;
+    if (pid === myId || teamOf(state, pid) === myTeam) continue;
     const result = myPlace < place[pid] ? 1 : myPlace > place[pid] ? 0 : 0.5;
     const expected = expectedScore(myRating, ratings[pid]);
     breakdown.push({ oppId: pid, oppRating: ratings[pid], expected, result });
     sum += result - expected;
   }
+  if (!breakdown.length) {
+    return { delta: 0, win, placement: myPlace, players: n, marginScore: 0, badness: 0, breakdown };
+  }
   const raw = kFactor(trophies, played) * (sum / breakdown.length);
 
-  // How one-sided was it?
-  const boardTiles = state.cols * state.rows;
+  // How one-sided was it? Walls don't count as ground you could have held, and
+  // in a team game your partner's territory is your territory.
+  let boardTiles = 0;
+  for (let i = 0; i < state.owner.length; i++) if (!state.blocked || !state.blocked[i]) boardTiles++;
+  boardTiles = Math.max(1, boardTiles);
   const finalTurn = Math.max(1, state.turnNumber);
   let myTiles = 0;
-  for (let i = 0; i < state.owner.length; i++) if (state.owner[i] === myId) myTiles++;
+  for (let i = 0; i < state.owner.length; i++) {
+    const o = state.owner[i];
+    if (o !== -1 && teamOf(state, o) === myTeam) myTiles++;
+  }
 
   let marginScore = 0;
   let badness = 0;

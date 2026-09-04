@@ -202,7 +202,7 @@
     </button>
 
     <fieldset class="field"><legend>Ladder</legend>
-      <ol class="ladder" id="ladder-list"></ol>
+      <ol class="ladder" id="ladder-list" reversed></ol>
     </fieldset>
   </div>
   <button class="btn btn-primary" id="ranked-play">Play match</button>
@@ -212,28 +212,45 @@
 <section class="screen" id="screen-rules">
   <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back" data-icon="back"></button><h2>How to play</h2></header>
   <div class="scroller rules">
-    <h3>The goal</h3>
-    <p>Wipe every other colour off the board. Last side standing wins.</p>
+    <!-- One card per rule. A single column of headings and paragraphs read as
+         one undifferentiated wall; carded, you can find your way back to the
+         rule you half-remember. -->
+    <section class="rule">
+      <h3>The goal</h3>
+      <p>Wipe every other colour off the board. Last side standing wins.</p>
+    </section>
 
-    <h3>Opening</h3>
-    <p>Everyone picks one tile on the empty board. It <b>busts immediately</b>, throwing a ball to each of its four neighbours — so you start with up to four tiles.</p>
-    <p>Openings claim a <b>3×3 zone</b> and no two zones may overlap, so nobody can crowd anyone out on move one. Reach for a tile inside someone's zone and it <b>flashes red</b> at you.</p>
+    <section class="rule">
+      <h3>Opening</h3>
+      <p>Everyone picks one tile on the empty board. It <b>busts immediately</b>, throwing a ball to each of its four neighbours — so you start with up to four tiles.</p>
+      <p>Openings claim a <b>3×3 zone</b> and no two zones may overlap, so nobody can crowd anyone out on move one. Reach for a tile inside someone's zone and it <b>flashes red</b> at you.</p>
+    </section>
 
-    <h3>Your turn</h3>
-    <p>Tap any tile you own to add a ball. Tiles hold <b>three</b>.</p>
+    <section class="rule">
+      <h3>Your turn</h3>
+      <p>Tap any tile you own to add a ball. Tiles hold <b>three</b>.</p>
+    </section>
 
-    <h3>Busting</h3>
-    <p>Add a ball to a tile that already holds three and it <b>busts</b>: the tile empties and fires one ball into each of the four neighbouring tiles. Every tile a ball lands on becomes yours.</p>
-    <p>If a landing ball pushes a tile past three, that one busts too — chains can run away across the whole board.</p>
+    <section class="rule">
+      <h3>Busting</h3>
+      <p>Add a ball to a tile that already holds three and it <b>busts</b>: the tile empties and fires one ball into each of the four neighbouring tiles. Every tile a ball lands on becomes yours.</p>
+      <p>If a landing ball pushes a tile past three, that one busts too — chains can run away across the whole board.</p>
+    </section>
 
-    <h3>The edge tax</h3>
-    <p>A bust always fires four balls, even with nowhere to put them. Bust on an edge and one ball falls off the board; bust in a corner and you lose two. <b>Walls eat balls the same way.</b> Edges are cheap to hold and expensive to attack from.</p>
+    <section class="rule">
+      <h3>The edge tax</h3>
+      <p>A bust always fires four balls, even with nowhere to put them. Bust on an edge and one ball falls off the board; bust in a corner and you lose two. <b>Walls eat balls the same way.</b> Edges are cheap to hold and expensive to attack from.</p>
+    </section>
 
-    <h3>Teams</h3>
-    <p>In <b>Duos</b> your balls <b>reinforce</b> a partner's tile instead of stealing it, and your side only loses when both of you are wiped out.</p>
+    <section class="rule">
+      <h3>Teams</h3>
+      <p>In <b>Duos</b> your balls <b>reinforce</b> a partner's tile instead of stealing it, and your side only loses when both of you are wiped out.</p>
+    </section>
 
-    <h3>Reading a tile</h3>
-    <p>The dots inside a disc are its balls. A disc with a <b>ring</b> around it is loaded — one more ball and it goes.</p>
+    <section class="rule">
+      <h3>Reading a tile</h3>
+      <p>The dots inside a disc are its balls. A disc with a <b>ring</b> around it is loaded — one more ball and it goes.</p>
+    </section>
   </div>
 </section>
 
@@ -248,6 +265,9 @@
   <div class="board-area" id="board-area">
     <canvas id="board" tabindex="0" role="application" aria-label="Game board"></canvas>
   </div>
+  <!-- How the board is split, right under the board. The score chips carry the
+       exact counts; this carries the shape of the game. -->
+  <div class="share-bar" id="share-bar" aria-hidden="true"></div>
   <div class="turn-banner" id="turn-banner"><span id="turn-text">—</span></div>
 </section>
 

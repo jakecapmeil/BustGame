@@ -2,7 +2,7 @@
    Solo and pass-and-play work with no connection at all; only the online mode
    needs the network, and that request is deliberately never cached. */
 
-const CACHE = 'bust-v8';
+const CACHE = 'bust-v9';
 const ASSETS = [
   './',
   'index.html',

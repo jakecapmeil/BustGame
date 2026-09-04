@@ -105,6 +105,7 @@ const $$ = (sel) => [...document.querySelectorAll(sel)];
 
 const canvas = $('#board');
 const boardArea = $('#board-area');
+const shareBar = $('#share-bar');
 const turnBanner = $('#turn-banner');
 const turnText = $('#turn-text');
 const liveRegion = $('#a11y-live');
@@ -223,10 +224,16 @@ function controlsPlayer(pid) {
 
 function chipHtml(state, pid) {
   const team = state.teams ? ` <span class="who">T${state.teams[pid] + 1}</span>` : '';
+  // Names are hidden on the flat rails (there is no room for eight of them), so
+  // the seat this device plays carries a marker instead — otherwise a rail of
+  // identical pills gives you no way to find your own score.
+  // Pass-and-play controls every seat, so "YOU" there would be on all of them
+  // and say nothing. It only earns its place when one seat is yours.
+  const you = mySeats().length === 1 && controlsPlayer(pid) ? '<span class="me">YOU</span>' : '';
   return `
     <div class="score-chip" data-pid="${pid}">
       <span class="dot" style="background:${PLAYER_COLORS[pid].ball}"></span>
-      <span class="val num">0</span>
+      <span class="val num">0</span>${you}
       <span class="who">${escapeHtml(playerLabel(state.players[pid]))}</span>${team}
     </div>`;
 }
@@ -249,20 +256,23 @@ function buildSeats() {
   if (crowded) {
     const rot = (pid) => (pid - localSeat + n) % n;   // you always sit first
     const ordered = [...state.players].sort((a, b) => rot(a.id) - rot(b.id)).map((p) => p.id);
-    // Read the two rails as one clockwise loop: bottom-left is you, the turn
-    // then climbs the left side, crosses the top rail left-to-right, and comes
-    // back down the right side to bottom-right.
-    const rails = n <= 2
-      ? { bottom: ordered.slice(0, 1), top: ordered.slice(1) }
-      : { bottom: [ordered[0], ordered[n - 1]], top: ordered.slice(1, n - 1) };
+    // Both rails now sit hard against the board rather than at the screen's
+    // edges, so the split is simply "you and your near neighbours below, the
+    // rest above" — the clockwise corner loop it used to describe no longer
+    // exists to describe.
+    const half = Math.ceil(n / 2);
+    const rails = { bottom: ordered.slice(0, half), top: ordered.slice(half).reverse() };
     for (const [slot, ids] of Object.entries(rails)) {
       const el = document.querySelector(`.seat-${slot}`);
       if (!el || !ids.length) continue;
       el.classList.add('is-shown');
       el.innerHTML = ids.map((pid) => chipHtml(state, pid)).join('');
     }
+    buildShareBar(ordered);
     return;
   }
+  shareBar.classList.remove('is-shown');
+  shareBar.innerHTML = '';
 
   const order = SEAT_ORDER[n] || SEAT_ORDER[4];
   for (let pid = 0; pid < n; pid++) {
@@ -275,6 +285,38 @@ function buildSeats() {
   }
 }
 
+/* -------------------------------------------------------------- share bar -- */
+
+/**
+ * One stacked rail under the board showing how much of it each seat holds.
+ * Segments are laid out in the same order the chips read in, and whatever is
+ * left over is unclaimed board — so the bar also shows how much game is left.
+ */
+function buildShareBar(ordered) {
+  shareBar.innerHTML = ordered.map((pid) => (
+    `<i data-pid="${pid}" style="background:${PLAYER_COLORS[pid].ball}"`
+    + `${mySeats().length === 1 && controlsPlayer(pid) ? ' class="mine"' : ''}></i>`
+  )).join('');
+  shareBar.classList.add('is-shown');
+}
+
+function refreshShareBar(tiles) {
+  if (!shareBar.classList.contains('is-shown')) return;
+  const total = session.state.owner.length - countWalls(session.state);
+  for (const seg of shareBar.children) {
+    const pid = Number(seg.dataset.pid);
+    seg.style.width = `${total ? (tiles[pid] / total) * 100 : 0}%`;
+    seg.style.opacity = session.state.players[pid].alive ? '1' : '.35';
+  }
+}
+
+function countWalls(state) {
+  if (!state.blocked) return 0;
+  let n = 0;
+  for (let i = 0; i < state.blocked.length; i++) if (state.blocked[i]) n++;
+  return n;
+}
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -283,14 +325,68 @@ function escapeHtml(s) {
 
 /* ------------------------------------------------------------------ display -- */
 
+/**
+ * Size the canvas to the board.
+ *
+ * In the rotated-seat layout the board area is a grid cell and the canvas
+ * simply fills it — the side columns have a fixed width in CSS, so whatever the
+ * area reports is already clear of them.
+ *
+ * The crowded layout is a centred flex column (rail, board, share bar, rail),
+ * which means the board area has to shrink-wrap the board: if the canvas kept
+ * filling the free space, the rails would be pushed back out to the screen
+ * edges and the HUD would stop being one object again. So we measure what is
+ * left after everything else in the column, lay the board out inside that, then
+ * cut the canvas down to the board's own height plus a margin for the tile
+ * shadows. On a phone the width is the binding constraint, so the second
+ * layout pass lands on the same tile size as the first.
+ */
 function fitBoard() {
   if (!session) return;
-  // The side seat columns have a fixed width in CSS, so whatever the board area
-  // reports is already clear of them.
-  const r = boardArea.getBoundingClientRect();
-  const w = Math.max(80, r.width);
-  const h = Math.max(80, r.height);
-  animator.resize(w, h, session.state.cols, session.state.rows);
+  const { cols, rows } = session.state;
+  const screen = $('#screen-game');
+
+  const crowded = screen.classList.contains('is-crowded');
+  const cs = getComputedStyle(screen);
+  const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+  const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+  const gap = parseFloat(cs.rowGap) || 0;
+
+  // Everything in the column that is not the board: the rails, the share bar,
+  // and (when it is in flow) the turn banner. Absolutely-positioned chrome and
+  // the hidden side rails cost nothing.
+  let taken = 0;
+  let stacked = 0;
+  for (const el of screen.children) {
+    if (el === boardArea || el.offsetParent === null) continue;
+    if (getComputedStyle(el).position === 'absolute') continue;
+    if (!crowded && (el.classList.contains('seat-left') || el.classList.contains('seat-right'))) continue;
+    taken += el.offsetHeight;
+    stacked++;
+  }
+
+  // The rotated layout keeps a rail down each side; the crowded one does not.
+  const sides = crowded ? 0 : ['.seat-left', '.seat-right']
+    .reduce((w, sel) => w + ($(sel).offsetParent ? $(sel).offsetWidth + gap : 0), 0);
+
+  const availW = Math.max(80, screen.clientWidth - padX - sides);
+  const availH = Math.max(80, screen.clientHeight - padY - taken - gap * stacked);
+
+  const probe = animator.resize(availW, availH, cols, rows);
+  // Enough margin to clear the tile drop shadows, and at least the padding
+  // `computeLayout` will subtract again on the second pass.
+  const margin = Math.max(10, Math.min(availW, availH) * 0.026);
+  const wrapped = Math.min(availH, probe.boardH + margin * 2);
+  const L = Math.abs(wrapped - availH) > 1
+    ? animator.resize(availW, wrapped, cols, rows) : probe;
+
+  // The share bar describes the board, so it is exactly as wide as the board.
+  shareBar.style.width = `${Math.round(L.boardW)}px`;
+  // Shrink-wrap the board's own box: in both layouts the chips sit against the
+  // board, so a canvas that kept filling the free space would push them back
+  // out to the screen's edges.
+  boardArea.style.height = `${Math.round(wrapped)}px`;
+
   refreshBoardOnly();
 }
 
@@ -324,6 +420,7 @@ function refresh() {
     chip.classList.toggle('is-turn', s.phase !== PHASE_OVER && s.turn === pid);
     chip.classList.toggle('is-out', !s.players[pid].alive);
   });
+  refreshShareBar(tiles);
 
   turnText.textContent = bannerText();
   turnBanner.style.background = s.phase === PHASE_OVER
@@ -770,14 +867,19 @@ function renderRankedScreen() {
   $('#stat-best').textContent = profile.best;
 
   const mode = currentMode();
-  paintModeHero('ranked-hero', mode, `${describeSetup(mode)} · ${rank.pool.map(difficultyLabel).join('/')} bots`);
+  paintModeHero('ranked-hero', mode, `${describeSetup(mode, true)} · ${rank.pool.map(difficultyLabel).join('/')} bots`);
 
   const here = rankIndexFor(profile.trophies);
   const list = $('#ladder-list');
   list.innerHTML = '';
-  RANKS.forEach((r, i) => {
+  // Top rank at the top: the ladder is something you climb, so it has to run
+  // upward. Rendered in reverse rather than flipped with `column-reverse`, so
+  // the DOM order a screen reader walks matches the order on screen.
+  let hereEl = null;
+  for (let i = RANKS.length - 1; i >= 0; i--) {
+    const r = RANKS[i];
     const li = document.createElement('li');
-    if (i === here) li.classList.add('is-here');
+    if (i === here) { li.classList.add('is-here'); hereEl = li; }
     if (i > here) li.classList.add('is-locked');
     const badge = document.createElement('span');
     badge.className = 'rank-badge';
@@ -791,7 +893,23 @@ function renderRankedScreen() {
     min.innerHTML = `${r.min}${icon('trophy', 'ico-inline')}`;
     li.appendChild(min);
     list.appendChild(li);
-  });
+  }
+
+  // Ten ranks do not fit on a phone, and the one that matters is your own —
+  // so open the ladder on it rather than at the top of the run.
+  // Driven off scrollTop rather than scrollIntoView: the screen is
+  // position:fixed, and scrollIntoView will happily scroll the document
+  // instead of the pane the row actually lives in. Measured synchronously —
+  // the rows are in the DOM, and a rAF here would never fire on a hidden tab.
+  const scroller = list.closest('.scroller');
+  if (hereEl && scroller) {
+    const delta = hereEl.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+    const want = scroller.scrollTop + delta - scroller.clientHeight / 2 + hereEl.offsetHeight / 2;
+    // Instant, not smooth: the ladder should simply already be on your rank
+    // when the screen opens, and a smooth scroll is rAF-driven — it never
+    // lands if the tab is in the background when the screen is built.
+    scroller.scrollTop = Math.max(0, want);
+  }
 }
 
 /**
@@ -899,7 +1017,10 @@ function paintModeHero(prefix, mode, subOverride) {
   const sub = $(`#${prefix}-sub`);
   if (g) g.innerHTML = icon(mode.icon);
   if (n) n.textContent = mode.name;
-  if (sub) sub.textContent = subOverride || `${mode.tagline} · ${describeSetup(mode)}`;
+  // No tagline here. The hero already gives the mode its name in 19px type, so
+  // the second line is worth more spent on the shape of the match — and with
+  // the tagline in front, the longest mode ran off the end into an ellipsis.
+  if (sub) sub.textContent = subOverride || describeSetup(mode);
 }
 
 function renderModeGrid() {
@@ -918,7 +1039,7 @@ function renderModeGrid() {
       <span class="mode-glyph" aria-hidden="true">${icon(MODES[key].icon)}</span>
       <span>
         <span class="mode-card-name">${escapeHtml(MODES[key].name)}</span><br>
-        <span class="mode-card-tag">${escapeHtml(MODES[key].tagline)} · ${escapeHtml(describeSetup(m))}</span>
+        <span class="mode-card-tag">${escapeHtml(MODES[key].tagline)} · ${escapeHtml(describeSetup(m, true))}</span>
       </span>
       <span class="mode-card-check" aria-hidden="true">${icon('check')}</span>`;
     grid.appendChild(b);
@@ -1236,8 +1357,10 @@ $('#online-leave').addEventListener('click', () => {
 
 /* ------------------------------------------------------------------ chrome -- */
 
+// Watch the screen, not the board area: `fitBoard` resizes the board area, so
+// observing that would feed its own output straight back in.
 const ro = new ResizeObserver(() => { if (currentScreen === 'screen-game') fitBoard(); });
-ro.observe(boardArea);
+ro.observe($('#screen-game'));
 window.addEventListener('orientationchange', () => setTimeout(fitBoard, 220));
 
 document.addEventListener('visibilitychange', () => {

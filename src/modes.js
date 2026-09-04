@@ -41,12 +41,12 @@ export const MODES = {
     seats: 8, board: [12, 12], teams: null, wallDensity: 0, theme: 'blaze', icon: 'mayhem',
   },
   duos: {
-    key: 'duos', name: 'Duos', tagline: '2 v 2 teams',
+    key: 'duos', name: 'Duos', tagline: 'Play in pairs',
     blurb: 'Partners share a win. Busts feed your team-mate instead of stealing from them.',
     seats: 4, board: [10, 10], teams: [0, 1, 0, 1], wallDensity: 0, theme: 'gild', icon: 'duos',
   },
   chaos: {
-    key: 'chaos', name: 'Chaos', tagline: 'Walls · big map',
+    key: 'chaos', name: 'Chaos', tagline: 'A mirrored maze',
     blurb: 'A mirrored maze of walls. Balls fired into a wall are gone — pick your angles.',
     seats: 4, board: [10, 10], teams: null, wallDensity: 0.13, theme: 'toxic', icon: 'chaos',
   },
@@ -152,9 +152,15 @@ export function buildSetup(modeKey, custom = null, seed = Date.now()) {
   return { cols, rows, seats, teams, blocked, seed, mode: cfg };
 }
 
-/** Human-readable one-liner for a setup, e.g. "4 seats · 10×10 · walls". */
-export function describeSetup(cfg) {
-  const bits = [`${cfg.seats} seats`, `${cfg.board[0]}×${cfg.board[1]}`];
+/**
+ * Human-readable one-liner for a setup, e.g. "4 seats · 10×10 · walls".
+ *
+ * `compact` shortens "4 seats" to "4p" — the mode cards put this after a
+ * tagline on one line, and the long form pushed the last fact (usually the one
+ * that matters, "walls") off the end into an ellipsis.
+ */
+export function describeSetup(cfg, compact = false) {
+  const bits = [compact ? `${cfg.seats}p` : `${cfg.seats} seats`, `${cfg.board[0]}×${cfg.board[1]}`];
   if (cfg.teams) bits.push('2v2');
   if (cfg.wallDensity) bits.push('walls');
   return bits.join(' · ');

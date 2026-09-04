@@ -112,6 +112,24 @@ Five rungs, each strictly stronger than the last:
 
 The search runs on a wall-clock budget so it never janks a phone mid-turn.
 
+## The game screen
+
+The HUD is one object, not four corners. Banner, the opponents' rail, the board,
+a share bar and your own rail sit in a single centred column, so a score is
+always next to the board it counts rather than a couple of hundred pixels away
+at the edge of the screen. `fitBoard` shrink-wraps the canvas to the board for
+exactly this reason — a canvas that filled the free space would push the rails
+back out to the edges.
+
+- The **share bar** under the board is one stacked rail of how much each seat
+  holds; whatever is left over is unclaimed board. Two numbers on opposite rails
+  never answered "am I winning" at a glance.
+- The seat this device plays is marked **YOU** — but only when there is one such
+  seat. In pass-and-play every seat is yours, and the marker would say nothing.
+- **Pass-and-play keeps the rotated edge seats**, because the device really is
+  being turned around. Everywhere else the chips go into flat rails, which also
+  hands the board back the width the side columns would have eaten.
+
 ## Accessibility
 
 - The board canvas is focusable. **Arrow keys** (or WASD) move a cursor, **Enter** or
@@ -181,9 +199,11 @@ in the background (stale-while-revalidate), so an update lands on the next load.
 
 `styles.css` opens with the full statement of it; the short version is six rules:
 
-1. **Extruded, not flat.** Controls sit on a hard, unblurred bottom shadow and
-   collapse into it on press. Blur is reserved for things genuinely floating —
-   modals, and the board's tiles.
+1. **Extruded, not flat.** Controls sit on a hard, unblurred bottom shadow and a
+   top highlight, and collapse into the shadow on press. The highlight is what
+   keeps a translucent panel legible as a raised face on a field it is barely
+   tinted against. Blur is reserved for things genuinely floating — modals, and
+   the board's tiles.
 2. **One accent per screen.** The active mode owns the palette. The only other
    saturated colours in the chrome are the eight seat colours, and those belong to
    the board.

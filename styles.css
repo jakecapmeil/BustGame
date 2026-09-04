@@ -5,9 +5,11 @@
    Six rules everything here follows:
 
    1. EXTRUDED, NOT FLAT. Every control sits on a hard bottom shadow
-      (`0 Npx 0`, never blurred) and collapses into it on press. Blurred
-      shadows are reserved for things genuinely floating above the app —
-      modals and the board's tiles.
+      (`0 Npx 0`, never blurred) and a top highlight (`--edge`), and collapses
+      into the shadow on press. The highlight is what keeps a translucent panel
+      readable as a raised face on a field it is barely tinted against — without
+      it a screen of panels reads as one wash. Blurred shadows are reserved for
+      things genuinely floating above the app — modals and the board's tiles.
    2. ONE ACCENT PER SCREEN. The active mode owns the palette. The only other
       saturated colours allowed in the chrome are the eight seat colours, and
       those belong to the board and the score chips.
@@ -35,20 +37,26 @@
   --tile-dim: #E0C6B4;
   --wall: #8B6B57;
 
-  /* ---- derived surfaces (theme-independent) ---- */
-  --panel: rgba(255, 255, 255, 0.15);
-  --panel-2: rgba(255, 255, 255, 0.24);
-  --panel-3: rgba(255, 255, 255, 0.36);
-  --sink: rgba(0, 0, 0, 0.16);
+  /* ---- derived surfaces (theme-independent) ----
+     A panel is a *lit* face, not a wash: it carries a top highlight and a hard
+     bottom shadow so it reads as raised even when its tint is close to the
+     field behind it. `--edge` is that highlight, applied wherever a surface
+     needs to separate itself from the background. */
+  --panel: rgba(255, 255, 255, 0.19);
+  --panel-2: rgba(255, 255, 255, 0.29);
+  --panel-3: rgba(255, 255, 255, 0.44);
+  --sink: rgba(0, 0, 0, 0.22);
   --card: #FBF1E4;
   --hairline: rgba(255, 255, 255, 0.20);
+  --edge: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  --edge-in: inset 0 2px 4px rgba(0, 0, 0, 0.18);
 
   /* ---- ink ---- */
   --ink: #3E2015;          /* on --card */
   --ink-dim: rgba(62, 32, 21, 0.60);
   --on-bg: #FFFFFF;        /* on --bg */
-  --on-bg-dim: rgba(255, 255, 255, 0.72);
-  --on-bg-faint: rgba(255, 255, 255, 0.58);
+  --on-bg-dim: rgba(255, 255, 255, 0.82);
+  --on-bg-faint: rgba(255, 255, 255, 0.68);
 
   /* ---- elevation ---- */
   --lift-1: 0 3px 0 rgba(0, 0, 0, 0.16);
@@ -187,6 +195,13 @@ body::before {
   scrollbar-width: none;
 }
 .scroller::-webkit-scrollbar { display: none; }
+/* A scroller that runs under a pinned footer button gets a soft bottom edge, so
+   a clipped row reads as "there is more" instead of as a layout mistake. */
+.screen > .scroller,
+.pane > .scroller {
+  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 26px), transparent 100%);
+  mask-image: linear-gradient(180deg, #000 calc(100% - 26px), transparent 100%);
+}
 
 /* A screen whose body is a scroller but that also carries its own pinned
    footer button (rather than the button being a direct child of .screen). */
@@ -219,7 +234,7 @@ body::before {
 }
 .btn:active { transform: translateY(5px); box-shadow: var(--lift-1); }
 .btn-primary { background: var(--accent); color: var(--on-accent); }
-.btn-ghost { background: var(--panel); color: var(--on-bg); box-shadow: var(--lift-1); }
+.btn-ghost { background: var(--panel); color: var(--on-bg); box-shadow: var(--lift-1), var(--edge); }
 .btn-sm { min-height: 46px; font-size: var(--fs-body); padding: var(--s-3); border-radius: var(--r-1); }
 .btn[disabled] { opacity: .4; pointer-events: none; }
 
@@ -231,8 +246,10 @@ body::before {
   color: var(--on-bg);
   display: grid; place-items: center;
   cursor: pointer;
-  transition: transform var(--t-fast) var(--e-out);
+  box-shadow: var(--lift-1), var(--edge);
+  transition: transform var(--t-fast) var(--e-out), box-shadow var(--t-fast) var(--e-out);
 }
+.icon-btn:active { box-shadow: none; }
 .icon-btn:active { transform: scale(.92); }
 
 /* segmented control */
@@ -240,6 +257,7 @@ body::before {
   display: flex; gap: 6px;
   background: var(--sink);
   padding: 5px; border-radius: var(--r-1);
+  box-shadow: var(--edge-in);
 }
 .seg-btn {
   flex: 1; appearance: none; border: 0;
@@ -265,7 +283,7 @@ body::before {
   background: var(--panel);
   border-radius: var(--r-2);
   padding: var(--s-3);
-  box-shadow: var(--lift-1);
+  box-shadow: var(--lift-1), var(--edge);
 }
 
 .chip-toggle {
@@ -273,8 +291,10 @@ body::before {
   font-size: 13px; font-weight: 800;
   padding: 10px 15px; min-height: 40px; border-radius: var(--r-pill);
   background: var(--panel); color: var(--on-bg-dim);
+  box-shadow: var(--lift-1), var(--edge);
   cursor: pointer;
 }
+.chip-toggle:active { box-shadow: var(--edge); transform: translateY(3px); }
 .chip-toggle[aria-pressed="false"] { opacity: .45; text-decoration: line-through; }
 .toggles { display: flex; gap: var(--s-2); justify-content: center; }
 
@@ -335,10 +355,10 @@ body::before {
   width: 100%; text-align: left;
   background: var(--panel-2); color: var(--on-bg);
   border-radius: var(--r-3); padding: var(--s-3) var(--s-4);
-  box-shadow: var(--lift-2);
+  box-shadow: var(--lift-2), var(--edge);
   transition: transform var(--t-fast) var(--e-out), box-shadow var(--t-fast) var(--e-out);
 }
-.mode-hero:active { transform: translateY(4px); box-shadow: var(--lift-1); }
+.mode-hero:active { transform: translateY(4px); box-shadow: var(--lift-1), var(--edge); }
 .mode-glyph {
   width: 46px; height: 46px; border-radius: var(--r-1);
   display: grid; place-items: center;
@@ -350,7 +370,10 @@ body::before {
 .mode-glyph .ico { width: 62%; height: 62%; }
 .mode-hero > span:nth-child(2) { min-width: 0; }
 .mode-hero-name { font-size: var(--fs-head); font-weight: 900; line-height: 1.15; }
-.mode-hero-sub { font-size: 12.5px; font-weight: 800; color: var(--on-bg-faint); line-height: 1.35; }
+.mode-hero-sub {
+  display: block; font-size: 12.5px; font-weight: 800; color: var(--on-bg-faint); line-height: 1.35;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .mode-hero-cue { font-size: 12px; font-weight: 900; color: var(--on-bg-faint); letter-spacing: .08em; }
 
 /* The picker grid. Each card previews its own theme. */
@@ -359,20 +382,39 @@ body::before {
   appearance: none; border: 0; cursor: pointer; text-align: left;
   display: grid; grid-template-columns: auto 1fr auto; align-items: center;
   gap: var(--s-3);
-  /* Each card wears the palette it will switch the app to. */
-  background: linear-gradient(150deg, var(--bg) 0%, var(--bg-deep) 100%);
+  /* Each card wears the palette it will switch the app to — which means the
+     card for the *current* mode is painted the same colour as the field behind
+     it. The top sheen and the hard bottom shadow are what keep it a raised
+     object rather than a hole in the page. */
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,0) 58%),
+    linear-gradient(150deg, var(--bg) 0%, var(--bg-deep) 100%);
   color: #fff;
   border-radius: var(--r-2); padding: var(--s-3);
-  box-shadow: var(--lift-2);
+  min-height: 70px;
+  box-shadow: var(--lift-2), inset 0 0 0 1px rgba(255,255,255,.16);
   transition: transform var(--t-fast) var(--e-out), box-shadow var(--t-fast) var(--e-out);
 }
-.mode-card:active { transform: translateY(4px); box-shadow: var(--lift-1); }
-.mode-card.is-on { outline: 3px solid #fff; outline-offset: 2px; }
+.mode-card:active { transform: translateY(4px); box-shadow: var(--lift-1), inset 0 0 0 1px rgba(255,255,255,.16); }
+.mode-card.is-on {
+  box-shadow: var(--lift-2), inset 0 0 0 2px rgba(255,255,255,.9), 0 0 0 3px rgba(0,0,0,.14);
+}
 .mode-card .mode-glyph { width: 44px; height: 44px; }
-.mode-card-name { font-size: 16px; font-weight: 900; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
-.mode-card-tag { font-size: 12.5px; font-weight: 800; color: rgba(255,255,255,.78); }
-.mode-card-check { width: 20px; height: 20px; opacity: 0; }
-.mode-card.is-on .mode-card-check { opacity: 1; }
+.mode-card > span:nth-child(2) { min-width: 0; }
+.mode-card-name { font-size: 16px; font-weight: 900; text-shadow: 0 1px 3px rgba(0,0,0,.35); }
+.mode-card-tag {
+  display: block; font-size: 12.5px; font-weight: 800; color: rgba(255,255,255,.86);
+  text-shadow: 0 1px 2px rgba(0,0,0,.3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* The tick sits in its own well so it reads as *selected*, not as decoration. */
+.mode-card-check {
+  width: 26px; height: 26px; flex: none; padding: 4px; border-radius: 50%;
+  opacity: 0; transform: scale(.5);
+  background: rgba(255,255,255,.92); color: #1a1a1a;
+  transition: opacity var(--t-fast) var(--e-out), transform var(--t-base) var(--e-pop);
+}
+.mode-card.is-on .mode-card-check { opacity: 1; transform: scale(1); }
 .mode-blurb {
   margin: 0; font-size: 13.5px; font-weight: 700; line-height: 1.5;
   color: var(--on-bg-dim);
@@ -384,6 +426,7 @@ body::before {
 .roster-seat {
   display: flex; flex-direction: column; gap: 7px;
   background: var(--panel); border-radius: var(--r-1); padding: var(--s-2) 10px;
+  box-shadow: var(--lift-1), var(--edge);
 }
 .roster-main { display: flex; align-items: center; gap: 10px; }
 .roster-seat .dot { width: 18px; height: 18px; border-radius: 50%; flex: none; box-shadow: inset 0 -2px 0 rgba(0,0,0,.16); }
@@ -411,12 +454,14 @@ body::before {
   font-size: 44px; font-weight: 900; letter-spacing: .18em; text-align: center;
   color: var(--on-bg); background: var(--panel); border-radius: var(--r-2);
   padding: var(--s-4) 10px; text-indent: .18em;
+  box-shadow: var(--lift-1), var(--edge);
 }
 .lobby-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .lobby-list li {
   display: flex; align-items: center; gap: 11px;
   background: var(--panel); border-radius: var(--r-1); padding: 12px 15px;
   font-weight: 800; font-size: 15px;
+  box-shadow: var(--lift-1), var(--edge);
 }
 .lobby-list .dot { width: 16px; height: 16px; border-radius: 50%; flex: none; }
 .lobby-list .you { margin-left: auto; font-size: 12px; color: var(--on-bg-faint); }
@@ -451,7 +496,7 @@ body::before {
   width: 100%; text-align: left;
   background: var(--panel); color: var(--on-bg);
   border-radius: var(--r-2); padding: 10px var(--s-3);
-  box-shadow: var(--lift-1);
+  box-shadow: var(--lift-1), var(--edge);
   transition: transform var(--t-fast) var(--e-out);
 }
 .rank-strip:active { transform: translateY(3px); }
@@ -461,12 +506,13 @@ body::before {
 .rank-strip-trophies { display: flex; align-items: center; gap: 5px; font-size: 16px; font-weight: 900; }
 
 /* progress track */
-.track { height: 8px; border-radius: var(--r-pill); background: var(--sink); overflow: hidden; }
+.track { height: 8px; border-radius: var(--r-pill); background: var(--sink); overflow: hidden; box-shadow: var(--edge-in); }
 .track-lg { height: 12px; }
 .track > i {
   display: block; height: 100%; width: 0%;
   background: var(--accent);
   border-radius: inherit;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .30);
   transition: width var(--t-slow) var(--e-out);
 }
 
@@ -476,7 +522,7 @@ body::before {
   text-align: center;
   background: var(--panel); border-radius: var(--r-3);
   padding: var(--s-5) var(--s-4) var(--s-4);
-  box-shadow: var(--lift-2);
+  box-shadow: var(--lift-2), var(--edge);
 }
 .rank-hero-name { font-size: 22px; font-weight: 900; letter-spacing: -.01em; }
 .rank-hero-count {
@@ -490,6 +536,7 @@ body::before {
 .stat {
   flex: 1; background: var(--panel); border-radius: var(--r-1);
   padding: 10px var(--s-2); text-align: center;
+  box-shadow: var(--lift-1), var(--edge);
 }
 .stat-v { font-size: 20px; font-weight: 900; line-height: 1.1; }
 .stat-k { font-size: 10.5px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: var(--on-bg-faint); }
@@ -500,6 +547,7 @@ body::before {
   display: flex; align-items: center; gap: 10px;
   background: var(--panel); border-radius: var(--r-1); padding: 8px 11px;
   color: var(--on-bg-dim); font-weight: 800; font-size: 13.5px;
+  box-shadow: var(--edge);
   transition: background var(--t-base) var(--e-out);
 }
 .ladder li .rank-badge { width: 28px; height: 28px; border-radius: 8px; }
@@ -507,8 +555,12 @@ body::before {
   margin-left: auto; display: flex; align-items: center; gap: 4px;
   font-size: 12px; color: var(--on-bg-faint);
 }
-.ladder li.is-here { background: var(--panel-3); color: var(--on-bg); box-shadow: var(--lift-1); }
-.ladder li.is-locked { opacity: .42; }
+.ladder li.is-here {
+  background: var(--panel-3); color: var(--on-bg);
+  box-shadow: var(--lift-1), var(--edge), inset 4px 0 0 var(--accent);
+  padding-left: 15px;
+}
+.ladder li.is-locked { opacity: .66; }
 
 /* trophy tally on the result card */
 .tally { display: flex; flex-direction: column; align-items: center; gap: var(--s-2); width: 100%; }
@@ -531,22 +583,35 @@ body::before {
 .rank-jump.promo { background: rgba(47,158,91,.16); color: #217A45; }
 .rank-jump.demo { background: rgba(198,57,47,.14); color: #A22C23; }
 @keyframes pop-in { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-.tally-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; width: 100%; }
+.tally-list {
+  list-style: none; margin: 6px 0 0; padding: 10px 0 0;
+  display: flex; flex-direction: column; gap: 4px; width: 100%;
+  border-top: 2px solid rgba(62, 32, 21, .10);
+}
 .tally-list li { display: flex; justify-content: space-between; gap: var(--s-3); font-size: 12.5px; font-weight: 800; color: var(--ink-dim); }
 
 /* -------------------------------------------------------------------- game */
 
 .screen-game { padding: 0; display: none; }
 .screen-game.is-active { display: grid; }
+/* Must out-specify `.screen-game.is-crowded`, or a game left mid-session keeps
+   rendering itself on top of whatever screen you walked back to. */
+.screen-game.is-crowded.is-active { display: flex; }
 .screen-game {
   grid-template-columns: auto 1fr auto;
-  grid-template-rows: auto 1fr auto;
+  /* Rows size to their content and the whole block centres, so the chips hug
+     the board instead of being flung to the screen's edges with a couple of
+     hundred pixels of empty field between a score and the board it counts.
+     `fitBoard` gives the board row its height. */
+  grid-template-rows: auto auto auto;
+  align-content: center;
   grid-template-areas:
     ".    top    ."
     "left board right"
     ".    bottom .";
-  gap: 2px;
-  padding: calc(var(--safe-t) + 4px) calc(var(--safe-r) + 4px)
+  gap: 6px;
+  /* Reserve the strip the floating turn banner and menu button live in. */
+  padding: calc(var(--safe-t) + 52px) calc(var(--safe-r) + 4px)
            calc(var(--safe-b) + 4px) calc(var(--safe-l) + 4px);
 }
 .board-area { grid-area: board; position: relative; min-width: 0; min-height: 0; display: grid; place-items: center; }
@@ -554,60 +619,114 @@ body::before {
 
 .seat { display: none; align-items: center; justify-content: center; padding: 2px; min-width: 0; }
 .seat.is-shown { display: flex; }
-/* Clear the floating turn banner and the menu button, which both live at the top. */
-.seat-top { padding-top: 48px; }
 .seat-top { grid-area: top; } .seat-bottom { grid-area: bottom; }
 .seat-left { grid-area: left; } .seat-right { grid-area: right; }
 
 /* Rotated edge seats only make sense for a table of four or fewer. The chip's
    layout box stays horizontal after a rotation, so the side columns get a hard
    width — otherwise a long name steals the board's width. */
-.seat-left, .seat-right { width: 46px; overflow: visible; }
+.seat-left, .seat-right { width: 40px; overflow: visible; }
 .seat-top .score-chip { transform: rotate(180deg); }
 .seat-left .score-chip { transform: rotate(90deg); }
 .seat-right .score-chip { transform: rotate(-90deg); }
 
 /* No rotated edge seats: used past four players, and for every solo / online
-   game (the device isn't being passed around). Chips sit in the screen's
-   corners rather than in two rails huddled at the centre — the middle is
-   handed back to the board and each player's score keeps a fixed spot. */
-.screen-game.is-crowded { grid-template-columns: 1fr; grid-template-areas: "top" "board" "bottom"; }
+   game (the device isn't being passed around).
+   
+   Here the HUD is a single centred column — rail, board, share bar, rail —
+   rather than chips pinned to the screen's edges. Pinning them there left a
+   200px gulf of empty field between a player's score and the board it
+   describes; grouping them means the whole readout moves as one object and the
+   slack lands *outside* it, above and below. The board is sized to its own box
+   by `fitBoard` so this column can shrink-wrap it. */
+.screen-game.is-crowded {
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  gap: 10px;
+  padding-top: calc(var(--safe-t) + 4px);
+}
+/* The banner joins the group rather than floating alone at the top of an empty
+   field: whose turn it is belongs *with* the scores, not two hundred pixels
+   away from them. It clears the menu button on width — it is centred and
+   capped, the button sits in the right margin. */
+.screen-game.is-crowded .turn-banner {
+  position: static; order: 0;
+  transform: none; margin: 0 auto;
+  max-width: calc(100% - 108px);
+}
+.screen-game.is-crowded .seat-top { order: 1; }
+.screen-game.is-crowded .board-area { order: 2; flex: 0 1 auto; min-height: 0; }
+.screen-game.is-crowded .share-bar { order: 3; }
+.screen-game.is-crowded .seat-bottom { order: 4; }
 .screen-game.is-crowded .seat-left, .screen-game.is-crowded .seat-right { display: none; }
-.screen-game.is-crowded .seat { flex-wrap: wrap; gap: 4px; }
-.screen-game.is-crowded .score-chip { transform: none; padding: 4px 9px 4px 5px; gap: 5px; }
+.screen-game.is-crowded .seat { flex-wrap: wrap; gap: 5px; padding: 0; }
+.screen-game.is-crowded .score-chip { transform: none; padding: 4px 10px 4px 5px; gap: 6px; }
 .screen-game.is-crowded .score-chip .val { font-size: 15px; }
 .screen-game.is-crowded .score-chip .who { display: none; }
 .screen-game.is-crowded .score-chip .dot { width: 14px; height: 14px; }
 
 .screen-game.is-crowded .seat-top,
 .screen-game.is-crowded .seat-bottom {
-  flex-wrap: nowrap;
-  justify-content: space-between;
-  gap: var(--s-2);
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
   padding-left: var(--s-2);
   padding-right: var(--s-2);
 }
-/* The top corners have to clear the menu button and the turn banner. */
-.screen-game.is-crowded .seat-top { padding-top: 52px; }
-.screen-game.is-crowded .seat-bottom { padding-bottom: 6px; }
-/* A rail holding one chip — two players, or the odd chip on an odd count —
-   keeps it centred instead of shoved into a single corner. */
-.screen-game.is-crowded .seat-top > .score-chip:only-child,
-.screen-game.is-crowded .seat-bottom > .score-chip:only-child { margin-inline: auto; }
 
 .score-chip {
   display: flex; align-items: center; gap: 8px;
   background: var(--panel); border-radius: var(--r-pill);
   padding: 6px 13px 6px 7px;
   white-space: nowrap;
-  transition: background var(--t-base) var(--e-out), box-shadow var(--t-base) var(--e-out), opacity var(--t-base);
+  box-shadow: var(--lift-1), var(--edge);
+  transition: background var(--t-base) var(--e-out), box-shadow var(--t-base) var(--e-out),
+              opacity var(--t-base), transform var(--t-base) var(--e-out);
 }
 .score-chip .dot { width: 18px; height: 18px; border-radius: 50%; flex: none; box-shadow: inset 0 -2px 0 rgba(0,0,0,.14); }
 .score-chip .val { font-size: 18px; font-weight: 900; min-width: 1.1em; text-align: center; }
 .score-chip .who { font-size: 11.5px; font-weight: 800; color: var(--on-bg-faint); }
-.score-chip.is-turn { background: var(--panel-3); box-shadow: 0 0 0 3px var(--on-bg-faint); }
-.score-chip.is-out { opacity: .3; }
+/* Which of these is me? On a rail of eight identical pills that is the first
+   thing you look for, so the seat this device plays says so outright. */
+.score-chip .me {
+  font-size: 9.5px; font-weight: 900; letter-spacing: .1em;
+  padding: 2px 6px; border-radius: var(--r-pill);
+  background: rgba(255,255,255,.28); color: var(--on-bg);
+}
+.score-chip.is-turn {
+  background: var(--panel-3);
+  box-shadow: 0 0 0 3px var(--on-bg-faint), var(--lift-1);
+  transform: translateY(-1px) scale(1.04);
+}
+.score-chip.is-out { opacity: .34; box-shadow: none; }
 .score-chip.is-out .val { text-decoration: line-through; }
+
+/* ------------------------------------------------------------- share bar --
+
+   How much of the board each side holds, as one stacked rail directly under
+   it. Two numbers on opposite rails never answered "am I winning" at a glance;
+   a bar you can read the split off in one look does, and it earns the space
+   the centred HUD column freed up. */
+.share-bar {
+  display: none;
+  height: 12px; flex: none;
+  border-radius: var(--r-pill);
+  background: var(--sink);
+  box-shadow: var(--edge-in);
+  overflow: hidden;
+  margin: 0 auto;
+  width: 100%;
+}
+.screen-game.is-crowded .share-bar.is-shown { display: flex; }
+.share-bar > i {
+  display: block; height: 100%;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.32);
+  transition: width var(--t-base) var(--e-out), opacity var(--t-base);
+}
+/* The seat this device plays gets a brighter face than the rest, so your own
+   share separates from the field without needing a label. */
+.share-bar > i.mine { box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 0 0 1px rgba(255,255,255,.4); }
 
 .game-menu { position: absolute; top: calc(var(--safe-t) + 6px); right: calc(var(--safe-r) + 6px); z-index: 4; }
 
@@ -647,7 +766,14 @@ body::before {
 @keyframes card-in { from { transform: scale(.88) translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
 .card h2 { margin: 0; text-align: center; font-size: 27px; font-weight: 900; color: var(--ink); }
 .card .hint { color: var(--ink-dim); text-align: center; }
-.card .btn-ghost { background: rgba(62,32,21,.09); color: var(--ink); }
+/* A plain .btn is cream — the same cream as the card it sits on — so inside a
+   card it takes a white face and an ink hairline to stay a button. */
+.card .btn { background: #FFF; box-shadow: var(--lift-2), inset 0 0 0 2px rgba(62,32,21,.11); }
+.card .btn:active { box-shadow: var(--lift-1), inset 0 0 0 2px rgba(62,32,21,.11); }
+.card .btn-primary { background: var(--accent); color: var(--on-accent); box-shadow: var(--lift-2); }
+.card .btn-primary:active { box-shadow: var(--lift-1); }
+.card .btn-ghost { background: rgba(62,32,21,.09); color: var(--ink); box-shadow: var(--lift-1); }
+.card .btn-ghost:active { box-shadow: none; }
 
 .winner-disc {
   width: 76px; height: 76px; border-radius: 50%;
@@ -712,7 +838,16 @@ body::before {
   text-align: center; margin: -4px 0 var(--s-2);
   color: var(--on-bg-dim); font-weight: 700; font-size: 15px; line-height: 1.45;
 }
-.rules h3 { color: var(--on-bg); font-size: 16px; margin: var(--s-4) 0 5px; font-weight: 900; }
-.rules h3:first-child { margin-top: 0; }
-.rules p { color: var(--on-bg-dim); font-weight: 700; font-size: 14.5px; line-height: 1.55; margin: 0 0 8px; }
+.rules { gap: var(--s-2); }
+.rule {
+  background: var(--panel); border-radius: var(--r-2);
+  padding: var(--s-3) var(--s-4) 14px;
+  box-shadow: var(--lift-1), var(--edge);
+}
+.rules h3 {
+  color: var(--on-bg); font-size: 12px; margin: 0 0 7px; font-weight: 900;
+  letter-spacing: .12em; text-transform: uppercase;
+}
+.rules p { color: var(--on-bg-dim); font-weight: 700; font-size: 14.5px; line-height: 1.55; margin: 0; }
+.rules p + p { margin-top: 9px; }
 .rules b { color: var(--on-bg); }

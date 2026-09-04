@@ -3,6 +3,9 @@
 **/node_modules
 **/.DS_Store
 **/.git
+# wrangler's own scratch dir. Without this its temp deploy artifacts (a
+# no-op-worker source map, local dev state) ship as public site assets.
+.wrangler
 .claude
 test
 package.json

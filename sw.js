@@ -2,7 +2,7 @@
    Solo and pass-and-play work with no connection at all; only the online mode
    needs the network, and that request is deliberately never cached. */
 
-const CACHE = 'bust-v9';
+const CACHE = 'bust-v10';
 const ASSETS = [
   './',
   'index.html',
@@ -11,6 +11,8 @@ const ASSETS = [
   'src/main.js',
   'src/engine.js',
   'src/ai.js',
+  'src/nn.js',
+  'src/nn-bot.js',
   'src/render.js',
   'src/icons.js',
   'src/modes.js',
@@ -20,6 +22,11 @@ const ASSETS = [
   'assets/icon.svg',
   'assets/icon-192.png',
   'assets/icon-512.png',
+  // assets/net/* is deliberately absent: the network weights are close to a
+  // megabyte and only matter to a player who picks the Neural rung. The fetch
+  // handler's stale-while-revalidate caches them on first use, so that player
+  // is offline-capable from their second game onwards and everyone else never
+  // downloads them at all.
 ];
 
 self.addEventListener('install', (e) => {

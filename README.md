@@ -100,7 +100,7 @@ get matchmade to your level.
 
 ## Bot difficulty
 
-Five rungs, each strictly stronger than the last:
+Six rungs, each stronger than the last:
 
 | Rung   | Search        | Notes |
 |--------|---------------|-------|
@@ -109,8 +109,55 @@ Five rungs, each strictly stronger than the last:
 | Hard   | 2-ply alpha-beta | punishes loose play |
 | Expert | 3-ply         | no noise, no blunders |
 | Brutal | 3-ply, long clock | widest search, plays to win |
+| Neural | learned net (+ MCTS at 1v1) | trained by self-play; no team play |
 
-The search runs on a wall-clock budget so it never janks a phone mid-turn.
+The first five run a hand-written positional evaluation on a wall-clock budget,
+so they never jank a phone mid-turn.
+
+**Neural** is a different animal. It is a small residual network — 464k
+parameters, policy and value — trained from scratch by AlphaZero-style
+self-play against nothing but the rules (the trainer lives in `../bustai`), and
+it searches with Gumbel MCTS rather than alpha-beta. It brings its own idea of
+what a position is worth instead of the hand-written one.
+
+In Duel it is a long way clear of the rest of the ladder. Played bot against
+bot in the browser, with both sides on their real clocks, it beats **Brutal
+40-0** over 40 games — twenty opening, twenty replying. Its raw policy, with no
+search at all, still beats `hard` 73%.
+
+Worth knowing while reading that: `expert` and `brutal` are the same search
+here, differing only in `budgetMs`, and at 7x7 that search finishes in about
+3 ms — so neither rung ever reaches its clock and the two play identically.
+Full numbers in [`EVALUATION.md`](EVALUATION.md).
+
+It also plans its search around the device. A forward pass costs an order of
+magnitude more on a budget phone than on a laptop, so the bot measures what one
+actually costs, works out how many simulations fit in its 1.4-second turn, and
+plans the schedule for that number. A fast device gets the full search; a slow
+one gets a shallower one rather than an overrunning turn.
+
+Three things worth knowing:
+
+- **The weights are a ~900 KB download**, so they are deliberately *not* in the
+  service worker's install list. Only a player who picks this rung fetches
+  them, on selection rather than on the first turn; after that they are cached
+  and the rung works offline like everything else. If the fetch fails, the seat
+  silently plays Brutal rather than freezing.
+- **It plays a free-for-all differently, and deliberately.** The *network*
+  generalises to four seats perfectly well. Its *search* does not: the backprop
+  assumes a point for me is a point against you, which against three opponents
+  is false enough that adding simulations makes the same weights play steadily
+  worse — in a Rumble seat against three `hard` bots, 64% wins with no search,
+  49% at 8 simulations, 19% at 32 and 16% at 96, where the `hard` bot in the
+  same seat wins 26%. So at three seats or more it plays the raw prior plus a
+  check for a move that wins on the spot: one evaluation, about 30 ms, and the
+  strongest option measured. Two seats get the full search.
+- **No teams and no walls.** In Duos a team-mate's tiles land in the *opponent*
+  planes of the encoding, so the network would be reading a board that is not
+  the one being played. Walls it simply never saw: at a walled four-seat table
+  it wins 21% where the `hard` bot it would replace wins 28%. The rung greys out
+  in Duos and Chaos (and in a Custom table with either turned on), and any seat
+  still set to it falls back to Brutal. Both want their own training run.
 
 ## The game screen
 
@@ -164,6 +211,10 @@ node --test test/*.mjs
   fight over a frame handle.
 - `rank.test.mjs` — trophy maths: Elo direction, the margin / "how badly you lost"
   multipliers, free-for-all placement, rank floors, and promotion detection.
+- `nn.test.mjs` — the neural rung against the model it was exported from: the
+  encoder must produce identical planes, the forward pass must match PyTorch at
+  the precision that ships, and the JS search must reproduce the Python search
+  move for move with the noise off. Skips itself if `assets/net/` is absent.
 
 ## Deploy to GitHub Pages
 
@@ -184,7 +235,10 @@ in the background (stale-while-revalidate), so an update lands on the next load.
 | File | Role |
 |---|---|
 | `src/engine.js` | Pure rules. Deterministic — no DOM, no randomness, no timers. |
-| `src/ai.js` | The five bots: positional eval + alpha-beta on a time budget. |
+| `src/ai.js` | The bot ladder: positional eval + alpha-beta, plus the neural rung. |
+| `src/nn.js` | Network inference and board encoding. No dependencies, no build step. |
+| `src/nn-bot.js` | Gumbel MCTS over `engine.js`, guided by the network. |
+| `assets/net/` | The trained weights (float16) and their manifest. |
 | `src/rank.js` | Trophy ladder: ranks, Elo + margin scoring, matchmaking, profile storage. |
 | `src/modes.js` | Mode table, seeded mirrored wall generation, per-mode setup. |
 | `src/render.js` | Canvas renderer and the cascade animator. |

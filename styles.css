@@ -270,6 +270,7 @@ body::before {
 }
 .seg-btn:active { transform: scale(.96); }
 .seg-btn.is-on { background: var(--card); color: var(--ink); box-shadow: var(--lift-1); }
+.seg-btn[disabled] { opacity: .38; pointer-events: none; }
 .seg-tight .seg-btn { font-size: 12.5px; padding: 11px 2px; }
 
 /* labelled group */

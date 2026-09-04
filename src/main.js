@@ -12,7 +12,7 @@ import {
   openingMask, blockingStarts,
   PHASE_PLACE, PHASE_PLAY, PHASE_OVER,
 } from './engine.js';
-import { chooseMove, difficultyLabel, DIFFICULTY_ORDER } from './ai.js';
+import { chooseMoveAsync, difficultyLabel, DIFFICULTY_ORDER, NEEDS_NET, warmNeural } from './ai.js';
 import {
   RANKS, rankFor, rankIndexFor, progressToNext, nextRank,
   matchmake, scoreResult, recordMatch, loadProfile, saveProfile,
@@ -551,9 +551,16 @@ function scheduleAI() {
   // this is the single biggest lever on how fast the game *feels*.
   session.aiTimer = setTimeout(() => {
     if (!session || epoch !== myEpoch) return;
-    const move = chooseMove(session.state, p.difficulty);
-    if (move === null || move === undefined) return;
-    enqueue(move, 'ai');
+    // The neural rung has to fetch its weights the first time, so the choice is
+    // a promise. Every other rung resolves in the same tick. Re-check that the
+    // board is still the one we asked about before committing the move: a
+    // restart, or the player leaving the screen, can land while we wait.
+    const asked = session.state;
+    Promise.resolve(chooseMoveAsync(asked, p.difficulty)).then((move) => {
+      if (!session || epoch !== myEpoch || session.state !== asked) return;
+      if (move === null || move === undefined) return;
+      enqueue(move, 'ai');
+    });
   }, s.phase === PHASE_PLACE ? AI_THINK_OPEN : AI_THINK);
 }
 
@@ -999,6 +1006,9 @@ $$('.seg').forEach((seg) => {
     if (!btn) return;
     unlockAudio(); sfx.ui(); haptic(8);
     seg.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('is-on', b === btn));
+    // Start the neural weights downloading the moment the rung is chosen, so
+    // the fetch overlaps the rest of the menu instead of the first turn.
+    if (btn.dataset.v && NEEDS_NET.has(btn.dataset.v)) warmNeural().catch(() => {});
   });
 });
 
@@ -1105,7 +1115,25 @@ function refreshShapeLines() {
   $('#solo-shape').textContent = `${shape}. You against ${m.seats - 1} bot${m.seats > 2 ? 's' : ''}.`;
   $('#local-shape').textContent = `${shape}. One device — fill the seats with any mix of people and bots.`;
   $('#online-shape').textContent = `${shape}. One player hosts and shares the room code.`;
+  syncNeuralAvailability(!m.teams && !m.wallDensity);
   paintModeHero('hero', m);
+}
+
+/**
+ * The Neural rung plays any number of seats, but not teams and not walls (see
+ * `neuralSupports`), so it greys out in Duos and Chaos and in a Custom table
+ * with either turned on. Greying it out with a reason beats letting a player
+ * pick a rung that would quietly hand the seat back to Brutal.
+ */
+function syncNeuralAvailability(ok) {
+  const btn = $('#solo-diff [data-v="neural"]');
+  if (!btn) return;
+  btn.disabled = !ok;
+  btn.title = ok ? '' : 'Not trained for teams or walls — those seats play Brutal';
+  if (!ok && btn.classList.contains('is-on')) {
+    btn.classList.remove('is-on');
+    $('#solo-diff [data-v="brutal"]')?.classList.add('is-on');
+  }
 }
 
 $('#solo-start').addEventListener('click', () => {
@@ -1149,9 +1177,15 @@ function buildRoster() {
     const li = document.createElement('li');
     li.className = 'roster-seat' + (seat.kind === 'human' ? ' is-human' : '');
     li.dataset.seat = String(i);
-    const diffBtns = DIFFICULTY_ORDER.map((k) => (
-      `<button class="seg-btn${seat.difficulty === k ? ' is-on' : ''}" type="button" data-diff="${k}">${escapeHtml(difficultyLabel(k))}</button>`
-    )).join('');
+    // The neural rung has no team play and no walls, so those modes neither
+    // offer it nor keep a seat pointed at it from before the mode changed.
+    const solo = !teams && !currentMode().wallDensity;
+    if (!solo && NEEDS_NET.has(seat.difficulty)) seat.difficulty = 'brutal';
+    const diffBtns = DIFFICULTY_ORDER
+      .filter((k) => solo || !NEEDS_NET.has(k))
+      .map((k) => (
+        `<button class="seg-btn${seat.difficulty === k ? ' is-on' : ''}" type="button" data-diff="${k}">${escapeHtml(difficultyLabel(k))}</button>`
+      )).join('');
     const teamTag = teams ? `<span class="team-tag">Team ${teams[i] + 1}</span>` : '';
     li.innerHTML = `
       <div class="roster-main">
@@ -1176,7 +1210,10 @@ $('#local-roster').addEventListener('click', (e) => {
   const i = Number(li.dataset.seat);
   unlockAudio(); sfx.ui(); haptic(8);
   if (btn.dataset.kind) localRoster[i].kind = btn.dataset.kind;
-  else if (btn.dataset.diff) localRoster[i].difficulty = btn.dataset.diff;
+  else if (btn.dataset.diff) {
+    localRoster[i].difficulty = btn.dataset.diff;
+    if (NEEDS_NET.has(btn.dataset.diff)) warmNeural().catch(() => {});
+  }
   buildRoster();
 });
 

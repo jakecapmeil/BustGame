@@ -9,11 +9,19 @@ import {
   EMPTY, MAX_BALLS, PHASE_OVER, PHASE_PLACE,
   legalMoves, legalPlacements, applyMove, neighbors, outDegree, idxOf,
 } from './engine.js';
+import { loadNet } from './nn.js';
+import { NeuralBot, NEURAL_PRESETS } from './nn-bot.js';
 
 /**
- * Five rungs, strictly increasing in strength. `easy`/`medium`/`hard`/`brutal`
- * are the original measured ladder, untouched; `expert` is the new rung between
+ * Six rungs, strictly increasing in strength. `easy`/`medium`/`hard`/`brutal`
+ * are the original measured ladder, untouched; `expert` is the rung between
  * hard and brutal — a full ply deeper than hard, on a shorter clock than brutal.
+ *
+ * `neural` is a different animal: not a hand-written evaluation searched a few
+ * plies deep, but a network trained by self-play (see nn-bot.js) that brings
+ * its own idea of what a position is worth. Its `depth`/`noise` entries are the
+ * fallback used if the weights cannot be fetched, which makes an offline first
+ * run degrade to Brutal instead of failing.
  */
 export const DIFFICULTIES = {
   easy:   { depth: 0, noise: 3.5,  blunder: 0.22, budgetMs: 60,   label: 'Easy' },
@@ -21,10 +29,14 @@ export const DIFFICULTIES = {
   hard:   { depth: 2, noise: 0.15, blunder: 0.0,  budgetMs: 700,  label: 'Hard' },
   expert: { depth: 3, noise: 0.0,  blunder: 0.0,  budgetMs: 1100, label: 'Expert' },
   brutal: { depth: 3, noise: 0.0,  blunder: 0.0,  budgetMs: 1600, label: 'Brutal' },
+  neural: { depth: 3, noise: 0.0,  blunder: 0.0,  budgetMs: 1600, label: 'Neural' },
 };
 
 /** Difficulty keys, weakest first — the order menus should present them in. */
-export const DIFFICULTY_ORDER = ['easy', 'medium', 'hard', 'expert', 'brutal'];
+export const DIFFICULTY_ORDER = ['easy', 'medium', 'hard', 'expert', 'brutal', 'neural'];
+
+/** Rungs that need the network fetched before they can play. */
+export const NEEDS_NET = new Set(['neural']);
 
 const WIN = 1e6;
 
@@ -182,6 +194,12 @@ function search(state, me, depth, alpha, beta, deadline) {
  * @param {() => number} [rnd] injectable RNG, for reproducible tests
  */
 export function chooseMove(state, difficulty = 'medium', rnd = Math.random) {
+  // Synchronous callers get the real neural move when the weights are already
+  // in memory, and the equivalent-clock alpha-beta search when they are not.
+  if (NEEDS_NET.has(difficulty) && neural && neuralSupports(state)) {
+    const move = neural.chooseMove(state, rnd);
+    if (move !== null && move !== undefined) return move;
+  }
   const cfg = DIFFICULTIES[difficulty] || DIFFICULTIES.medium;
   const me = state.turn;
 
@@ -217,6 +235,81 @@ export function chooseMove(state, difficulty = 'medium', rnd = Math.random) {
   }
 
   return best;
+}
+
+/* ------------------------------------------------------------ neural rung -- */
+
+let netPromise = null;
+let neural = null;
+
+/**
+ * Fetch the weights and build the neural bot, once per page load.
+ *
+ * Roughly a megabyte, so it is deliberately not in the service worker's
+ * install list: only a player who actually picks this rung pays for it, and the
+ * fetch handler caches it afterwards so every later game works offline.
+ * Call it as soon as the rung is *selected* so the download overlaps the menu.
+ */
+export function warmNeural() {
+  if (neural) return Promise.resolve(neural);
+  if (!netPromise) {
+    netPromise = loadNet()
+      .then((net) => {
+        neural = new NeuralBot(net, NEURAL_PRESETS.normal);
+        return neural;
+      })
+      .catch((err) => {
+        netPromise = null;      // let a later attempt retry
+        throw err;
+      });
+  }
+  return netPromise;
+}
+
+/** True once the network is in memory and the rung will really play itself. */
+export function neuralReady() {
+  return neural !== null;
+}
+
+/**
+ * Whether the network is the right tool for this table.
+ *
+ * Seat count is fine — `NeuralBot` picks its own method, searching at two seats
+ * and playing the raw prior in a free-for-all, because it is the search and not
+ * the network that fails there. Two things are not fine, both measured rather
+ * than assumed:
+ *
+ *  - **Teams.** A team-mate's tiles land in the opponent planes, so in Duos the
+ *    network is reading a board that is not the one being played.
+ *  - **Walls.** It never saw one in training. At a walled four-seat table it
+ *    wins 21% of games where the `hard` bot it would replace wins 28%.
+ *
+ * Both fall back to the alpha-beta search, which was built for them.
+ */
+export function neuralSupports(state) {
+  return !state.teams && !state.blocked;
+}
+
+/**
+ * Pick a move, waiting for the network if this rung needs it.
+ *
+ * Every rung except `neural` resolves immediately with the synchronous choice,
+ * so callers can use this everywhere and stop caring which is which.
+ */
+export async function chooseMoveAsync(state, difficulty = 'medium', rnd = Math.random) {
+  if (NEEDS_NET.has(difficulty)) {
+    if (!neuralSupports(state)) return chooseMove(state, 'brutal', rnd);
+    try {
+      const bot = await warmNeural();
+      const move = bot.chooseMove(state, rnd);
+      if (move !== null && move !== undefined) return move;
+    } catch {
+      // No weights (offline first run, or a bad deploy) — fall back rather
+      // than leave the seat frozen.
+    }
+    return chooseMove(state, 'brutal', rnd);
+  }
+  return chooseMove(state, difficulty, rnd);
 }
 
 /** Human-facing label, e.g. for the settings screen. */

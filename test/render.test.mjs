@@ -185,9 +185,10 @@ function oneTile(count) {
 }
 
 test('a full tile draws three pips; an over-capacity one squares up to four', () => {
-  // disc + pips (+ the loaded ring, which both of these get)
-  assert.equal(oneTile(3).length, 1 + 3 + 1);
-  assert.equal(oneTile(4).length, 1 + 4 + 1, 'the fourth ball must be visible before it goes');
+  // disc + pips. Only an over-capacity tile (mid-burst) also draws a ring;
+  // a merely full 3-ball tile gets no ring.
+  assert.equal(oneTile(3).length, 1 + 3, 'three balls is full but not bursting, so no ring');
+  assert.equal(oneTile(4).length, 1 + 4 + 1, 'the fourth ball must be visible, with the burst ring');
   assert.equal(oneTile(2).length, 1 + 2, 'two balls is not loaded, so no ring');
 });
 

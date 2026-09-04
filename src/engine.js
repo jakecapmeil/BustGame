@@ -7,9 +7,13 @@
  *
  * Rules (see README for the long version):
  *  - Each tile holds 0..3 balls and is owned by whoever has balls on it.
- *  - Adding a 4th ball to a tile BUSTS it: the tile empties and sends exactly
- *    one ball to each of its 4 orthogonal neighbours. Balls aimed off the board
- *    are lost, so busting on an edge or in a corner costs you material.
+ *  - A tile BUSTS the moment it holds a 4th ball: it empties and throws balls
+ *    outward, `count - 3` to each of its 4 orthogonal neighbours — one per side
+ *    for a 4, two per side for a 5, three for a 6, and so on. Balls aimed off
+ *    the board or into a wall are lost, so busting on an edge costs you material.
+ *  - A bust can hand a tile several balls at once, so it can be pushed well past
+ *    capacity before its own turn to go. Work outwards from the catalyst: a
+ *    chain reaction escalates as it spreads.
  *  - Balls landing on a tile capture it for the buster, which can cascade.
  */
 
@@ -20,8 +24,10 @@ export const PHASE_PLACE = 'place';
 export const PHASE_PLAY = 'play';
 export const PHASE_OVER = 'over';
 
-// Hard ceiling on cascade waves. A cascade can never gain balls (interior busts
-// conserve, edge busts lose), so this is a safety net rather than a rule.
+// Hard ceiling on cascade waves. A bust now throws more balls than it holds
+// once a tile is pushed past a 4, so a chain reaction can grow rather than only
+// conserve or lose. This ceiling, plus the "one side holds everything" check in
+// the loop, keeps a pathological board from spinning forever.
 const MAX_WAVES = 2000;
 
 /* ------------------------------------------------------------------ board -- */
@@ -348,23 +354,31 @@ export function applyMove(prev, moveIdx) {
   while (pending.length && waves++ < MAX_WAVES) {
     // Once a single side holds every ball on the board the cascade is
     // decided; stopping here also rules out a runaway loop on a full board,
-    // where interior busts conserve balls and could otherwise ping-pong.
+    // where escalating busts could otherwise ping-pong without end.
     if (soleSurvivingTeam(state) !== -1 && !opening) break;
 
     const wave = [...new Set(pending)].sort((a, b) => a - b);
-    const busts = wave.map((i) => ({ at: i, player: state.owner[i], to: neighbors(state, i) }));
+    // How hard a tile blows scales with how far past a 4 it was pushed: a 4
+    // throws one ball per side, a 5 two, a 6 three (`count - MAX_BALLS`). Balls
+    // aimed off the board or into a wall are still simply lost.
+    const busts = wave.map((i) => ({
+      at: i,
+      player: state.owner[i],
+      to: neighbors(state, i),
+      n: state.count[i] - MAX_BALLS,
+    }));
 
     // Empty every bursting tile before distributing, so two adjacent tiles
-    // bursting in the same wave correctly hand each other a single ball.
+    // bursting in the same wave hand each other their balls cleanly.
     for (const i of wave) { state.owner[i] = EMPTY; state.count[i] = 0; }
 
     const next = new Set();
     for (const b of busts) {
       for (const t of b.to) {
-        // A ball landing on a team-mate reinforces their tile without stealing
+        // Balls landing on a team-mate reinforce their tile without stealing
         // it; anything else is captured outright.
         if (!sameTeam(state, state.owner[t], b.player)) state.owner[t] = b.player;
-        state.count[t] += 1;
+        state.count[t] += b.n;
         if (state.count[t] > MAX_BALLS) next.add(t);
       }
     }

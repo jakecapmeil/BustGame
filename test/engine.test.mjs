@@ -150,6 +150,53 @@ test('a 4th ball busts: tile empties, one ball to each neighbour', () => {
   assert.equal(r.frames[1].busts[0].to.length, 4);
 });
 
+test('a tile pushed past a 4 throws count-3 balls per side', () => {
+  let base = game(7, 7);
+  base = play(base, idxOf(base, 1, 1), idxOf(base, 5, 5));
+  const t = idxOf(base, 3, 3); // interior, 4 neighbours
+  assert.equal(outDegree(base, t), 4);
+
+  // A move only ever adds one ball, so pre-load `t` to (target - 1) and click it.
+  const burstAt = (loaded) => {
+    const s = applyMove(base, idxOf(base, 1, 0)).state; // A filler move, then reset t
+    for (const nb of neighbors(base, t)) { s.owner[nb] = EMPTY; s.count[nb] = 0; }
+    s.owner[t] = 0; s.count[t] = loaded - 1; s.turn = 0;
+    return applyMove(s, t).state;
+  };
+
+  let s = burstAt(4); // plain 4: one per side
+  assert.equal(s.count[t], 0, 'the burst tile empties');
+  for (const nb of neighbors(base, t)) assert.equal(s.count[nb], 1, 'one ball to each side');
+
+  s = burstAt(5); // 5: two per side, eight out
+  for (const nb of neighbors(base, t)) assert.equal(s.count[nb], 2, 'two balls to each side');
+
+  s = burstAt(6); // 6: three per side, twelve out
+  for (const nb of neighbors(base, t)) assert.equal(s.count[nb], 3, 'three balls to each side');
+});
+
+test('a chain reaction escalates as it spreads outward', () => {
+  let s = game(7, 7);
+  s = play(s, idxOf(s, 3, 3), idxOf(s, 6, 6)); // openings clear of the corner block
+  // A loaded 2x2 block: bursting one corner drives two tiles into the far
+  // corner in the same wave, overfilling it to a 5 before it goes.
+  for (const [x, y] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+    const i = idxOf(s, x, y); s.owner[i] = 0; s.count[i] = 3;
+  }
+  s.turn = 0;
+  const r = applyMove(s, idxOf(s, 0, 0)); // 3 -> 4, kicks it off
+  assert.ok(r.ok);
+  const waves = r.frames.filter((f) => f.kind === 'wave');
+  assert.ok(waves.length >= 3, `chain should run several waves, got ${waves.length}`);
+  // The catalyst bursts as a plain 4; a downstream tile bursts harder.
+  assert.equal(waves[0].busts[0].n, 1, 'the catalyst bursts as a plain 4');
+  const biggest = Math.max(...waves.flatMap((w) => w.busts.map((b) => b.n)));
+  assert.ok(biggest > 1, `a downstream tile was overfilled before bursting (max n = ${biggest})`);
+  for (let i = 0; i < r.state.count.length; i++) {
+    assert.ok(r.state.count[i] <= MAX_BALLS, `tile ${i} left over capacity: ${r.state.count[i]}`);
+  }
+});
+
 test('busting captures enemy tiles', () => {
   // A at (1,1) opening, B at (4,4) opening. Build A up next to a B tile.
   let s = game();

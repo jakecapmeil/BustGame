@@ -44,11 +44,12 @@ const haptic = (ms) => { if (settings.haptics) buzz(ms); };
 
 // Up to four players get their own screen edge, rotated to face them. Beyond
 // that the chips go into flat rails top and bottom — see `.is-crowded`.
+// Turn order runs clockwise from the bottom edge: bottom -> left -> top -> right.
 const SEAT_ORDER = {
   1: ['bottom'],
   2: ['bottom', 'top'],
-  3: ['bottom', 'top', 'left'],
-  4: ['bottom', 'top', 'left', 'right'],
+  3: ['bottom', 'left', 'top'],
+  4: ['bottom', 'left', 'top', 'right'],
 };
 
 /** The mode the player has selected; drives every play screen and the theme. */
@@ -248,8 +249,12 @@ function buildSeats() {
   if (crowded) {
     const rot = (pid) => (pid - localSeat + n) % n;   // you always sit first
     const ordered = [...state.players].sort((a, b) => rot(a.id) - rot(b.id)).map((p) => p.id);
-    const half = Math.ceil(n / 2);
-    const rails = { bottom: ordered.slice(0, half), top: ordered.slice(half) };
+    // Read the two rails as one clockwise loop: bottom-left is you, the turn
+    // then climbs the left side, crosses the top rail left-to-right, and comes
+    // back down the right side to bottom-right.
+    const rails = n <= 2
+      ? { bottom: ordered.slice(0, 1), top: ordered.slice(1) }
+      : { bottom: [ordered[0], ordered[n - 1]], top: ordered.slice(1, n - 1) };
     for (const [slot, ids] of Object.entries(rails)) {
       const el = document.querySelector(`.seat-${slot}`);
       if (!el || !ids.length) continue;

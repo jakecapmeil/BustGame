@@ -315,17 +315,16 @@ export function drawBoard(ctx, L, view) {
       ctx.restore();
     }
 
-    // A full tile gets a ring — the "one more and it goes" tell. A tile that is
-    // already *over* capacity is a different state entirely: it is going, and
-    // it draws a second ring closing in on it.
-    if (c >= MAX_BALLS) {
-      const over = c > MAX_BALLS;
+    // A tile that is *over* capacity is mid-burst: it draws a hard ring closing
+    // in on it. A merely full tile (3 balls) gets no ring — the third pip on
+    // the disc is the "one more and it goes" tell by itself.
+    if (c > MAX_BALLS) {
       ctx.save();
       ctx.beginPath();
-      ctx.arc(x + L.tile / 2, y + L.tile / 2, discR * (1.13 + 0.045 * (view.pulse || 0)), 0, Math.PI * 2);
+      ctx.arc(x + L.tile / 2, y + L.tile / 2, discR * 1.13, 0, Math.PI * 2);
       ctx.strokeStyle = PLAYER_COLORS[o].ball;
-      ctx.globalAlpha = over ? 0.9 : 0.35 + 0.25 * (view.pulse || 0);
-      ctx.lineWidth = Math.max(1.5, L.tile * (over ? 0.05 : 0.03));
+      ctx.globalAlpha = 0.9;
+      ctx.lineWidth = Math.max(1.5, L.tile * 0.05);
       ctx.stroke();
       ctx.restore();
     }
@@ -377,8 +376,23 @@ function drawFlyers(ctx, L, busts, t) {
         drawDisc(ctx, tx, ty - tl, r * (1 - 0.16 * k), colour, 0, 1);
       }
       ctx.globalAlpha = 1;
-      // Squash along the direction of travel, eased out as it arrives.
-      drawDisc(ctx, cx, cy - lift, r, colour, 0, 1 + 0.12 * Math.sin(Math.PI * flight));
+      // Squash along the direction of travel, eased out as it arrives. A tile
+      // pushed past a 4 throws a clump — one disc per ball, fanned a little so
+      // the size of the burst reads at a glance. Deep in a runaway cascade the
+      // real count runs into the hundreds, so the drawn clump is capped.
+      const balls = Math.min(6, Math.max(1, b.n || 1));
+      const perp = { x: -(to.cy - from.cy), y: to.cx - from.cx };
+      const plen = Math.hypot(perp.x, perp.y) || 1;
+      for (let k = 0; k < balls; k++) {
+        const spread = balls === 1 ? 0 : (k / (balls - 1) - 0.5) * r * 1.6;
+        drawDisc(
+          ctx,
+          cx + (perp.x / plen) * spread,
+          cy - lift + (perp.y / plen) * spread,
+          r * (balls > 1 ? 0.82 : 1),
+          colour, 0, 1 + 0.12 * Math.sin(Math.PI * flight),
+        );
+      }
       ctx.restore();
     }
   }

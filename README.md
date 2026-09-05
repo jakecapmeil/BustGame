@@ -19,6 +19,10 @@ GitHub Pages from the repo root as-is.
 - A bust always fires four balls, **even with nowhere to put them**. Bust on an edge
   and one ball falls off the board; bust in a corner and two do. Edges are cheap to
   hold and expensive to attack from — this is the game's main strategic texture.
+- Walls eat a ball the same way the edge does — unless **bouncy walls** are turned on
+  (a Custom option), in which case a ball thrown at a wall rebounds and stays on the
+  tile it left, capped at the tile's own capacity of three. The board edge always
+  taxes a bust; only walls are negotiable.
 - **Opening round:** each player picks one tile on the empty board, which busts on
   the spot. An opening claims a **3×3 zone** and no two zones may overlap — the
   board is not shaded to show this; reach into someone's zone and it flashes red.
@@ -48,7 +52,7 @@ that mode's palette.
 | **Mayhem** | 8 players | 12×12 |
 | **Duos** | 2 v 2 teams | 10×10 |
 | **Chaos** | 4 players + a mirrored maze of walls | 10×10 |
-| **Custom** | 2–8 seats, board size, teams and wall density all yours | up to 13×13 |
+| **Custom** | 2–8 seats, board size, teams, wall density and wall behaviour all yours | up to 13×13 |
 
 Two modes change the rules, not just the numbers:
 
@@ -60,16 +64,49 @@ Two modes change the rules, not just the numbers:
   A ball fired into a wall is **gone** — walls tax a bust exactly the way the
   board edge does, which is the whole tactical point.
 
+**Custom** can invert that last rule. With **bouncy walls** on, a ball thrown at a
+wall comes back and stays on the tile it left, so a walled-in tile is no longer
+punished for its neighbours and the maze becomes cover rather than a tax. The
+rebound is capped at capacity, which is what keeps it a rule and not a bomb: a
+tile can never re-detonate itself off its own rebound.
+
 ### Then: solo, local or online
 
 - **Ranked** — the current mode, against matchmade bots, for trophies (below).
 - **Solo** — the current mode against bots at one difficulty. No trophies.
 - **Local** — one device, passed around. Fill every seat with **any mix of people
   and bots**. All humans is classic pass-and-play; all bots is a spectator match.
-- **Online** — across devices over WebRTC (PeerJS). One player hosts and shares a
-  5-character room code; the mode, board, teams and wall map all ride along in the
-  start packet so every client builds a byte-identical board. Because the engine is
-  deterministic, only move indices cross the wire after that.
+- **Online** — across devices over WebRTC (PeerJS). See below.
+
+## Online is a party, not a match
+
+The unit is a **group of people**, not a single game. You get everyone in once and
+then play round after round out of the same room.
+
+- **Host once.** One player hosts and gets a 5-character code and a **shareable
+  link** (`?party=CODE`). Opening that link drops you straight into the room, so
+  nobody has to read a code off a screenshot.
+- **Everyone has a name.** Type it once; it is remembered, it shows on every
+  lobby row, and it rides the score chips during the round.
+- **Everyone ticks ready.** The host's Start button only appears once the whole
+  party has, so a round never begins on somebody still finding their seat.
+- **The party sets the table.** The *mode* supplies the map — board size, teams,
+  walls — and the *party* supplies the seat count, with the board growing to fit
+  however many turned up (`buildPartySetup`). So a room is never capped at
+  whatever the mode happens to seat.
+- **Play again is a vote.** When a round ends, everyone gets the result card with
+  the party on it. Each "Play again" is a tick; when the last one lands the next
+  round deals itself. Nobody is re-invited, and the host can **change the map**
+  from that same card between rounds.
+- **A round can end without the party ending.** If someone drops mid-game the
+  round is abandoned — every client is replaying a move stream keyed to seat
+  indices, so it has to be — but everyone lands back in the lobby together.
+
+The mode, board, teams, wall map and wall behaviour all ride along in the start
+packet so every client builds a byte-identical board. Because the engine is
+deterministic, only move indices cross the wire after that, and the host judges
+each one against the board it will actually land on rather than against whatever
+it was showing when the packet arrived.
 
 ## Ranked ladder
 
@@ -159,6 +196,17 @@ Three things worth knowing:
   in Duos and Chaos (and in a Custom table with either turned on), and any seat
   still set to it falls back to Brutal. Both want their own training run.
 
+## Playing
+
+- **Game speed.** A `1×` / `2×` chip on the home screen (and in the pause card).
+  `2×` halves the beat a bot waits before committing and the pace a cascade plays
+  back at. It is not a difficulty setting — the bot's search budget is untouched.
+- **Planned moves.** Most of a four-way game is spent watching other people think.
+  **Double-tap** one of your own tiles while you are waiting and it gets a dashed
+  ring; it plays itself the instant your turn comes round. **Tap it again** to
+  undo. Only where one seat is yours — in pass-and-play every seat is, so there
+  is no wait to plan through.
+
 ## The game screen
 
 The HUD is one object, not four corners. Banner, the opponents' rail, the board,
@@ -211,6 +259,11 @@ node --test test/*.mjs
   fight over a frame handle.
 - `rank.test.mjs` — trophy maths: Elo direction, the margin / "how badly you lost"
   multipliers, free-for-all placement, rank floors, and promotion detection.
+- `net.test.mjs` — the online party protocol over a loopback `Peer`: rosters and
+  names, ready ticks, what a client is told on start, seat compaction when
+  somebody leaves the lobby, and a mid-round drop ending the round but not the
+  party. Real WebRTC needs a signalling server and two browsers, which is
+  exactly why this layer went untested and exactly why it drifted.
 - `nn.test.mjs` — the neural rung against the model it was exported from: the
   encoder must produce identical planes, the forward pass must match PyTorch at
   the precision that ships, and the JS search must reproduce the Python search
@@ -244,7 +297,7 @@ in the background (stale-while-revalidate), so an update lands on the next load.
 | `src/render.js` | Canvas renderer and the cascade animator. |
 | `src/icons.js` | Every mark in the app, hand-drawn on one 24×24 grid. No emoji. |
 | `src/main.js` | Screens, input, the serial move queue, AI scheduling, online glue. |
-| `src/net.js` | PeerJS host/join, room codes, move relay. |
+| `src/net.js` | PeerJS party rooms: codes, names, ready ticks, rounds, move relay. |
 | `src/audio.js` | Synthesised WebAudio SFX — zero audio assets. |
 | `index.html` / `styles.css` | Mobile-first shell. |
 | `sw.js` / `manifest.webmanifest` / `assets/` | PWA offline cache, installable manifest, icons. |

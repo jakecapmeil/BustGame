@@ -254,6 +254,21 @@ export function drawBoard(ctx, L, view) {
       ctx.restore();
     }
 
+    // A pre-planned move: the tile this device will play the instant its turn
+    // comes round. Dashed, and drawn whether or not the tile is currently
+    // legal, so it never reads as one of the breathing legal-move rings.
+    if (view.planned === i) {
+      const p = view.pulse || 0;
+      ctx.save();
+      ctx.setLineDash([L.tile * 0.15, L.tile * 0.11]);
+      ctx.lineDashOffset = -(view.pulse || 0) * L.tile * 0.26;
+      roundRect(ctx, x + 2, y + 2, L.tile - 4, L.tile - 4, radius - 2);
+      ctx.strokeStyle = `rgba(255,255,255,${0.72 + 0.24 * p})`;
+      ctx.lineWidth = Math.max(2, L.tile * 0.06);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Keyboard cursor — a bold ring the arrow keys move around.
     if (view.cursor === i) {
       ctx.save();
@@ -357,6 +372,25 @@ function drawFlyers(ctx, L, busts, t) {
       ctx.restore();
     }
     if (flight >= 1) continue; // landed; drawBoard draws the pop from here
+
+    // Bouncy walls: these balls set off at a wall, hit it, and come home. Out
+    // and back on a sine, so the turn happens at the wall rather than at some
+    // arbitrary point in the flight.
+    if (b.back && b.back.length && b.keep > 0) {
+      const swing = Math.sin(Math.PI * flight);
+      ctx.save();
+      for (const target of b.back) {
+        const to = cellCentre(L, target);
+        ctx.globalAlpha = 0.85;
+        drawDisc(
+          ctx,
+          from.cx + (to.cx - from.cx) * 0.46 * swing,
+          from.cy + (to.cy - from.cy) * 0.46 * swing,
+          r * 0.9, colour, 0, 1,
+        );
+      }
+      ctx.restore();
+    }
 
     for (const target of b.to) {
       const to = cellCentre(L, target);

@@ -15,6 +15,9 @@
  *    capacity before its own turn to go. Work outwards from the catalyst: a
  *    chain reaction escalates as it spreads.
  *  - Balls landing on a tile capture it for the buster, which can cascade.
+ *  - With `bounce` set, a ball thrown at a WALL rebounds onto the tile it left
+ *    instead of being lost. The board edge still taxes a bust either way — the
+ *    edge is the game's oldest rule, and only walls are opt-in scenery.
  */
 
 export const EMPTY = -1;
@@ -65,6 +68,26 @@ export function neighbors(state, i) {
   return out;
 }
 
+/**
+ * The on-board orthogonal neighbours of `i` that are walls, ascending.
+ *
+ * These are exactly the directions a bust throws into and loses — so with
+ * bouncy walls on they are the directions whose balls come back.
+ */
+export function wallNeighbors(state, i) {
+  const { cols, rows } = state;
+  const b = state.blocked;
+  if (!b) return [];
+  const x = i % cols;
+  const y = (i / cols) | 0;
+  const out = [];
+  if (y > 0 && b[i - cols]) out.push(i - cols);
+  if (x > 0 && b[i - 1]) out.push(i - 1);
+  if (x < cols - 1 && b[i + 1]) out.push(i + 1);
+  if (y < rows - 1 && b[i + cols]) out.push(i + cols);
+  return out;
+}
+
 /** How many balls a bust on this tile actually keeps on the board (0..4). */
 export function outDegree(state, i) {
   return neighbors(state, i).length;
@@ -98,8 +121,9 @@ export function winnersOf(state) {
  * @param {Array<{name:string, kind:'human'|'ai', difficulty?:string}>} opts.players
  * @param {number[]} [opts.teams]     team id per player; omit for a free-for-all
  * @param {ArrayLike<number>} [opts.blocked] 1 per walled tile; omit for an open board
+ * @param {boolean} [opts.bounce]    walls rebound balls instead of eating them
  */
-export function createGame({ cols, rows, players, teams = null, blocked = null }) {
+export function createGame({ cols, rows, players, teams = null, blocked = null, bounce = false }) {
   const n = cols * rows;
   return {
     cols,
@@ -107,6 +131,7 @@ export function createGame({ cols, rows, players, teams = null, blocked = null }
     owner: new Int8Array(n).fill(EMPTY),
     count: new Uint8Array(n),
     blocked: blocked ? Uint8Array.from(blocked) : null,
+    bounce: !!bounce && !!blocked,
     teams: teams ? Int8Array.from(teams) : null,
     players: players.map((p, i) => ({
       id: i,
@@ -132,6 +157,7 @@ export function cloneGame(s) {
     count: s.count.slice(),
     // Walls and team assignment never change mid-game, so they are shared.
     blocked: s.blocked,
+    bounce: s.bounce,
     teams: s.teams,
     players: s.players.map((p) => ({ ...p })),
     turn: s.turn,
@@ -360,17 +386,35 @@ export function applyMove(prev, moveIdx) {
     const wave = [...new Set(pending)].sort((a, b) => a - b);
     // How hard a tile blows scales with how far past a 4 it was pushed: a 4
     // throws one ball per side, a 5 two, a 6 three (`count - MAX_BALLS`). Balls
-    // aimed off the board or into a wall are still simply lost.
-    const busts = wave.map((i) => ({
-      at: i,
-      player: state.owner[i],
-      to: neighbors(state, i),
-      n: state.count[i] - MAX_BALLS,
-    }));
+    // aimed off the board are simply lost; balls aimed into a wall are lost too
+    // unless `bounce` is on, in which case they come back (`back` / `keep`).
+    const busts = wave.map((i) => {
+      const n = state.count[i] - MAX_BALLS;
+      const back = state.bounce ? wallNeighbors(state, i) : [];
+      return {
+        at: i,
+        player: state.owner[i],
+        to: neighbors(state, i),
+        n,
+        back,
+        // Capped at capacity: a rebound puts balls back on the tile, it never
+        // re-detonates it on its own. Without that cap a tile with one exit
+        // keeps 3x what it throws and the cascade never terminates.
+        keep: back.length ? Math.min(MAX_BALLS, back.length * n) : 0,
+      };
+    });
 
     // Empty every bursting tile before distributing, so two adjacent tiles
     // bursting in the same wave hand each other their balls cleanly.
     for (const i of wave) { state.owner[i] = EMPTY; state.count[i] = 0; }
+
+    // Rebounds land before the outgoing balls do, so a tile that kept some of
+    // its own can still be captured by a neighbour bursting in the same wave.
+    for (const b of busts) {
+      if (b.keep <= 0) continue;
+      state.owner[b.at] = b.player;
+      state.count[b.at] = b.keep;
+    }
 
     const next = new Set();
     for (const b of busts) {

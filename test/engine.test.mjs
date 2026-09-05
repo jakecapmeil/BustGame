@@ -4,6 +4,7 @@ import {
   createGame, applyMove, legalPlacements, legalMoves, neighbors, outDegree,
   scores, idxOf, EMPTY, MAX_BALLS, PHASE_PLACE, PHASE_PLAY, PHASE_OVER,
   teamOf, sameTeam, winnersOf, isBlocked, openingMask, blockingStarts,
+  wallNeighbors,
 } from '../src/engine.js';
 
 const P2 = [
@@ -483,4 +484,88 @@ test('blockingStarts is empty for a tile that is illegal for another reason', ()
   let s = createGame({ cols: 5, rows: 5, players: P4.slice(0, 3) });
   assert.deepEqual(blockingStarts(s, 12), [], 'nobody has opened yet');
   assert.ok(!legalPlacements(s).includes(12), 'but the centre still strands a seat');
+});
+
+/* ---------------------------------------------------------- bouncy walls -- */
+
+/** A 7x7 with a wall directly east of the centre tile (3,3) = 24. */
+const WALL_E = 25;
+function walledBoard(bounce) {
+  const blocked = new Uint8Array(49);
+  blocked[WALL_E] = 1;
+  return createGame({ cols: 7, rows: 7, players: P2, blocked, bounce });
+}
+
+test('wallNeighbors names only the walled sides, never the board edge', () => {
+  const s = walledBoard(true);
+  assert.deepEqual(wallNeighbors(s, 24), [WALL_E], 'the centre has one walled side');
+  assert.deepEqual(wallNeighbors(s, 0), [], 'a corner is edged, not walled');
+  assert.deepEqual(wallNeighbors(s, 18), [WALL_E], 'north of the wall');
+  const open = createGame({ cols: 7, rows: 7, players: P2 });
+  assert.deepEqual(wallNeighbors(open, 24), [], 'no walls, nothing to bounce off');
+});
+
+test('bounce is only armed when the board actually has walls', () => {
+  const s = createGame({ cols: 7, rows: 7, players: P2, bounce: true });
+  assert.equal(s.bounce, false, 'no wall mask means nothing to bounce off');
+  assert.equal(walledBoard(true).bounce, true);
+  assert.equal(walledBoard(false).bounce, false);
+});
+
+test('a wall eats a ball with bounce off and hands it back with bounce on', () => {
+  // The opening tile is dropped in at MAX_BALLS + 1, so it busts on the spot
+  // throwing one ball per side. The centre has three open sides and one wall.
+  const lost = applyMove(walledBoard(false), 24);
+  assert.ok(lost.ok);
+  assert.equal(lost.state.owner[24], EMPTY, 'the busted tile empties');
+  assert.equal(lost.state.count[24], 0);
+  assert.equal(scores(lost.state).balls[0], 3, 'the walled ball is gone');
+
+  const kept = applyMove(walledBoard(true), 24);
+  assert.ok(kept.ok);
+  assert.equal(kept.state.owner[24], 0, 'the rebound leaves the tile yours');
+  assert.equal(kept.state.count[24], 1, 'one walled side, one ball back');
+  assert.equal(scores(kept.state).balls[0], 4, 'nothing was lost');
+});
+
+test('a rebound is capped at capacity so it can never re-detonate its own tile', () => {
+  // A tile walled on three sides, pushed to 6 balls: three walls x three balls
+  // each would be nine, which must clamp to MAX_BALLS.
+  const blocked = new Uint8Array(25);
+  for (const w of [7, 11, 13]) blocked[w] = 1;   // north, west and east of 12
+  const s = createGame({ cols: 5, rows: 5, players: P2, blocked, bounce: true });
+  s.phase = PHASE_PLAY;
+  s.players.forEach((p) => { p.placed = true; });
+  s.starts = [0, 24];
+  s.owner[12] = 0; s.count[12] = MAX_BALLS + 2;   // a 5, about to take a 6th
+  s.owner[17] = 1; s.count[17] = 1;               // south neighbour, so B stays alive
+
+  const r = applyMove(s, 12);
+  assert.ok(r.ok);
+  assert.equal(r.state.count[12], MAX_BALLS, 'clamped, not nine');
+  assert.ok(r.state.count[12] <= MAX_BALLS, 'never over capacity from a rebound');
+});
+
+test('every tile is legal after a bouncy-wall cascade (fuzz)', () => {
+  // The rebound puts balls back that the old rules destroyed, so the board
+  // carries more material and cascades run longer. Prove they still settle.
+  let seed = 20260905;
+  const rnd = () => {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+  for (let round = 0; round < 6; round++) {
+    const blocked = new Uint8Array(49);
+    for (let i = 0; i < 49; i++) if (rnd() < 0.12) blocked[i] = 1;
+    let s = createGame({ cols: 7, rows: 7, players: P2, blocked, bounce: true });
+    for (let step = 0; step < 220 && s.phase !== PHASE_OVER; step++) {
+      const opts = legalMoves(s);
+      if (!opts.length) break;
+      s = applyMove(s, opts[Math.floor(rnd() * opts.length)]).state;
+      for (let i = 0; i < s.count.length; i++) {
+        assert.ok(s.count[i] <= MAX_BALLS, `tile ${i} over capacity`);
+        if (s.blocked[i]) assert.equal(s.owner[i], EMPTY, `wall ${i} owned`);
+      }
+    }
+  }
 });

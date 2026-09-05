@@ -61,6 +61,7 @@
     <div class="toggles">
       <button class="chip-toggle" id="toggle-sound" aria-pressed="true">Sound on</button>
       <button class="chip-toggle" id="toggle-haptics" aria-pressed="true">Haptics on</button>
+      <button class="chip-toggle chip-cycle" id="toggle-speed" aria-label="Game speed">Speed 1×</button>
     </div>
   </div>
 </section>
@@ -101,6 +102,15 @@
           <button class="seg-btn" type="button" data-v="0.08">Few</button>
           <button class="seg-btn" type="button" data-v="0.14">Some</button>
           <button class="seg-btn" type="button" data-v="0.2">Many</button>
+        </div>
+        <!-- Only worth asking once there are walls to ask about. -->
+        <div id="custom-bounce-wrap" class="is-hidden">
+          <span class="label" style="margin-top:10px;display:block">Hitting a wall</span>
+          <div class="seg seg-tight" id="custom-bounce">
+            <button class="seg-btn is-on" type="button" data-v="off">Ball is lost</button>
+            <button class="seg-btn" type="button" data-v="on">Ball bounces back</button>
+          </div>
+          <p class="hint" id="custom-bounce-note">A ball thrown into a wall is gone, exactly like one thrown off the edge.</p>
         </div>
       </div>
       <p class="err" id="custom-err"></p>
@@ -147,28 +157,53 @@
   <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back" data-icon="back"></button><h2>Online</h2></header>
   <div class="pane" id="online-setup">
     <div class="scroller">
-      <p class="hint" id="online-shape">Play across devices. One player hosts and shares the room code.</p>
-      <fieldset class="field"><legend>Join a room</legend>
+      <p class="hint" id="online-shape">Play across devices. Get a group together once, then keep playing round after round.</p>
+      <fieldset class="field"><legend>Your name</legend>
+        <input id="online-name" class="text-input" type="text" maxlength="14" autocomplete="nickname"
+               autocapitalize="words" spellcheck="false" placeholder="Your name" aria-label="Your name">
+      </fieldset>
+      <fieldset class="field"><legend>Join a party</legend>
         <div class="join-row">
           <input id="online-code" class="code-input" inputmode="text" autocapitalize="characters"
-                 autocomplete="off" spellcheck="false" maxlength="5" placeholder="CODE" aria-label="Room code">
+                 autocomplete="off" autocorrect="off" spellcheck="false" maxlength="5" placeholder="CODE" aria-label="Party code">
           <button class="btn" id="online-join">Join</button>
         </div>
       </fieldset>
       <p class="err" id="online-err" role="alert"></p>
       <button class="btn btn-ghost btn-sm" data-goto="screen-modes">Change mode</button>
     </div>
-    <button class="btn btn-primary" id="online-host">Host a room</button>
+    <button class="btn btn-primary" id="online-host">Host a party</button>
   </div>
 
-  <div class="stack setup is-hidden" id="online-lobby">
-    <span class="label">Room code</span>
-    <div class="room-code num" id="online-room-code">—</div>
-    <button class="btn btn-ghost btn-sm" id="online-copy">Copy code</button>
-    <ul class="lobby-list" id="online-players"></ul>
-    <p class="err" id="online-lobby-msg" role="status"></p>
-    <button class="btn btn-primary is-hidden" id="online-begin">Start game</button>
-    <button class="btn btn-ghost btn-sm" id="online-leave">Leave room</button>
+  <!-- The lobby is the party, not one match: it is where you come back to
+       between rounds, so it carries the names, the ready ticks and the map. -->
+  <div class="pane is-hidden" id="online-lobby">
+    <div class="scroller">
+      <span class="label">Party code</span>
+      <div class="room-code num" id="online-room-code">—</div>
+      <div class="lobby-actions">
+        <button class="btn btn-sm" id="online-share">Share link</button>
+        <button class="btn btn-ghost btn-sm" id="online-copy">Copy code</button>
+      </div>
+      <fieldset class="field"><legend>Your name</legend>
+        <input id="lobby-name" class="text-input" type="text" maxlength="14" autocomplete="nickname"
+               autocapitalize="words" spellcheck="false" placeholder="Your name" aria-label="Your name">
+      </fieldset>
+      <span class="label">Players</span>
+      <ul class="lobby-list" id="online-players"></ul>
+      <button class="mode-hero is-hidden" id="lobby-mode-hero" data-map-picker aria-label="Change the map">
+        <span class="mode-glyph" id="lobby-hero-glyph" aria-hidden="true"></span>
+        <span>
+          <span class="mode-hero-name" id="lobby-hero-name">Duel</span><br>
+          <span class="mode-hero-sub" id="lobby-hero-sub">—</span>
+        </span>
+        <span class="mode-hero-cue">CHANGE</span>
+      </button>
+      <p class="err" id="online-lobby-msg" role="status"></p>
+    </div>
+    <button class="btn btn-primary" id="online-ready" aria-pressed="false">I'm ready</button>
+    <button class="btn btn-primary is-hidden" id="online-begin">Start the round</button>
+    <button class="btn btn-ghost btn-sm" id="online-leave">Leave party</button>
   </div>
 </section>
 
@@ -249,6 +284,12 @@
     </section>
 
     <section class="rule">
+      <h3>Plan ahead</h3>
+      <p>Waiting on someone else? <b>Double-tap</b> one of your own tiles to plan your next move. It gets a dashed ring, and it plays itself the moment your turn comes round.</p>
+      <p>Changed your mind — <b>tap the planned tile again</b> to undo it.</p>
+    </section>
+
+    <section class="rule">
       <h3>Reading a tile</h3>
       <p>The dots inside a disc are its balls. A disc with a <b>ring</b> around it is loaded — one more ball and it goes.</p>
     </section>
@@ -276,6 +317,12 @@
 <div class="overlay" id="overlay-pause" hidden>
   <div class="card">
     <h2>Paused</h2>
+    <fieldset class="field"><legend>Game speed</legend>
+      <div class="seg seg-tight" id="pause-speed">
+        <button class="seg-btn is-on" type="button" data-v="1">1× speed</button>
+        <button class="seg-btn" type="button" data-v="2">2× speed</button>
+      </div>
+    </fieldset>
     <button class="btn btn-primary" id="pause-resume">Resume</button>
     <button class="btn" id="pause-restart">Restart</button>
     <button class="btn btn-ghost" id="pause-quit">Quit to menu</button>
@@ -312,7 +359,14 @@
       <ul class="tally-list" id="over-breakdown"></ul>
     </div>
 
+    <!-- Online, "play again" is a vote rather than a button: the round starts
+         when the whole party has ticked it, so the party outlives the match. -->
+    <div class="party-again is-hidden" id="over-party">
+      <ul class="lobby-list" id="over-party-list"></ul>
+    </div>
+
     <button class="btn btn-primary" id="over-again">Play again</button>
+    <button class="btn is-hidden" id="over-map">Change the map</button>
     <button class="btn btn-ghost" id="over-menu">Menu</button>
   </div>
 </div>

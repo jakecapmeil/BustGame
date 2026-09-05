@@ -140,7 +140,14 @@
 
 html, body {
   margin: 0;
+  /* `dvh` tracks the viewport as a mobile browser's toolbars slide away; `lvh`
+     is the size with them gone. The old flat `100%` sized to whichever the page
+     loaded with, so a retracting toolbar uncovered a strip of bare page below
+     everything — a bar at the foot of the screen, the background's colour but
+     none of its shading, which is exactly what it looked like: a mistake. */
   height: 100%;
+  height: 100dvh;
+  min-height: 100dvh;
   overflow: hidden;
   overscroll-behavior: none;
   background: var(--bg);
@@ -153,11 +160,21 @@ html, body {
   transition: background var(--t-slow) var(--e-out);
 }
 
-/* A soft vignette so the flat field has some depth under the board. */
+/* A soft vignette so the flat field has some depth under the board.
+
+   Sized to the LARGE viewport and hung off the top, so it still covers the
+   strip a retracting toolbar uncovers — a vignette that stopped at the small
+   viewport's edge drew the very band it exists to avoid. The gradient runs to
+   140% too, so its ellipse closes past the bottom of the screen instead of
+   leaving a flat slab of `--bg-deep` below it. */
 body::before {
   content: '';
   position: fixed; inset: 0; pointer-events: none; z-index: 0;
-  background: radial-gradient(120% 80% at 50% 0%, transparent 40%, var(--bg-deep) 100%);
+  /* `inset: 0` stays as the floor: with top, bottom and height all set, CSS
+     ignores `bottom`, so a browser that knows `lvh` gets the taller box and one
+     that doesn't still gets a full-height vignette rather than none at all. */
+  height: 100lvh;
+  background: radial-gradient(135% 118% at 50% -8%, transparent 38%, var(--bg-deep) 100%);
   opacity: .55;
   transition: background var(--t-slow) var(--e-out);
 }
@@ -169,6 +186,10 @@ body::before {
 .screen {
   position: fixed;
   inset: 0;
+  /* Belt and braces with `inset: 0`: on a browser that supports it the screen
+     tracks the live viewport, so the layout reflows as the toolbar moves
+     instead of being clipped or leaving a gap under itself. */
+  height: 100dvh;
   z-index: 1;
   display: none;
   flex-direction: column;
@@ -195,10 +216,20 @@ body::before {
   scrollbar-width: none;
 }
 .scroller::-webkit-scrollbar { display: none; }
+/* A screen whose content does not fill the pane centres it instead of jamming
+   it under the header and leaving half a phone of empty field above the pinned
+   button. Only ever applied when nothing overflows, so it can never clip the
+   top of a scrollable column. */
+.scroller.is-short { justify-content: center; }
 /* A scroller that runs under a pinned footer button gets a soft bottom edge, so
-   a clipped row reads as "there is more" instead of as a layout mistake. */
-.screen > .scroller,
-.pane > .scroller {
+   a clipped row reads as "there is more" instead of as a layout mistake.
+
+   Only while there actually is more, though: `.is-clipped` is set from script
+   when the content overflows and the scroller is not at its end. Applied
+   unconditionally it faded the last row of every short screen into the
+   background for no reason, which read as a rendering fault rather than a hint. */
+.screen > .scroller.is-clipped,
+.pane > .scroller.is-clipped {
   -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 26px), transparent 100%);
   mask-image: linear-gradient(180deg, #000 calc(100% - 26px), transparent 100%);
 }
@@ -211,6 +242,10 @@ body::before {
    of the screen (or its .pane), never scrolling away with the content. */
 .screen > .btn-primary,
 .pane > .btn-primary { flex: none; margin-top: var(--s-3); }
+/* A pane can pin more than one action (the party lobby pins ready, start and
+   leave); every one of them stays out of the scroller's flex. */
+.pane > .btn { flex: none; }
+.pane > .btn + .btn { margin-top: var(--s-2); }
 
 /* -------------------------------------------------------------------- bar */
 
@@ -297,7 +332,11 @@ body::before {
 }
 .chip-toggle:active { box-shadow: var(--edge); transform: translateY(3px); }
 .chip-toggle[aria-pressed="false"] { opacity: .45; text-decoration: line-through; }
-.toggles { display: flex; gap: var(--s-2); justify-content: center; }
+/* Speed cycles between two gears rather than switching off, so it never wears
+   the struck-through "off" treatment — the accent is the on-state instead. */
+.chip-cycle[aria-pressed="false"] { opacity: 1; text-decoration: none; }
+.chip-cycle.is-fast { background: var(--accent); color: var(--on-accent); }
+.toggles { display: flex; gap: var(--s-2); justify-content: center; flex-wrap: wrap; }
 
 .hint { color: var(--on-bg-dim); font-weight: 700; font-size: 14px; line-height: 1.5; margin: 0; }
 .err { color: #FFE2DC; font-weight: 800; font-size: 14px; min-height: 20px; margin: 0; }
@@ -451,10 +490,13 @@ body::before {
   background: var(--card); color: var(--ink); box-shadow: var(--lift-2);
 }
 .code-input::placeholder { color: rgba(62,32,21,.28); }
+/* Big enough to read across a table, small enough that it does not push the
+   party list — the thing you actually came to the lobby to look at — under the
+   fold on a phone. */
 .room-code {
-  font-size: 44px; font-weight: 900; letter-spacing: .18em; text-align: center;
+  font-size: 32px; font-weight: 900; letter-spacing: .16em; text-align: center;
   color: var(--on-bg); background: var(--panel); border-radius: var(--r-2);
-  padding: var(--s-4) 10px; text-indent: .18em;
+  padding: 10px 10px 9px; text-indent: .16em;
   box-shadow: var(--lift-1), var(--edge);
 }
 .lobby-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -465,7 +507,64 @@ body::before {
   box-shadow: var(--lift-1), var(--edge);
 }
 .lobby-list .dot { width: 16px; height: 16px; border-radius: 50%; flex: none; }
-.lobby-list .you { margin-left: auto; font-size: 12px; color: var(--on-bg-faint); }
+.lobby-list .lobby-who {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lobby-list .you,
+.lobby-list .tag {
+  flex: none; font-size: 10px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: var(--r-pill);
+  background: rgba(255,255,255,.24); color: var(--on-bg);
+}
+.lobby-list .tag { background: rgba(0,0,0,.18); color: var(--on-bg-dim); }
+/* The tick is the whole point of the row, so it holds its column whether or not
+   it is filled — a list that reflows as people ready up is unreadable. */
+.lobby-list .ready-tick {
+  margin-left: auto; flex: none; width: 22px; height: 22px;
+  display: grid; place-items: center; color: var(--on-bg);
+  opacity: 0; transition: opacity var(--t-base) var(--e-out);
+}
+.lobby-list li.is-ready { background: var(--panel-3); }
+.lobby-list li.is-ready .ready-tick { opacity: 1; }
+.lobby-list .ready-tick .ico { width: 18px; height: 18px; }
+
+.lobby-actions { display: flex; gap: var(--s-2); }
+.lobby-actions .btn { flex: 1; }
+#online-lobby > .scroller { gap: var(--s-2); }
+#online-lobby .text-input { min-height: 46px; padding: 10px var(--s-3); font-size: var(--fs-body); }
+
+/* A plain text field, dressed as one of the app's sunken controls. */
+.text-input {
+  appearance: none; border: 0; width: 100%; min-width: 0;
+  font: inherit; font-size: var(--fs-head); font-weight: 800;
+  color: var(--ink); background: var(--card);
+  border-radius: var(--r-1); padding: 13px var(--s-3); min-height: 52px;
+  box-shadow: var(--lift-1);
+}
+.text-input::placeholder { color: rgba(62,32,21,.32); }
+.text-input:focus-visible { outline: 3px solid var(--on-bg-faint); outline-offset: 2px; }
+
+/* An action that is already taken — ready, or a vote already cast — reads as
+   pressed in rather than raised, so the party list is the thing you look at. */
+.btn.is-armed {
+  background: var(--panel-3); color: var(--on-bg);
+  box-shadow: var(--edge-in), var(--edge);
+}
+.card .btn.is-armed {
+  background: rgba(62,32,21,.12); color: var(--ink); box-shadow: var(--edge-in);
+}
+
+/* The party's play-again vote, on the result card. */
+.party-again { display: flex; flex-direction: column; gap: var(--s-2); }
+.party-again .lobby-list li {
+  background: rgba(62,32,21,.07); color: var(--ink);
+  box-shadow: none; padding: 9px 12px; font-size: 14px;
+}
+.party-again .lobby-list li.is-ready { background: rgba(62,32,21,.13); }
+.party-again .lobby-list .ready-tick,
+.party-again .lobby-list .you { color: var(--ink); }
+.party-again .lobby-list .you,
+.party-again .lobby-list .tag { background: rgba(62,32,21,.12); color: var(--ink-dim); }
 
 /* ------------------------------------------------------------------ ranked */
 
@@ -617,6 +716,15 @@ body::before {
 }
 .board-area { grid-area: board; position: relative; min-width: 0; min-height: 0; display: grid; place-items: center; }
 #board { display: block; touch-action: none; }
+/* The board takes keyboard focus (arrow keys move a cursor on it), so it needs
+   a focus ring — but the browser default is a hard white box tight against the
+   tiles. Same job, drawn in the app's own language. */
+#board:focus { outline: none; }
+#board:focus-visible {
+  outline: 3px solid var(--on-bg-faint);
+  outline-offset: 6px;
+  border-radius: var(--r-1);
+}
 
 .seat { display: none; align-items: center; justify-content: center; padding: 2px; min-width: 0; }
 .seat.is-shown { display: flex; }
@@ -665,6 +773,12 @@ body::before {
 .screen-game.is-crowded .score-chip { transform: none; padding: 4px 10px 4px 5px; gap: 6px; }
 .screen-game.is-crowded .score-chip .val { font-size: 15px; }
 .screen-game.is-crowded .score-chip .who { display: none; }
+/* Four or fewer fit their names on the rail, and in an online party knowing
+   which colour is which person is most of what the rail is for. */
+.screen-game.is-crowded.is-few .score-chip .who {
+  display: inline-block; max-width: 84px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom;
+}
 .screen-game.is-crowded .score-chip .dot { width: 14px; height: 14px; }
 
 .screen-game.is-crowded .seat-top,
@@ -713,8 +827,11 @@ body::before {
   display: none;
   height: 12px; flex: none;
   border-radius: var(--r-pill);
-  background: var(--sink);
-  box-shadow: var(--edge-in);
+  /* A light track, not a dark hole. On `--sink` an unclaimed board — the whole
+     of it, every opening round — was a solid dark slab sitting under the
+     board, which read as a stray bar rather than as an empty gauge. */
+  background: var(--panel);
+  box-shadow: var(--edge-in), var(--edge);
   overflow: hidden;
   margin: 0 auto;
   width: 100%;
@@ -775,6 +892,13 @@ body::before {
 .card .btn-primary:active { box-shadow: var(--lift-1); }
 .card .btn-ghost { background: rgba(62,32,21,.09); color: var(--ink); box-shadow: var(--lift-1); }
 .card .btn-ghost:active { box-shadow: none; }
+/* A segmented control on a cream card has to invert with it: on `--sink` the
+   track goes grey and the near-white labels vanish into it. */
+.card .seg { background: rgba(62,32,21,.10); box-shadow: none; }
+.card .seg-btn { color: var(--ink-dim); }
+.card .seg-btn.is-on { background: #FFF; color: var(--ink); box-shadow: var(--lift-1); }
+.card .field > legend, .card .label { color: var(--ink-dim); }
+.card .field { width: 100%; }
 
 .winner-disc {
   width: 76px; height: 76px; border-radius: 50%;

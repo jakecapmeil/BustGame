@@ -98,9 +98,14 @@
 
 /* ------------------------------------------------------------------ themes */
 
+/* Ember is the theme you meet first, and its accent used to sit only a shade
+   darker than its own salmon field — so the one primary action on the home
+   screen had less separation from the background than the secondary buttons
+   beside it. Deepened until the accent reads as an object on the field, and
+   until white type on it clears the large-text contrast floor. */
 [data-theme="ember"] {
   --bg: #D98E74; --bg-deep: #C97A60;
-  --accent: #F2564B; --accent-deep: #C6392F; --on-accent: #FFF;
+  --accent: #E23B2B; --accent-deep: #A62A1C; --on-accent: #FFF;
   --tile: #F8EBDA; --tile-dim: #E0C6B4; --wall: #8B6B57;
 }
 [data-theme="tide"] {
@@ -137,6 +142,13 @@
 /* ------------------------------------------------------------------- reset */
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+/* A long press on iOS raises the copy/share callout — over the board that lands
+   mid-thought, on top of the tile you were aiming at. */
+body, .btn, .icon-btn, .seg-btn, .chip-toggle, .mode-card, .mode-hero,
+.rank-strip, .score-chip, #board {
+  -webkit-touch-callout: none;
+}
 
 html, body {
   margin: 0;
@@ -197,6 +209,55 @@ body::before {
            calc(var(--safe-b) + var(--s-4)) calc(var(--safe-l) + var(--s-4));
 }
 .screen.is-active { display: flex; animation: screen-in var(--t-base) var(--e-out); }
+
+/* ---- the shell -----------------------------------------------------------
+
+   The app is designed at phone width and stays that way on a desktop: a menu
+   stretched across 1440px is a phone UI blown up, with 14px labels marooned at
+   opposite ends of a control the width of a table. So every screen's contents
+   sit in one centred column of a fixed comfortable width, and the extra space
+   on a big monitor is simply field.
+
+   The game screen is the exception — the board is the thing you came for, and
+   it takes whatever room it is given. */
+:root { --shell: 520px; }
+
+.screen > .bar,
+.screen > .scroller,
+.screen > .pane,
+.screen > .btn {
+  width: 100%;
+  max-width: var(--shell);
+  margin-left: auto;
+  margin-right: auto;
+}
+.screen-game > * { max-width: none; }
+
+/* The mode picker and the rules are lists of cards, so they earn a little more
+   width — and on a real desktop they read far better two-up than as one very
+   long column of very wide rows. */
+#screen-modes { --shell: 560px; }
+#screen-rules { --shell: 660px; }
+@media (min-width: 900px) {
+  #screen-modes { --shell: 820px; }
+  #screen-rules { --shell: 940px; }
+  /* A desktop window has no thumb zone, so the primary action belongs directly
+     under the content it confirms. Pinned to the foot of a 1080px window it
+     left the header at the top, the content adrift in the middle and the
+     button glued to the bottom — one screen reading as three separate bands. */
+  .screen:not(.screen-game) > .scroller { flex: 0 1 auto; }
+  .scroller.is-short { justify-content: flex-start; }
+  /* Out-specified deliberately: `.mode-grid` and `.scroller` both declare a
+     flex column further down the sheet, and this block sits above them so the
+     shell tokens can be read by everything that follows. */
+  #mode-grid { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+  .scroller.rules {
+    display: grid; grid-template-columns: 1fr 1fr;
+    /* `start`, not the default stretch: a one-line rule beside a five-line one
+       was being inflated to match it, so half the manual was empty card. */
+    align-content: start; align-items: start; gap: var(--s-3);
+  }
+}
 @keyframes screen-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 .stack {
@@ -211,6 +272,8 @@ body::before {
 .stack.setup { justify-content: flex-start; }
 .scroller {
   flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  /* Reaching the end of a list must not start dragging the page behind it. */
+  overscroll-behavior: contain;
   display: flex; flex-direction: column; gap: var(--s-3);
   padding-bottom: var(--s-5);
   scrollbar-width: none;
@@ -221,18 +284,30 @@ body::before {
    button. Only ever applied when nothing overflows, so it can never clip the
    top of a scrollable column. */
 .scroller.is-short { justify-content: center; }
-/* A scroller that runs under a pinned footer button gets a soft bottom edge, so
-   a clipped row reads as "there is more" instead of as a layout mistake.
+/* A scroller that runs past either end gets a soft edge there, so a clipped row
+   reads as "there is more" instead of as a layout mistake.
 
-   Only while there actually is more, though: `.is-clipped` is set from script
-   when the content overflows and the scroller is not at its end. Applied
-   unconditionally it faded the last row of every short screen into the
-   background for no reason, which read as a rendering fault rather than a hint. */
-.screen > .scroller.is-clipped,
-.pane > .scroller.is-clipped {
-  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 26px), transparent 100%);
-  mask-image: linear-gradient(180deg, #000 calc(100% - 26px), transparent 100%);
+   Only while there actually is more, though: the two `is-clipped` classes are
+   set from script from the real scroll position. Applied unconditionally the
+   foot of every short screen faded into the background for no reason, which
+   read as a rendering fault rather than a hint. Scrolled content used to be
+   guillotined at the TOP with a hard edge — a trophy count sliced through the
+   middle of its own digits — because only the bottom ever softened. */
+.screen > .scroller,
+.pane > .scroller {
+  --fade-t: 0px;
+  --fade-b: 0px;
+  -webkit-mask-image: linear-gradient(180deg,
+    transparent 0, #000 var(--fade-t),
+    #000 calc(100% - var(--fade-b)), transparent 100%);
+  mask-image: linear-gradient(180deg,
+    transparent 0, #000 var(--fade-t),
+    #000 calc(100% - var(--fade-b)), transparent 100%);
 }
+.screen > .scroller.is-clipped,
+.pane > .scroller.is-clipped { --fade-b: 26px; }
+.screen > .scroller.is-clipped-top,
+.pane > .scroller.is-clipped-top { --fade-t: 22px; }
 
 /* A screen whose body is a scroller but that also carries its own pinned
    footer button (rather than the button being a direct child of .screen). */
@@ -307,6 +382,14 @@ body::before {
 .seg-btn.is-on { background: var(--card); color: var(--ink); box-shadow: var(--lift-1); }
 .seg-btn[disabled] { opacity: .38; pointer-events: none; }
 .seg-tight .seg-btn { font-size: 12.5px; padding: 11px 2px; }
+
+/* Six bot rungs across a 375px phone clipped the last one — "Neural" ran off
+   the end of its own track. Two rows of three until there is room for one. */
+#solo-diff, .seg.diff { flex-wrap: wrap; }
+#solo-diff .seg-btn, .seg.diff .seg-btn { flex: 1 1 28%; }
+@media (min-width: 520px) {
+  #solo-diff .seg-btn, .seg.diff .seg-btn { flex: 1 1 0; }
+}
 
 /* labelled group */
 .field { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: var(--s-2); }
@@ -436,9 +519,15 @@ body::before {
   transition: transform var(--t-fast) var(--e-out), box-shadow var(--t-fast) var(--e-out);
 }
 .mode-card:active { transform: translateY(4px); box-shadow: var(--lift-1), inset 0 0 0 1px rgba(255,255,255,.16); }
+/* Every card wears the palette it would switch the app to — which means the
+   card for the mode you are ALREADY on is painted the colour of the field
+   behind it, and was the one card in the picker with nothing to catch the eye.
+   The selection is a cream halo and a lift instead: rule 4, invert to focus. */
 .mode-card.is-on {
-  box-shadow: var(--lift-2), inset 0 0 0 2px rgba(255,255,255,.9), 0 0 0 3px rgba(0,0,0,.14);
+  transform: translateY(-2px);
+  box-shadow: var(--lift-3), inset 0 0 0 3px var(--card), 0 0 0 4px rgba(0,0,0,.20);
 }
+.mode-card.is-on:active { transform: translateY(3px); box-shadow: var(--lift-1), inset 0 0 0 3px var(--card); }
 .mode-card .mode-glyph { width: 44px; height: 44px; }
 .mode-card > span:nth-child(2) { min-width: 0; }
 .mode-card-name { font-size: 16px; font-weight: 900; text-shadow: 0 1px 3px rgba(0,0,0,.35); }
@@ -531,7 +620,22 @@ body::before {
 .lobby-actions { display: flex; gap: var(--s-2); }
 .lobby-actions .btn { flex: 1; }
 #online-lobby > .scroller { gap: var(--s-2); }
-#online-lobby .text-input { min-height: 46px; padding: 10px var(--s-3); font-size: var(--fs-body); }
+
+/* A phone on its side has 390px of height to spend and the lobby wants all of
+   it for the one thing you are there to read — who has turned up. So the code
+   block gives up its label and most of its size, and the rows tighten. */
+@media (max-height: 560px) {
+  #online-lobby > .scroller > .label:first-child { display: none; }
+  #online-lobby .room-code { font-size: 24px; padding: 6px 8px; letter-spacing: .14em; text-indent: .14em; }
+  #online-lobby .lobby-list li { padding: 8px 12px; font-size: 14px; }
+  #online-lobby .text-input { min-height: 40px; }
+  #online-lobby > .btn { min-height: 44px; }
+  #online-lobby > .btn.btn-sm { min-height: 38px; }
+}
+/* 16px is a hard floor on any focusable field: below it, iOS Safari zooms the
+   whole page in when the field takes focus and leaves the player scrolled into
+   a corner of their own lobby. */
+#online-lobby .text-input { min-height: 46px; padding: 10px var(--s-3); font-size: 16px; }
 
 /* A plain text field, dressed as one of the app's sunken controls. */
 .text-input {
@@ -602,8 +706,15 @@ body::before {
 .rank-strip:active { transform: translateY(3px); }
 .rank-strip .rank-badge { width: 30px; height: 30px; border-radius: 9px; }
 .rank-strip-main { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+/* At zero trophies the meter is an empty channel, which read as a broken
+   loading bar. The caption says what the bar is counting towards. */
+.rank-strip-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-2); }
 .rank-strip-name { font-size: 13px; font-weight: 900; }
-.rank-strip-trophies { display: flex; align-items: center; gap: 5px; font-size: 16px; font-weight: 900; }
+.rank-strip-next {
+  font-size: 11px; font-weight: 800; color: var(--on-bg-faint);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rank-strip-trophies { display: flex; align-items: center; gap: 5px; font-size: 20px; font-weight: 900; }
 
 /* progress track */
 .track { height: 8px; border-radius: var(--r-pill); background: var(--sink); overflow: hidden; box-shadow: var(--edge-in); }
@@ -638,11 +749,25 @@ body::before {
   padding: 10px var(--s-2); text-align: center;
   box-shadow: var(--lift-1), var(--edge);
 }
-.stat-v { font-size: 20px; font-weight: 900; line-height: 1.1; }
+.stat-v { font-size: 26px; font-weight: 900; line-height: 1.1; }
 .stat-k { font-size: 10.5px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: var(--on-bg-faint); }
 
 /* ladder */
-.ladder { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+/* The ladder scrolls inside itself. Scrolling the whole screen to put your own
+   rank on view carried the hero — badge, trophy count, distance to the next
+   rank — clean off the top of the phone, so opening Ranked answered every
+   question except the one you came with. */
+.ladder {
+  list-style: none; margin: 0; padding: 0 2px;
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: min(44vh, 330px);
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
+  /* Ten ranks never fit, so the fade is unconditional here — without it the row
+     at each end is guillotined mid-word. */
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+}
+.ladder::-webkit-scrollbar { display: none; }
 .ladder li {
   display: flex; align-items: center; gap: 10px;
   background: var(--panel); border-radius: var(--r-1); padding: 8px 11px;
@@ -653,13 +778,18 @@ body::before {
 .ladder li .rank-badge { width: 28px; height: 28px; border-radius: 8px; }
 .ladder li .lad-min {
   margin-left: auto; display: flex; align-items: center; gap: 4px;
-  font-size: 12px; color: var(--on-bg-faint);
+  font-size: 14px; font-weight: 900; color: var(--on-bg-dim);
 }
+/* Your own rank inverts rather than wearing a coloured stripe down one side.
+   Rule 4 of the language: anything that demands attention becomes a cream card
+   with dark text — and the stripe was the one place in the app that answered
+   "which of these is mine" with a border instead. */
 .ladder li.is-here {
-  background: var(--panel-3); color: var(--on-bg);
-  box-shadow: var(--lift-1), var(--edge), inset 4px 0 0 var(--accent);
-  padding-left: 15px;
+  background: var(--card); color: var(--ink);
+  box-shadow: var(--lift-2);
+  font-weight: 900;
 }
+.ladder li.is-here .lad-min { color: var(--ink-dim); }
 .ladder li.is-locked { opacity: .66; }
 
 /* trophy tally on the result card */
@@ -698,21 +828,31 @@ body::before {
    rendering itself on top of whatever screen you walked back to. */
 .screen-game.is-crowded.is-active { display: flex; }
 .screen-game {
-  grid-template-columns: auto 1fr auto;
+  /* Content-sized columns plus `justify-content: center` means the rails hug
+     the board. Left as `1fr` the centre column ate every spare pixel and flung
+     a player's score to the far edge of a desktop monitor — the exact gulf the
+     flat-rail layout exists to close. */
+  grid-template-columns: auto auto auto;
+  justify-content: center;
   /* Rows size to their content and the whole block centres, so the chips hug
      the board instead of being flung to the screen's edges with a couple of
      hundred pixels of empty field between a score and the board it counts.
      `fitBoard` gives the board row its height. */
-  grid-template-rows: auto auto auto;
+  grid-template-rows: auto auto auto auto;
   align-content: center;
   grid-template-areas:
     ".    top    ."
     "left board right"
+    ".    share  ."
     ".    bottom .";
   gap: 6px;
-  /* Reserve the strip the floating turn banner and menu button live in. */
-  padding: calc(var(--safe-t) + 52px) calc(var(--safe-r) + 4px)
-           calc(var(--safe-b) + 4px) calc(var(--safe-l) + 4px);
+  /* Reserve the strip the floating turn banner and menu button live in.
+     The side and bottom inset is 10px, not 4: a score chip carries a 3px hard
+     bottom shadow, and at 4px the last row of chips reached within a pixel of
+     the viewport edge with its own extrusion sheared off — on an iPhone that
+     strip is the home indicator. */
+  padding: calc(var(--safe-t) + 52px) calc(var(--safe-r) + 10px)
+           calc(var(--safe-b) + 12px) calc(var(--safe-l) + 10px);
 }
 .board-area { grid-area: board; position: relative; min-width: 0; min-height: 0; display: grid; place-items: center; }
 #board { display: block; touch-action: none; }
@@ -753,7 +893,7 @@ body::before {
   justify-content: center;
   align-items: stretch;
   gap: 10px;
-  padding-top: calc(var(--safe-t) + 4px);
+  padding-top: calc(var(--safe-t) + 6px);
 }
 /* The banner joins the group rather than floating alone at the top of an empty
    field: whose turn it is belongs *with* the scores, not two hundred pixels
@@ -771,7 +911,9 @@ body::before {
 .screen-game.is-crowded .seat-left, .screen-game.is-crowded .seat-right { display: none; }
 .screen-game.is-crowded .seat { flex-wrap: wrap; gap: 5px; padding: 0; }
 .screen-game.is-crowded .score-chip { transform: none; padding: 4px 10px 4px 5px; gap: 6px; }
-.screen-game.is-crowded .score-chip .val { font-size: 15px; }
+/* The flat rails hold more chips, so they sit tighter — but not smaller: the
+   number is the hero at every size. */
+.screen-game.is-crowded .score-chip .val { font-size: clamp(17px, 2.2vmin, 28px); }
 .screen-game.is-crowded .score-chip .who { display: none; }
 /* Four or fewer fit their names on the rail, and in an online party knowing
    which colour is which person is most of what the rail is for. */
@@ -792,16 +934,25 @@ body::before {
 
 .score-chip {
   display: flex; align-items: center; gap: 8px;
-  background: var(--panel); border-radius: var(--r-pill);
+  /* `--panel` measured 1.3:1 against the field and put white numerals on it at
+     2.7:1 — a chip you could barely find, carrying the number that is supposed
+     to be the hero of the screen. */
+  background: var(--panel-2); border-radius: var(--r-pill);
   padding: 6px 13px 6px 7px;
   white-space: nowrap;
   box-shadow: var(--lift-1), var(--edge);
   transition: background var(--t-base) var(--e-out), box-shadow var(--t-base) var(--e-out),
-              opacity var(--t-base), transform var(--t-base) var(--e-out);
+              color var(--t-base), opacity var(--t-base), transform var(--t-base) var(--e-out);
 }
 .score-chip .dot { width: 18px; height: 18px; border-radius: 50%; flex: none; box-shadow: inset 0 -2px 0 rgba(0,0,0,.14); }
-.score-chip .val { font-size: 18px; font-weight: 900; min-width: 1.1em; text-align: center; }
-.score-chip .who { font-size: 11.5px; font-weight: 800; color: var(--on-bg-faint); }
+/* Rule 5. The score scales with the screen it is on: at a flat 15px it was one
+   third of a tile on a phone and one ninth of one on a monitor, and lost to
+   the turn banner on both. */
+.score-chip .val {
+  font-size: clamp(18px, 2.4vmin, 30px);
+  font-weight: 900; min-width: 1.1em; text-align: center;
+}
+.score-chip .who { font-size: clamp(11.5px, 1.4vmin, 16px); font-weight: 800; color: var(--on-bg-dim); }
 /* Which of these is me? On a rail of eight identical pills that is the first
    thing you look for, so the seat this device plays says so outright. */
 .score-chip .me {
@@ -809,11 +960,15 @@ body::before {
   padding: 2px 6px; border-radius: var(--r-pill);
   background: rgba(255,255,255,.28); color: var(--on-bg);
 }
+/* Rule 4, on the one thing on this screen that genuinely demands attention:
+   whose turn it is. A cream chip with dark ink, not a pale ring on a pale fill. */
 .score-chip.is-turn {
-  background: var(--panel-3);
-  box-shadow: 0 0 0 3px var(--on-bg-faint), var(--lift-1);
-  transform: translateY(-1px) scale(1.04);
+  background: var(--card); color: var(--ink);
+  box-shadow: var(--lift-2);
+  transform: translateY(-2px) scale(1.05);
 }
+.score-chip.is-turn .who { color: var(--ink-dim); }
+.score-chip.is-turn .me { background: rgba(62, 32, 21, .14); color: var(--ink); }
 .score-chip.is-out { opacity: .34; box-shadow: none; }
 .score-chip.is-out .val { text-decoration: line-through; }
 
@@ -829,14 +984,17 @@ body::before {
   border-radius: var(--r-pill);
   /* A light track, not a dark hole. On `--sink` an unclaimed board — the whole
      of it, every opening round — was a solid dark slab sitting under the
-     board, which read as a stray bar rather than as an empty gauge. */
-  background: var(--panel);
-  box-shadow: var(--edge-in), var(--edge);
+     board, which read as a stray bar rather than as an empty gauge. At
+     `--panel` it went the other way and measured 1.4:1 against the field,
+     reading as a hairline seam; `--panel-2` plus a hard rim makes it a track. */
+  background: var(--panel-2);
+  box-shadow: var(--edge-in), var(--edge), 0 2px 0 rgba(0, 0, 0, .14);
   overflow: hidden;
   margin: 0 auto;
   width: 100%;
 }
-.screen-game.is-crowded .share-bar.is-shown { display: flex; }
+.share-bar.is-shown { display: flex; }
+.share-bar { grid-area: share; }
 .share-bar > i {
   display: block; height: 100%;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.32);
@@ -846,6 +1004,60 @@ body::before {
    share separates from the field without needing a label. */
 .share-bar > i.mine { box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 0 0 1px rgba(255,255,255,.4); }
 
+/* ---- any screen wider than it is tall -------------------------------------
+
+   The board is square, so on a wide screen its height is the binding
+   constraint and the spare width is enormous: a laptop had 357px of empty
+   field down each side of it and stacked the score rails above and below,
+   where they cost the board the little height it had. Turning the same three
+   pieces through ninety degrees puts the rails IN that spare width — the HUD
+   becomes one object around the board, and the board gets the whole height.
+
+   One rule covers a phone on its side, a tablet in landscape and every desktop
+   window, because they are the same problem at different sizes. */
+@media (min-aspect-ratio: 5/4) {
+  .screen-game.is-crowded.is-active {
+    display: grid;
+    grid-template-columns: auto auto auto;
+    grid-template-rows: auto auto auto;
+    /* The rails sit beside the board only. Spanning them down over the share
+       bar's row as well let their height bid for that row, which inflated it
+       and squeezed the board's row out from under the canvas. */
+    grid-template-areas:
+      "banner banner banner"
+      "left   board  right"
+      ".      share  .";
+    justify-content: center;
+    align-content: center;
+    gap: 6px 10px;
+    padding-top: calc(var(--safe-t) + 4px);
+  }
+  .screen-game.is-crowded .turn-banner {
+    grid-area: banner; max-width: none; justify-self: center;
+  }
+  .screen-game.is-crowded .seat-top    { grid-area: left; }
+  .screen-game.is-crowded .seat-bottom { grid-area: right; }
+  .screen-game.is-crowded .board-area  { grid-area: board; }
+  .screen-game.is-crowded .share-bar   { grid-area: share; }
+  .screen-game.is-crowded .seat-top,
+  .screen-game.is-crowded .seat-bottom {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    justify-content: center;
+    /* Grows with the window, so a desktop rail holds a full name where a
+       landscape phone holds a number and a colour. */
+    width: clamp(126px, 16vw, 210px);
+    padding: 0;
+  }
+  .screen-game.is-crowded .score-chip { justify-content: flex-start; }
+  /* A rail this shape has room for a name at any seat count. */
+  .screen-game.is-crowded .score-chip .who {
+    display: inline-block; max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+}
+
 .game-menu { position: absolute; top: calc(var(--safe-t) + 6px); right: calc(var(--safe-r) + 6px); z-index: 4; }
 
 .turn-banner {
@@ -853,9 +1065,44 @@ body::before {
   transform: translateX(-50%);
   padding: 7px 16px; border-radius: var(--r-pill);
   background: var(--panel-2);
-  color: var(--on-bg); font-size: 13px; font-weight: 900; letter-spacing: .05em;
+  color: var(--on-bg); font-size: clamp(13px, 1.5vmin, 18px); font-weight: 900; letter-spacing: .05em;
   pointer-events: none; z-index: 3; max-width: 66vw; text-align: center;
   transition: background var(--t-base) var(--e-out);
+}
+
+/* ------------------------------------------------------------------ hover --
+
+   Touch has no hover, and a :hover rule on a phone sticks after a tap — the
+   button stays lit until you press something else. So every hover state is
+   behind a query for a device that genuinely has a pointer, which is also the
+   device that feels dead without one. The motion matches the press it
+   anticipates: lift towards the reader, then collapse into the shadow. */
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover { transform: translateY(-2px); box-shadow: var(--lift-3); }
+  .btn:hover:active { transform: translateY(5px); box-shadow: var(--lift-1); }
+  .btn-ghost:hover { background: var(--panel-2); box-shadow: var(--lift-2), var(--edge); }
+  .card .btn-ghost:hover { background: rgba(62, 32, 21, .15); }
+  .icon-btn:hover { background: var(--panel-2); transform: translateY(-1px); }
+  .seg-btn:hover:not(.is-on) { background: rgba(255, 255, 255, .12); color: var(--on-bg); }
+  .card .seg-btn:hover:not(.is-on) { background: rgba(62, 32, 21, .06); color: var(--ink); }
+  .chip-toggle:hover { background: var(--panel-2); }
+  .mode-card:hover { transform: translateY(-2px); box-shadow: var(--lift-3), inset 0 0 0 1px rgba(255,255,255,.24); }
+  .mode-card:hover:active { transform: translateY(4px); box-shadow: var(--lift-1), inset 0 0 0 1px rgba(255,255,255,.16); }
+  .mode-hero:hover, .rank-strip:hover { transform: translateY(-2px); box-shadow: var(--lift-3), var(--edge); }
+  .lobby-list li:hover { background: var(--panel-2); }
+  #board:hover { cursor: pointer; }
+}
+
+/* A visible focus ring on every control, for anyone driving this by keyboard.
+   `:focus-visible` keeps it off a mouse click. */
+.btn:focus-visible, .icon-btn:focus-visible, .seg-btn:focus-visible,
+.chip-toggle:focus-visible, .mode-card:focus-visible, .mode-hero:focus-visible,
+.rank-strip:focus-visible {
+  outline: 3px solid var(--on-bg);
+  outline-offset: 3px;
+}
+.card .btn:focus-visible, .card .seg-btn:focus-visible {
+  outline-color: var(--ink);
 }
 
 /* ---------------------------------------------------------------- overlays */

@@ -184,6 +184,7 @@ function syncScrollFades() {
   $$('.scroller').forEach((el) => {
     const over = el.scrollHeight - el.clientHeight;
     el.classList.toggle('is-clipped', over - el.scrollTop > 8);
+    el.classList.toggle('is-clipped-top', el.scrollTop > 8);
     // Measured on overflow rather than on the fade, so it cannot flip as the
     // player scrolls to the end of a long screen.
     el.classList.toggle('is-short', over <= 1);
@@ -298,16 +299,27 @@ function buildSeats() {
   // around. Everywhere else (and always past four players) the chips go into
   // flat rails, which hands the board back the ~25% of width the side columns
   // would have eaten.
-  const crowded = n > 4 || session.mode !== 'local';
+  // Rotated edge seats exist for a device that is physically turned round a
+  // table, so they need touch AND enough screen to spend on them. On a desktop
+  // nobody rotates the monitor and upside-down names are simply wrong; on a
+  // phone the two side columns cost the board a quarter of its width, which on
+  // a 390px screen shrank it from 366px to 277px and left half the display
+  // empty. A tablet has the room and loses about a tenth — there it is worth it.
+  const roomy = typeof matchMedia === 'function'
+    ? matchMedia('(pointer: coarse) and (min-width: 700px) and (min-height: 620px)').matches
+    : false;
+  const crowded = n > 4 || session.mode !== 'local' || !roomy;
   screen.classList.toggle('is-crowded', crowded);
+  // Reading order: you first, then round the table. Both layouts use it — the
+  // gauge under the board is the same gauge whichever way the chips are turned.
+  const rot = (pid) => (pid - localSeat + n) % n;
+  const ordered = [...state.players].sort((a, b) => rot(a.id) - rot(b.id)).map((p) => p.id);
   // Names are dropped from the flat rails because eight of them do not fit —
   // but four do, and in an online party the names are the whole point of
   // having asked for them.
   screen.classList.toggle('is-few', n <= 4);
 
   if (crowded) {
-    const rot = (pid) => (pid - localSeat + n) % n;   // you always sit first
-    const ordered = [...state.players].sort((a, b) => rot(a.id) - rot(b.id)).map((p) => p.id);
     // Both rails now sit hard against the board rather than at the screen's
     // edges, so the split is simply "you and your near neighbours below, the
     // rest above" — the clockwise corner loop it used to describe no longer
@@ -323,9 +335,8 @@ function buildSeats() {
     buildShareBar(ordered);
     return;
   }
-  shareBar.classList.remove('is-shown');
-  shareBar.innerHTML = '';
 
+  buildShareBar(ordered);
   const order = SEAT_ORDER[n] || SEAT_ORDER[4];
   for (let pid = 0; pid < n; pid++) {
     // Rotate so the device's own player always sits at the bottom edge.
@@ -402,42 +413,54 @@ function fitBoard() {
   const cs = getComputedStyle(screen);
   const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
   const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-  const gap = parseFloat(cs.rowGap) || 0;
+  const gapY = parseFloat(cs.rowGap) || 0;
+  const gapX = parseFloat(cs.columnGap) || gapY;
 
-  // Everything in the column that is not the board: the rails, the share bar,
-  // and (when it is in flow) the turn banner. Absolutely-positioned chrome and
-  // the hidden side rails cost nothing.
+  // Which siblings cost the board height and which cost it width depends on the
+  // arrangement, and there are three. A phone on its side turns the crowded
+  // column through ninety degrees — rails beside the board rather than above
+  // and below it — and that is the only case where a crowded screen lays itself
+  // out as a grid, so the computed display tells the two apart.
+  const sideways = crowded && cs.display === 'grid';
+  const isSideRail = (el) => (sideways
+    ? el.classList.contains('seat-top') || el.classList.contains('seat-bottom')
+    : !crowded && (el.classList.contains('seat-left') || el.classList.contains('seat-right')));
+
+  // Everything that is not the board: the rails, the share bar, and (when it is
+  // in flow) the turn banner. Absolutely-positioned chrome and hidden rails
+  // cost nothing.
   let taken = 0;
   let stacked = 0;
+  let sides = 0;
   for (const el of screen.children) {
     if (el === boardArea || el.offsetParent === null) continue;
     if (getComputedStyle(el).position === 'absolute') continue;
-    if (!crowded && (el.classList.contains('seat-left') || el.classList.contains('seat-right'))) continue;
+    if (isSideRail(el)) { sides += el.offsetWidth + gapX; continue; }
     taken += el.offsetHeight;
     stacked++;
   }
 
-  // The rotated layout keeps a rail down each side; the crowded one does not.
-  const sides = crowded ? 0 : ['.seat-left', '.seat-right']
-    .reduce((w, sel) => w + ($(sel).offsetParent ? $(sel).offsetWidth + gap : 0), 0);
-
   const availW = Math.max(80, screen.clientWidth - padX - sides);
-  const availH = Math.max(80, screen.clientHeight - padY - taken - gap * stacked);
+  const availH = Math.max(80, screen.clientHeight - padY - taken - gapY * stacked);
 
   const probe = animator.resize(availW, availH, cols, rows);
   // Enough margin to clear the tile drop shadows, and at least the padding
   // `computeLayout` will subtract again on the second pass.
   const margin = Math.max(10, Math.min(availW, availH) * 0.026);
-  const wrapped = Math.min(availH, probe.boardH + margin * 2);
-  const L = Math.abs(wrapped - availH) > 1
-    ? animator.resize(availW, wrapped, cols, rows) : probe;
+  // Shrink-wrap the canvas to the board on BOTH axes. Whichever axis is not
+  // the binding one leaves the canvas full of slack, and the chips sit against
+  // the canvas — so that slack is exactly how far the score rails get thrown
+  // from the board they describe. In portrait width binds and the spare height
+  // is small; on a phone held sideways height binds and the spare width is
+  // enormous, which put a player's own score at the far edge of the screen.
+  const wrapW = Math.min(availW, probe.boardW + margin * 2);
+  const wrapH = Math.min(availH, probe.boardH + margin * 2);
+  const L = (Math.abs(wrapW - availW) > 1 || Math.abs(wrapH - availH) > 1)
+    ? animator.resize(wrapW, wrapH, cols, rows) : probe;
 
   // The share bar describes the board, so it is exactly as wide as the board.
   shareBar.style.width = `${Math.round(L.boardW)}px`;
-  // Shrink-wrap the board's own box: in both layouts the chips sit against the
-  // board, so a canvas that kept filling the free space would push them back
-  // out to the screen's edges.
-  boardArea.style.height = `${Math.round(wrapped)}px`;
+  boardArea.style.height = `${Math.round(wrapH)}px`;
 
   refreshBoardOnly();
 }
@@ -1039,7 +1062,12 @@ function renderHomeStrip() {
   paintBadge($('#strip-badge'), rank);
   $('#strip-name').textContent = rank.name;
   countTo($('#strip-count'), profile.trophies);
-  $('#strip-fill').style.width = `${Math.round(progressToNext(profile.trophies).frac * 100)}%`;
+  const prog = progressToNext(profile.trophies);
+  $('#strip-fill').style.width = `${Math.round(prog.frac * 100)}%`;
+  // An empty meter with no caption reads as a broken loading bar, which is
+  // exactly what a brand-new player sees on their very first screen.
+  const nxt = nextRank(profile.trophies);
+  $('#strip-next').textContent = nxt ? `${prog.need - prog.have} to ${nxt.name}` : 'Top rank';
   paintModeHero('hero', currentMode());
 }
 
@@ -1089,20 +1117,19 @@ function renderRankedScreen() {
     list.appendChild(li);
   }
 
-  // Ten ranks do not fit on a phone, and the one that matters is your own —
-  // so open the ladder on it rather than at the top of the run.
-  // Driven off scrollTop rather than scrollIntoView: the screen is
-  // position:fixed, and scrollIntoView will happily scroll the document
-  // instead of the pane the row actually lives in. Measured synchronously —
-  // the rows are in the DOM, and a rAF here would never fire on a hidden tab.
-  const scroller = list.closest('.scroller');
-  if (hereEl && scroller) {
-    const delta = hereEl.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
-    const want = scroller.scrollTop + delta - scroller.clientHeight / 2 + hereEl.offsetHeight / 2;
-    // Instant, not smooth: the ladder should simply already be on your rank
-    // when the screen opens, and a smooth scroll is rAF-driven — it never
-    // lands if the tab is in the background when the screen is built.
-    scroller.scrollTop = Math.max(0, want);
+  // Ten ranks do not fit on a phone, and the one that matters is your own — so
+  // open the ladder on it rather than at the top of the run. The LADDER is what
+  // scrolls, not the screen: scrolling the screen took the hero with it, and
+  // the hero is what you opened this screen to read.
+  //
+  // Driven off scrollTop rather than scrollIntoView, which will happily scroll
+  // an ancestor instead. Measured synchronously — the rows are in the DOM, and
+  // a rAF here would never fire on a hidden tab. Instant, not smooth: the
+  // ladder should simply already be on your rank when the screen opens.
+  if (hereEl) {
+    const delta = hereEl.getBoundingClientRect().top - list.getBoundingClientRect().top;
+    const want = list.scrollTop + delta - list.clientHeight / 2 + hereEl.offsetHeight / 2;
+    list.scrollTop = Math.max(0, want);
   }
 }
 

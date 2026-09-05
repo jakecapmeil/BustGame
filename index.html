@@ -7,6 +7,7 @@
 <meta name="description" content="BUST — a fast tactical board game of chain reactions. Load a tile past three balls and it bursts, flinging one ball to every neighbour and stealing whatever they land on.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BUST">
 <!-- Translucent so the status bar shows the page background and always tracks
      the active theme. iOS ignores live theme-color changes in a standalone
      PWA, which otherwise leaves the bar frozen on the launch colour. -->
@@ -33,7 +34,10 @@
     <button class="rank-strip" id="rank-strip" data-goto="screen-ranked" aria-label="Your rank">
       <span class="rank-badge" id="strip-badge" aria-hidden="true"></span>
       <span class="rank-strip-main">
-        <span class="rank-strip-name" id="strip-name">Firecracker</span>
+        <span class="rank-strip-top">
+          <span class="rank-strip-name" id="strip-name">Firecracker</span>
+          <span class="rank-strip-next" id="strip-next"></span>
+        </span>
         <span class="track"><i id="strip-fill"></i></span>
       </span>
       <span class="rank-strip-trophies num"><span class="trophy-ico" data-icon="trophy"></span><span id="strip-count">0</span></span>

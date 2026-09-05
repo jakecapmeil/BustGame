@@ -874,7 +874,10 @@ body::before {
 /* Rotated edge seats only make sense for a table of four or fewer. The chip's
    layout box stays horizontal after a rotation, so the side columns get a hard
    width — otherwise a long name steals the board's width. */
-.seat-left, .seat-right { width: 40px; overflow: visible; }
+/* A rotated chip's layout box stays horizontal, so this width is really the
+   chip's height once it is turned — and the score inside it now scales with the
+   screen, so the column has to be tall enough for the biggest of them. */
+.seat-left, .seat-right { width: 48px; overflow: visible; }
 .seat-top .score-chip { transform: rotate(180deg); }
 .seat-left .score-chip { transform: rotate(90deg); }
 .seat-right .score-chip { transform: rotate(-90deg); }

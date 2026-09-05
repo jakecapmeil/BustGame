@@ -213,26 +213,69 @@ Three things worth knowing:
 
 ## The game screen
 
-The HUD is one object, not four corners. Banner, the opponents' rail, the board,
-a share bar and your own rail sit in a single centred column, so a score is
-always next to the board it counts rather than a couple of hundred pixels away
-at the edge of the screen. `fitBoard` shrink-wraps the canvas to the board for
-exactly this reason — a canvas that filled the free space would push the rails
-back out to the edges.
+The HUD is one object, not four corners. Banner, rails, board and share bar sit
+together, so a score is always next to the board it counts rather than a couple
+of hundred pixels away at the edge of the screen. `fitBoard` shrink-wraps the
+canvas to the board **on both axes** for exactly that reason: the chips sit
+against the canvas, so whichever axis has slack is exactly how far they get
+thrown from the board.
 
+The board is square, so which axis binds depends on the screen — and the HUD
+turns to suit:
+
+| Screen | Layout |
+|---|---|
+| Taller than wide (a phone, a tablet upright) | Rails above and below the board, in a centred column. |
+| Wider than tall (a phone on its side, a tablet in landscape, any desktop window) | Rails become columns **beside** the board, which then gets the full height. |
+| A roomy touch device playing pass-and-play | Rotated edge seats, one per side, facing outwards. |
+
+- **Rotated edge seats need touch and room.** They exist because the device
+  really is being turned around a table — but the two side columns cost the
+  board a quarter of its width, which on a 390pt phone is the difference
+  between a 366px board and a 277px one. A tablet loses about a tenth and keeps
+  them; a phone gets the flat rails and the bigger board; a desktop, where
+  nobody rotates the monitor, never sees them.
+- **On a wide screen the rails live in the gutters.** A square board on a 16:9
+  window leaves several hundred pixels of empty field down each side while the
+  scarce axis — height — is what the rails were eating. Turning them through
+  ninety degrees uses the space the board cannot.
 - The **share bar** under the board is one stacked rail of how much each seat
   holds; whatever is left over is unclaimed board. Two numbers on opposite rails
   never answered "am I winning" at a glance.
+- The seat whose **turn it is** inverts to a cream chip with dark ink — rule 4
+  of the design language, spent on the one thing on the screen that genuinely
+  demands attention.
 - The seat this device plays is marked **YOU** — but only when there is one such
-  seat. In pass-and-play every seat is yours, and the marker would say nothing.
-- **Pass-and-play keeps the rotated edge seats**, because the device really is
-  being turned around. Everywhere else the chips go into flat rails, which also
-  hands the board back the width the side columns would have eaten.
+  seat, and only when its name does not already say so. In pass-and-play every
+  seat is yours, and the marker would say nothing.
+- **Scores scale with the screen.** A flat size was one third of a tile on a
+  phone and one ninth of one on a monitor; rule 5 says the numbers are the hero
+  at every size.
+
+## Mobile, iOS and desktop
+
+Designed at phone width and kept that way: on a desktop the menus sit in one
+centred column rather than stretching to 1920px, and the extra room goes to the
+things that can use it — the mode picker and the rules run two-up, and the
+board grows.
+
+iOS in particular:
+
+- Screens are sized in `dvh` and the field's shading covers `lvh`, so a
+  retracting Safari toolbar cannot uncover a strip of bare page beneath them.
+- No focusable field is under 16px, because below that Safari zooms the whole
+  page in the moment one takes focus.
+- Long-press callouts are off over the board and the controls, scrollers do not
+  rubber-band the page behind them, and safe-area insets are honoured on every
+  screen and overlay.
+- `orientation: any` — landscape is a first-class layout, not a fallback.
 
 ## Accessibility
 
 - The board canvas is focusable. **Arrow keys** (or WASD) move a cursor, **Enter** or
   **Space** plays the highlighted tile.
+- Every control takes a visible focus ring on `:focus-visible`, and hover states
+  are behind `(hover: hover)` so a tap never leaves a button stuck lit.
 - An `aria-live` region announces whose turn it is, the tile counts, and the result.
 - Honours `prefers-reduced-motion`.
 

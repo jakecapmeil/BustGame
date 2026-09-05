@@ -88,6 +88,22 @@ export function wallNeighbors(state, i) {
   return out;
 }
 
+/**
+ * How many of a tile's four sides run off the board (0..2).
+ *
+ * This is the part of a bust's tax that no rule turns off: with bouncy walls
+ * the walled sides hand their balls back, but the edge never does. Counted
+ * rather than collected, because the AI asks for it once per owned tile per
+ * evaluation and an array per call would show up in the search.
+ */
+export function edgeSides(state, i) {
+  const { cols, rows } = state;
+  const x = i % cols;
+  const y = (i / cols) | 0;
+  return (y === 0 ? 1 : 0) + (x === 0 ? 1 : 0)
+    + (x === cols - 1 ? 1 : 0) + (y === rows - 1 ? 1 : 0);
+}
+
 /** How many balls a bust on this tile actually keeps on the board (0..4). */
 export function outDegree(state, i) {
   return neighbors(state, i).length;

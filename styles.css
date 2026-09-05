@@ -865,7 +865,8 @@ body::before {
   display: grid; place-items: center;
   background: rgba(20, 10, 6, 0.58);
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  padding: var(--s-5);
+  padding: calc(var(--safe-t) + var(--s-5)) calc(var(--safe-r) + var(--s-5))
+           calc(var(--safe-b) + var(--s-5)) calc(var(--safe-l) + var(--s-5));
   animation: fade var(--t-base) var(--e-out);
 }
 .overlay[hidden] { display: none; }
@@ -876,11 +877,17 @@ body::before {
   border-radius: var(--r-3);
   padding: var(--s-5) var(--s-4) var(--s-4);
   width: min(360px, 100%);
-  max-height: 88vh; overflow-y: auto;
+  /* `dvh` where it is understood: `vh` is the viewport with the mobile
+     toolbars gone, so a card sized by it can run off the bottom of the screen
+     it is actually being shown on. */
+  max-height: 88vh;
+  max-height: 88dvh;
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
   display: flex; flex-direction: column; gap: 10px; align-items: stretch;
   box-shadow: var(--float);
   animation: card-in var(--t-slow) var(--e-pop);
 }
+.card::-webkit-scrollbar { display: none; }
 @keyframes card-in { from { transform: scale(.88) translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
 .card h2 { margin: 0; text-align: center; font-size: 27px; font-weight: 900; color: var(--ink); }
 .card .hint { color: var(--ink-dim); text-align: center; }

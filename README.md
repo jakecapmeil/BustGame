@@ -70,6 +70,10 @@ punished for its neighbours and the maze becomes cover rather than a tax. The
 rebound is capped at capacity, which is what keeps it a rule and not a bomb: a
 tile can never re-detonate itself off its own rebound.
 
+The bots know about it: the hand-written evaluation prices a tile by how many
+of its sides actually *eat* a ball, so with bouncy walls on it stops paying a
+safety bonus for hugging a wall and counts only the board's own edge.
+
 ### Then: solo, local or online
 
 - **Ranked** — the current mode, against matchmade bots, for trophies (below).

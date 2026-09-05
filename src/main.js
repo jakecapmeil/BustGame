@@ -239,6 +239,8 @@ function startGame({
     outShown: false,   // the "you lose" card has had its one chance to appear
     spectating: false, // knocked out, chose to watch the rest
     planned: null,     // tile this device will play the moment its turn comes
+    pending: null,     // online: a move proposed to the host, not yet echoed
+    pendingTimer: 0,
   };
 
   keyCursor = Math.floor((rows * cols) / 2);
@@ -496,6 +498,7 @@ function bannerText() {
   if (s.phase === PHASE_OVER) return 'Game over';
   // A planned move is the one thing you want confirmed while you wait, and the
   // banner is already the "what is happening" line.
+  if (movePending()) return 'Move sent…';
   if (session.planned !== null && !controlsPlayer(s.turn)) return 'Move planned · tap to undo';
   if (session.spectating) return `Spectating · ${playerLabel(s.players[s.turn])}`;
   const p = s.players[s.turn];
@@ -563,6 +566,7 @@ async function pump() {
       }
 
       session.state = r.state;
+      session.pending = null;   // whatever we were waiting on has landed
       refresh();
 
       if (r.state.phase === PHASE_OVER) { finish(); return; }
@@ -631,6 +635,11 @@ function scheduleAI() {
 
 /* -------------------------------------------------------------------- input -- */
 
+// How long a client waits on the host to echo its move before letting go of the
+// turn. Long enough to cover a bad connection, short enough that a packet the
+// host dropped never locks the player out of their own turn.
+const PENDING_MS = 5000;
+
 /** True when this device may act on the current turn right now. */
 function canActNow() {
   if (!session || session.over) return false;
@@ -638,7 +647,14 @@ function canActNow() {
   if (s.phase === PHASE_OVER) return false;
   if (!controlsPlayer(s.turn)) return false;
   if (session.queue.length || session.pumping) return false; // mid-cascade
+  if (movePending()) return false;                           // already sent one
   return true;
+}
+
+/** A proposed move still waiting on the host, within its patience window. */
+function movePending() {
+  const p = session && session.pending;
+  return !!p && performance.now() - p.at < PENDING_MS;
 }
 
 /**
@@ -669,8 +685,23 @@ function commitTile(idx) {
     return;
   }
   if (session.mode === 'online' && !session.room?.isHost) {
-    // Clients propose; they apply only when the host echoes it back.
+    // Clients propose; they apply only when the host echoes it back. Until it
+    // does, the turn is spoken for: without that, a tap on a slow connection
+    // reads as "nothing happened", gets repeated, and sends a second move for
+    // the same turn. The host drops the extra, so the board was never at risk —
+    // but the player was left tapping at a board that would not answer.
+    session.pending = { idx, at: performance.now() };
     session.room.sendMove(idx);
+    refresh();
+    // Nothing else would repaint if the host simply never answers, so the
+    // "sent" banner would outlive the wait it describes.
+    const myEpoch = epoch;
+    clearTimeout(session.pendingTimer);
+    session.pendingTimer = setTimeout(() => {
+      if (!session || epoch !== myEpoch || !session.pending) return;
+      session.pending = null;
+      refresh();
+    }, PENDING_MS + 40);
     return;
   }
   enqueue(idx, 'local');
@@ -1918,11 +1949,24 @@ const ro = new ResizeObserver(() => { if (currentScreen === 'screen-game') fitBo
 ro.observe($('#screen-game'));
 
 $$('.scroller').forEach((el) => el.addEventListener('scroll', syncScrollFades, { passive: true }));
-// A scroller's content changes size as rosters and rows come and go, so the
-// fade is re-checked on the box itself rather than only when a screen opens.
-const scrollRo = new ResizeObserver(syncScrollFades);
-$$('.scroller').forEach((el) => scrollRo.observe(el));
 window.addEventListener('resize', syncScrollFades);
+
+// A scroller overflows because of what is *inside* it — a party roster growing
+// by a row, a ladder being built — and a ResizeObserver on the box never sees
+// that: the box is the same size either way. So watch the content instead,
+// coalesced onto one frame so a full rebuild costs one measurement.
+const scrollRo = new ResizeObserver(syncScrollFades);
+let fadeQueued = false;
+const queueScrollFades = () => {
+  if (fadeQueued) return;
+  fadeQueued = true;
+  requestAnimationFrame(() => { fadeQueued = false; syncScrollFades(); });
+};
+const scrollMo = new MutationObserver(queueScrollFades);
+$$('.scroller').forEach((el) => {
+  scrollRo.observe(el);
+  scrollMo.observe(el, { childList: true, subtree: true, characterData: true });
+});
 window.addEventListener('orientationchange', () => setTimeout(fitBoard, 220));
 
 document.addEventListener('visibilitychange', () => {
@@ -1950,3 +1994,4 @@ syncRosterToMode();
 refreshShapeLines();
 show('screen-home');
 joinFromLink();             // a shared party link opens straight into the room
+

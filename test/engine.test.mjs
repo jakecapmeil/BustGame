@@ -4,7 +4,7 @@ import {
   createGame, applyMove, legalPlacements, legalMoves, neighbors, outDegree,
   scores, idxOf, EMPTY, MAX_BALLS, PHASE_PLACE, PHASE_PLAY, PHASE_OVER,
   teamOf, sameTeam, winnersOf, isBlocked, openingMask, blockingStarts,
-  wallNeighbors,
+  wallNeighbors, edgeSides,
 } from '../src/engine.js';
 
 const P2 = [
@@ -503,6 +503,14 @@ test('wallNeighbors names only the walled sides, never the board edge', () => {
   assert.deepEqual(wallNeighbors(s, 18), [WALL_E], 'north of the wall');
   const open = createGame({ cols: 7, rows: 7, players: P2 });
   assert.deepEqual(wallNeighbors(open, 24), [], 'no walls, nothing to bounce off');
+});
+
+test('edgeSides counts only the sides that run off the board', () => {
+  const s = walledBoard(true);
+  assert.equal(edgeSides(s, 24), 0, 'the centre touches no edge, wall or not');
+  assert.equal(edgeSides(s, 0), 2, 'a corner');
+  assert.equal(edgeSides(s, 3), 1, 'a top edge');
+  assert.equal(edgeSides(s, 18), 0, 'walled on one side, but still interior');
 });
 
 test('bounce is only armed when the board actually has walls', () => {

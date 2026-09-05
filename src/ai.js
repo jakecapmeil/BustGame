@@ -7,7 +7,7 @@
 
 import {
   EMPTY, MAX_BALLS, PHASE_OVER, PHASE_PLACE,
-  legalMoves, legalPlacements, applyMove, neighbors, outDegree, idxOf,
+  legalMoves, legalPlacements, applyMove, neighbors, outDegree, edgeSides, idxOf,
 } from './engine.js';
 import { loadNet } from './nn.js';
 import { NeuralBot, NEURAL_PRESETS } from './nn-bot.js';
@@ -69,8 +69,11 @@ export function evaluate(state, me) {
     const c = state.count[i];
     const deg = outDegree(state, i);
     // Territory is the win condition; balls are the fuel. Border tiles get a
-    // small bonus because they are structurally harder to dislodge.
-    let v = 1.0 + 0.30 * c + (4 - deg) * 0.45;
+    // small bonus because they are structurally harder to dislodge — but the
+    // bonus is for sides that *eat* a ball, and with bouncy walls a walled side
+    // hands it straight back. There, only the board's own edge still counts.
+    const taxed = state.bounce ? edgeSides(state, i) : 4 - deg;
+    let v = 1.0 + 0.30 * c + taxed * 0.45;
 
     if (c === MAX_BALLS) {
       let threatenedBy = 0;

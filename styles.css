@@ -241,6 +241,27 @@ body::before {
 @media (min-width: 900px) {
   #screen-modes { --shell: 820px; }
   #screen-rules { --shell: 940px; }
+  /* A desktop is not a phone held further away. The column and the type both
+     step up once, so the app reads at arm's length on a monitor instead of
+     being a postage stamp of phone-sized controls in the middle of it. */
+  :root {
+    --shell: 580px;
+    --fs-title: 30px; --fs-head: 21px; --fs-body: 16px; --fs-label: 13px;
+  }
+  .btn { min-height: 62px; }
+  .btn-sm { min-height: 52px; }
+  .mode-card { min-height: 82px; }
+  .mode-card-name { font-size: 18px; }
+  .mode-card-tag { font-size: 13.5px; }
+  .mode-hero-name { font-size: 21px; }
+  .mode-hero-sub, .mode-hero-cue { font-size: 13.5px; }
+  .rank-strip-name { font-size: 15px; }
+  .rank-strip-next { font-size: 12.5px; }
+  .seg-btn { font-size: 15px; }
+  .seg-tight .seg-btn { font-size: 14px; }
+  .ladder li { font-size: 15px; padding: 10px 13px; }
+  .ladder li .lad-min { font-size: 16px; }
+  .roster-seat .who { font-size: 16px; }
   /* A desktop window has no thumb zone, so the primary action belongs directly
      under the content it confirms. Pinned to the foot of a 1080px window it
      left the header at the top, the content adrift in the middle and the
@@ -625,6 +646,27 @@ body::before {
    it for the one thing you are there to read — who has turned up. So the code
    block gives up its label and most of its size, and the rows tighten. */
 @media (max-height: 560px) {
+  /* The ranked hero is built for a tall screen; on a short one it pushed the
+     stats and the whole ladder off the bottom. Shrunk, and — since a short
+     screen is a wide one — split into two columns: who you are on the left,
+     the ladder you are climbing on the right. */
+  .rank-badge-xl { width: 56px; height: 56px; border-radius: 18px; }
+  .rank-hero-count { font-size: 30px; }
+  .rank-hero { padding: var(--s-3); gap: 4px; }
+  .stat-v { font-size: 22px; }
+
+  #screen-ranked > .scroller {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--s-2) var(--s-3);
+    align-content: start;
+  }
+  #screen-ranked .rank-hero { grid-column: 1; grid-row: 1; }
+  #screen-ranked .stat-row { grid-column: 1; grid-row: 2; }
+  #screen-ranked #ranked-mode-hero { grid-column: 1; grid-row: 3; }
+  #screen-ranked > .scroller > .field { grid-column: 2; grid-row: 1 / span 3; min-height: 0; }
+  #screen-ranked .ladder { max-height: none; }
+
   #online-lobby > .scroller > .label:first-child { display: none; }
   #online-lobby .room-code { font-size: 24px; padding: 6px 8px; letter-spacing: .14em; text-indent: .14em; }
   #online-lobby .lobby-list li { padding: 8px 12px; font-size: 14px; }
@@ -760,7 +802,7 @@ body::before {
 .ladder {
   list-style: none; margin: 0; padding: 0 2px;
   display: flex; flex-direction: column; gap: 6px;
-  max-height: min(44vh, 330px);
+  max-height: min(52vh, 460px);
   overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
   /* Ten ranks never fit, so the fade is unconditional here — without it the row
      at each end is guillotined mid-word. */
@@ -771,7 +813,7 @@ body::before {
 .ladder li {
   display: flex; align-items: center; gap: 10px;
   background: var(--panel); border-radius: var(--r-1); padding: 8px 11px;
-  color: var(--on-bg-dim); font-weight: 800; font-size: 13.5px;
+  color: var(--on-bg); font-weight: 800; font-size: 13.5px;
   box-shadow: var(--edge);
   transition: background var(--t-base) var(--e-out);
 }
@@ -790,7 +832,10 @@ body::before {
   font-weight: 900;
 }
 .ladder li.is-here .lad-min { color: var(--ink-dim); }
-.ladder li.is-locked { opacity: .66; }
+/* .66 took nine of the ten rungs — and their badges — down to about 1.8:1
+   against their own rows. A rank you have not reached is dimmer than one you
+   have; it is not meant to be unreadable. */
+.ladder li.is-locked { opacity: .84; }
 
 /* trophy tally on the result card */
 .tally { display: flex; flex-direction: column; align-items: center; gap: var(--s-2); width: 100%; }
@@ -916,7 +961,7 @@ body::before {
 .screen-game.is-crowded .score-chip { transform: none; padding: 4px 10px 4px 5px; gap: 6px; }
 /* The flat rails hold more chips, so they sit tighter — but not smaller: the
    number is the hero at every size. */
-.screen-game.is-crowded .score-chip .val { font-size: clamp(17px, 2.2vmin, 28px); }
+.screen-game.is-crowded .score-chip .val { font-size: clamp(19px, 2.8vmin, 34px); }
 .screen-game.is-crowded .score-chip .who { display: none; }
 /* Four or fewer fit their names on the rail, and in an online party knowing
    which colour is which person is most of what the rail is for. */
@@ -952,7 +997,7 @@ body::before {
    third of a tile on a phone and one ninth of one on a monitor, and lost to
    the turn banner on both. */
 .score-chip .val {
-  font-size: clamp(18px, 2.4vmin, 30px);
+  font-size: clamp(20px, 3vmin, 36px);
   font-weight: 900; min-width: 1.1em; text-align: center;
 }
 .score-chip .who { font-size: clamp(11.5px, 1.4vmin, 16px); font-weight: 800; color: var(--on-bg-dim); }
@@ -983,15 +1028,15 @@ body::before {
    the centred HUD column freed up. */
 .share-bar {
   display: none;
-  height: 12px; flex: none;
+  height: 10px; flex: none;
   border-radius: var(--r-pill);
-  /* A light track, not a dark hole. On `--sink` an unclaimed board — the whole
-     of it, every opening round — was a solid dark slab sitting under the
-     board, which read as a stray bar rather than as an empty gauge. At
-     `--panel` it went the other way and measured 1.4:1 against the field,
-     reading as a hairline seam; `--panel-2` plus a hard rim makes it a track. */
-  background: var(--panel-2);
-  box-shadow: var(--edge-in), var(--edge), 0 2px 0 rgba(0, 0, 0, .14);
+  /* Recessed, exactly like the rank meter two screens away: a channel that is
+     darker than the field reads as empty, and a channel lighter than it reads
+     as full — which at the opening of a game, when nobody holds anything, is a
+     lie. It was a lighter fill for a while and it told that lie. Shallower and
+     rimmed so it is a track rather than the dark slab it started as. */
+  background: rgba(0, 0, 0, .17);
+  box-shadow: var(--edge-in), 0 1px 0 var(--hairline);
   overflow: hidden;
   margin: 0 auto;
   width: 100%;
@@ -1046,11 +1091,13 @@ body::before {
   .screen-game.is-crowded .seat-bottom {
     flex-direction: column;
     flex-wrap: nowrap;
-    align-items: stretch;
+    /* `center`, not stretch: stretched to a 210px rail a chip was three and a
+       half times wider than the words in it, which reads as an unfinished flex
+       row rather than a pill. The rail is as wide as its widest chip. */
+    align-items: center;
     justify-content: center;
-    /* Grows with the window, so a desktop rail holds a full name where a
-       landscape phone holds a number and a colour. */
-    width: clamp(126px, 16vw, 210px);
+    width: auto;
+    max-width: min(26vw, 230px);
     padding: 0;
   }
   .screen-game.is-crowded .score-chip { justify-content: flex-start; }
@@ -1066,10 +1113,23 @@ body::before {
 .turn-banner {
   position: absolute; left: 50%; top: calc(var(--safe-t) + 8px);
   transform: translateX(-50%);
-  padding: 7px 16px; border-radius: var(--r-pill);
-  background: var(--panel-2);
-  color: var(--on-bg); font-size: clamp(13px, 1.5vmin, 18px); font-weight: 900; letter-spacing: .05em;
+  display: flex; align-items: center; gap: 8px; justify-content: center;
+  padding: 7px 16px 7px 12px; border-radius: var(--r-pill);
+  /* Rule 4, on the element that says what the game is waiting for. It used to
+     be filled with the current seat's own colour, which on some themes matched
+     the field's luminance almost exactly — the app's single most important
+     status separated from its background by hue alone, invisible in greyscale
+     and to anyone who cannot tell those two hues apart. The seat colour is the
+     dot now; the pill is cream, and it is extruded like every other control. */
+  background: var(--card);
+  color: var(--ink); font-size: clamp(13px, 1.4vmin, 16px); font-weight: 900; letter-spacing: .04em;
+  box-shadow: var(--lift-1);
   pointer-events: none; z-index: 3; max-width: 66vw; text-align: center;
+}
+.turn-dot {
+  width: 13px; height: 13px; border-radius: 50%; flex: none;
+  background: var(--ink-dim);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .16);
   transition: background var(--t-base) var(--e-out);
 }
 

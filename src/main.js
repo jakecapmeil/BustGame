@@ -146,6 +146,7 @@ const boardArea = $('#board-area');
 const shareBar = $('#share-bar');
 const turnBanner = $('#turn-banner');
 const turnText = $('#turn-text');
+const turnDot = $('#turn-dot');
 const liveRegion = $('#a11y-live');
 const animator = new BoardAnimator(canvas);
 
@@ -499,9 +500,10 @@ function refresh() {
   refreshShareBar(tiles);
 
   turnText.textContent = bannerText();
-  turnBanner.style.background = s.phase === PHASE_OVER
-    ? 'rgba(255,255,255,0.24)'
-    : hexToSoft(PLAYER_COLORS[s.turn].ball);
+  // The pill itself is cream and stays cream; the seat's colour is the dot.
+  turnDot.style.background = s.phase === PHASE_OVER
+    ? 'var(--ink-dim)'
+    : PLAYER_COLORS[s.turn].ball;
 
   if (s.phase !== PHASE_OVER) {
     const you = tiles.map((t, pid) => `${playerLabel(s.players[pid])} ${t}`).join(', ');
@@ -509,11 +511,6 @@ function refresh() {
   }
 
   refreshBoardOnly();
-}
-
-function hexToSoft(hex) {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.85)`;
 }
 
 function bannerText() {
@@ -1316,6 +1313,19 @@ function selectMode(key) {
   renderHomeStrip();
   syncRosterToMode();
   refreshShapeLines();
+  // Custom opens a panel of settings below the picker, and on a small phone
+  // that panel lands entirely behind the pinned Done bar — you tap Custom and
+  // nothing appears to happen.
+  if (key === 'custom') requestAnimationFrame(revealCustomPanel);
+}
+
+function revealCustomPanel() {
+  const panel = $('#custom-panel');
+  const scroller = panel?.closest('.scroller');
+  if (!panel || !scroller) return;
+  const delta = panel.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+  scroller.scrollTop = Math.max(0, scroller.scrollTop + delta - 12);
+  syncScrollFades();
 }
 
 $('#mode-grid').addEventListener('click', (e) => {

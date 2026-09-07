@@ -985,10 +985,10 @@ function quitToMenu() {
   session = null;
   closeOverlays();
   applyTheme(MODES[modeKey].theme);
-renderModeGrid();
-syncRosterToMode();
-refreshShapeLines();
-show('screen-home');
+  renderModeGrid();
+  syncRosterToMode();
+  refreshShapeLines();
+  show('screen-home');
 }
 
 /* ----------------------------------------------------------------- overlays -- */
@@ -1100,11 +1100,14 @@ $('#mode-grid').addEventListener('click', (e) => {
   selectMode(card.dataset.mode);
 });
 
-$('#modes-done').addEventListener('click', () => { sfx.ui(); applyTheme(MODES[modeKey].theme);
-renderModeGrid();
-syncRosterToMode();
-refreshShapeLines();
-show('screen-home'); });
+$('#modes-done').addEventListener('click', () => {
+  sfx.ui();
+  applyTheme(MODES[modeKey].theme);
+  renderModeGrid();
+  syncRosterToMode();
+  refreshShapeLines();
+  show('screen-home');
+});
 
 /* custom setup ------------------------------------------------------------- */
 

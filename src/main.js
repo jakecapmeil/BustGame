@@ -40,6 +40,16 @@ function saveSettings() {
 
 const haptic = (ms) => { if (settings.haptics) buzz(ms); };
 
+/* The two home-screen chips. Sound is muted at the audio graph, so nothing
+   else has to know; haptics are gated here in `haptic`. */
+function syncToggles() {
+  const s = $('#toggle-sound');
+  const h = $('#toggle-haptics');
+  if (s) { s.setAttribute('aria-pressed', String(settings.sound)); s.textContent = settings.sound ? 'Sound on' : 'Sound off'; }
+  if (h) { h.setAttribute('aria-pressed', String(settings.haptics)); h.textContent = settings.haptics ? 'Haptics on' : 'Haptics off'; }
+  setSoundEnabled(settings.sound);
+}
+
 /* ------------------------------------------------------------------- modes -- */
 
 // Up to four players get their own screen edge, rotated to face them. Beyond
@@ -373,19 +383,23 @@ function fitBoard() {
   const availH = Math.max(80, screen.clientHeight - padY - taken - gap * stacked);
 
   const probe = animator.resize(availW, availH, cols, rows);
-  // Enough margin to clear the tile drop shadows, and at least the padding
-  // `computeLayout` will subtract again on the second pass.
+  // The canvas is the board's tray, so it is cut to the board on *both* axes:
+  // a margin wide enough to clear the tile drop shadows, and at least the
+  // padding `computeLayout` will subtract again on the second pass. In
+  // landscape the board is height-bound and this is what stops the tray
+  // running the full width of the screen.
   const margin = Math.max(10, Math.min(availW, availH) * 0.026);
-  const wrapped = Math.min(availH, probe.boardH + margin * 2);
-  const L = Math.abs(wrapped - availH) > 1
-    ? animator.resize(availW, wrapped, cols, rows) : probe;
+  const wrappedH = Math.min(availH, probe.boardH + margin * 2);
+  const wrappedW = Math.min(availW, probe.boardW + margin * 2);
+  const L = (Math.abs(wrappedH - availH) > 1 || Math.abs(wrappedW - availW) > 1)
+    ? animator.resize(wrappedW, wrappedH, cols, rows) : probe;
 
   // The share bar describes the board, so it is exactly as wide as the board.
   shareBar.style.width = `${Math.round(L.boardW)}px`;
   // Shrink-wrap the board's own box: in both layouts the chips sit against the
   // board, so a canvas that kept filling the free space would push them back
   // out to the screen's edges.
-  boardArea.style.height = `${Math.round(wrapped)}px`;
+  boardArea.style.height = `${Math.round(wrappedH)}px`;
 
   refreshBoardOnly();
 }
@@ -399,6 +413,11 @@ function chrome() {
   const view = { walls: s.blocked, teams: s.teams };
   if (s.phase !== PHASE_OVER && controlsPlayer(s.turn)) {
     view.legal = new Set(legalMoves(s));
+    // The hint wears the colour of the seat it is inviting, and shouts a
+    // little louder during the opening, when the whole board is bare and a
+    // new player has nothing else telling them where to tap.
+    view.hintColor = PLAYER_COLORS[s.turn].ball;
+    view.opening = s.phase === PHASE_PLACE;
     if (keyActive && keyCursor >= 0) view.cursor = keyCursor;
   }
   return view;
@@ -419,6 +438,7 @@ function refresh() {
     chip.querySelector('.val').textContent = tiles[pid];
     chip.classList.toggle('is-turn', s.phase !== PHASE_OVER && s.turn === pid);
     chip.classList.toggle('is-out', !s.players[pid].alive);
+    chip.style.setProperty('--seat', PLAYER_COLORS[pid].ball);
   });
   refreshShareBar(tiles);
 
@@ -677,7 +697,7 @@ function offerSpectate() {
 
   session.outShown = true;
   const dead = seats[seats.length - 1];
-  $('#out-disc').style.background = PLAYER_COLORS[dead].ball;
+  paintToken($('#out-disc'), PLAYER_COLORS[dead].ball, 'burst');
 
   const alive = s.players.filter((p) => p.alive);
   const lasted = Math.max(...seats.map((pid) => session.elimTurn[pid] || s.turnNumber));
@@ -723,7 +743,7 @@ function finish() {
     $('#over-disc').classList.remove('is-hidden');
     teamEl.classList.add('is-hidden');
   }
-  $('#over-disc').style.background = PLAYER_COLORS[w].ball;
+  paintToken($('#over-disc'), PLAYER_COLORS[w].ball, 'trophy');
   const isSelf = ((session.mode === 'solo' || session.mode === 'ranked') && winners.includes(0))
     || (session.mode === 'online' && winners.includes(session.localSeat));
   $('#over-title').textContent = isSelf ? 'You win!'
@@ -807,12 +827,23 @@ function settleRanked() {
 
 /* ------------------------------------------------------------------ ranked -- */
 
-/** A rank badge: the rank's own bomb, on the rank's own tint. */
+/**
+ * A rank badge: the rank's own bomb, on the rank's own tint. The tint goes in
+ * as `--rank` so whatever contains the badge (the hero card, a ladder row) can
+ * echo it without being told the colour twice.
+ */
 function paintBadge(el, rank) {
   if (!el) return;
   el.innerHTML = icon(rank.key);
-  el.style.background = RANK_COLORS[rank.key] || '#8A5A3C';
+  el.style.setProperty('--rank', RANK_COLORS[rank.key] || '#8A5A3C');
   el.setAttribute('aria-hidden', 'true');
+}
+
+/** The result-card token: a seat-coloured disc carrying one of the marks. */
+function paintToken(el, colour, mark) {
+  if (!el) return;
+  el.style.setProperty('--seat', colour);
+  el.innerHTML = icon(mark);
 }
 
 /**
@@ -852,6 +883,7 @@ function renderHomeStrip() {
 function renderRankedScreen() {
   const rank = rankFor(profile.trophies);
   paintBadge($('#rank-hero-badge'), rank);
+  $('#rank-hero').style.setProperty('--rank', RANK_COLORS[rank.key]);
   $('#rank-hero-name').textContent = rank.name;
   countTo($('#rank-hero-count'), profile.trophies);
   const prog = progressToNext(profile.trophies);
@@ -875,11 +907,11 @@ function renderRankedScreen() {
   // Top rank at the top: the ladder is something you climb, so it has to run
   // upward. Rendered in reverse rather than flipped with `column-reverse`, so
   // the DOM order a screen reader walks matches the order on screen.
-  let hereEl = null;
   for (let i = RANKS.length - 1; i >= 0; i--) {
     const r = RANKS[i];
     const li = document.createElement('li');
-    if (i === here) { li.classList.add('is-here'); hereEl = li; }
+    li.style.setProperty('--rank', RANK_COLORS[r.key]);
+    if (i === here) li.classList.add('is-here');
     if (i > here) li.classList.add('is-locked');
     const badge = document.createElement('span');
     badge.className = 'rank-badge';
@@ -888,28 +920,25 @@ function renderRankedScreen() {
     const name = document.createElement('span');
     name.textContent = r.name;
     li.appendChild(name);
+    if (i === here) {
+      const you = document.createElement('span');
+      you.className = 'lad-you';
+      you.textContent = 'YOU';
+      li.appendChild(you);
+    }
     const min = document.createElement('span');
     min.className = 'lad-min';
-    min.innerHTML = `${r.min}${icon('trophy', 'ico-inline')}`;
+    min.innerHTML = `${i > here ? icon('lock', 'lad-lock') : ''}${r.min}${icon('trophy', 'ico-inline')}`;
     li.appendChild(min);
     list.appendChild(li);
   }
 
-  // Ten ranks do not fit on a phone, and the one that matters is your own —
-  // so open the ladder on it rather than at the top of the run.
-  // Driven off scrollTop rather than scrollIntoView: the screen is
-  // position:fixed, and scrollIntoView will happily scroll the document
-  // instead of the pane the row actually lives in. Measured synchronously —
-  // the rows are in the DOM, and a rAF here would never fire on a hidden tab.
+  // The screen opens on the hero — your rank, count and distance to the next
+  // one are all there — and the ladder runs down from it like a ladder should.
+  // (It used to auto-scroll to your row, which threw the hero and the stat row
+  // off the top and landed you on a clipped strip of numbers.)
   const scroller = list.closest('.scroller');
-  if (hereEl && scroller) {
-    const delta = hereEl.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
-    const want = scroller.scrollTop + delta - scroller.clientHeight / 2 + hereEl.offsetHeight / 2;
-    // Instant, not smooth: the ladder should simply already be on your rank
-    // when the screen opens, and a smooth scroll is rAF-driven — it never
-    // lands if the tab is in the background when the screen is built.
-    scroller.scrollTop = Math.max(0, want);
-  }
+  if (scroller) scroller.scrollTop = 0;
 }
 
 /**
@@ -1035,11 +1064,16 @@ function renderModeGrid() {
     b.setAttribute('aria-pressed', String(key === modeKey));
     // Each card previews the palette it will switch the app to.
     b.dataset.theme = MODES[key].theme;
+    // One descriptor per card: the tagline already says who is playing, so
+    // the only fact worth adding is the board. Custom is whatever you made it.
+    const tag = key === 'custom'
+      ? describeSetup(m, true)
+      : `${MODES[key].tagline} · ${m.board[0]}×${m.board[1]}`;
     b.innerHTML = `
       <span class="mode-glyph" aria-hidden="true">${icon(MODES[key].icon)}</span>
       <span>
         <span class="mode-card-name">${escapeHtml(MODES[key].name)}</span><br>
-        <span class="mode-card-tag">${escapeHtml(MODES[key].tagline)} · ${escapeHtml(describeSetup(m, true))}</span>
+        <span class="mode-card-tag">${escapeHtml(tag)}</span>
       </span>
       <span class="mode-card-check" aria-hidden="true">${icon('check')}</span>`;
     grid.appendChild(b);
@@ -1098,15 +1132,94 @@ function readCustom() {
 
 /* ------------------------------------------------------------- play screens -- */
 
-/** The "here's what you're about to play" line on every play screen. */
+/**
+ * A thumbnail of the board about to be played: the grid, any walls, and one
+ * disc per seat set out roughly where players tend to open. Walls come from
+ * the same seeded generator the game will use, so a Chaos preview is a real
+ * Chaos map rather than a decorative one. Colours are the theme's own via CSS
+ * custom properties, so the thumbnail restyles with the app.
+ */
+function previewSvg(setup) {
+  const { cols, rows, seats, blocked } = setup;
+  const step = 100 / Math.max(cols, rows);
+  const gap = step * 0.14;
+  const size = step - gap;
+  const r = Math.max(1.2, size * 0.24);
+  let out = `<svg viewBox="0 0 100 100" aria-hidden="true">`;
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const wall = blocked && blocked[y * cols + x];
+      out += `<rect x="${(x * step + gap / 2).toFixed(2)}" y="${(y * step + gap / 2).toFixed(2)}" `
+        + `width="${size.toFixed(2)}" height="${size.toFixed(2)}" rx="${r.toFixed(2)}" `
+        + `style="fill:var(${wall ? '--wall' : '--tile'})"/>`;
+    }
+  }
+  // Seats ring the board a third of the way in, starting bottom-centre and
+  // running clockwise — the same order the real seats take.
+  const cx = cols / 2;
+  const cy = rows / 2;
+  const rad = Math.min(cols, rows) * 0.30;
+  for (let i = 0; i < seats; i++) {
+    const a = Math.PI / 2 + (i / seats) * Math.PI * 2;
+    const tx = Math.min(cols - 1, Math.max(0, Math.round(cx + rad * Math.cos(a) - 0.5)));
+    const ty = Math.min(rows - 1, Math.max(0, Math.round(cy + rad * Math.sin(a) - 0.5)));
+    const px = tx * step + step / 2;
+    const py = ty * step + step / 2;
+    out += `<circle cx="${px.toFixed(2)}" cy="${py.toFixed(2)}" r="${(size * 0.40).toFixed(2)}" fill="${PLAYER_COLORS[i].ball}"/>`;
+  }
+  return `${out}</svg>`;
+}
+
+const DIFFICULTY_NOTES = {
+  easy: '<b>Easy</b> blunders often and plays fast. Learn the game here.',
+  medium: '<b>Medium</b> plays a solid, sensible game with the odd slip.',
+  hard: '<b>Hard</b> reads two moves ahead and punishes loose play.',
+  expert: '<b>Expert</b> reads three moves deep. No noise, no blunders.',
+  brutal: '<b>Brutal</b> runs the widest search on the longest clock. Plays to win.',
+};
+
+function paintPreview(prefix, mode, setup, noteHtml) {
+  const board = $(`#${prefix}-preview-board`);
+  if (board) board.innerHTML = previewSvg(setup);
+  const name = $(`#${prefix}-preview-name`);
+  if (name) name.textContent = mode.name;
+  const shape = $(`#${prefix}-preview-shape`);
+  if (shape) shape.textContent = describeSetup(mode);
+  const note = $(`#${prefix}-preview-note`);
+  if (note) note.innerHTML = noteHtml;
+}
+
+function soloNote(m) {
+  const diff = segValue('solo-diff') || 'medium';
+  const n = m.seats - 1;
+  return `You against <b>${n} ${escapeHtml(difficultyLabel(diff))} bot${n > 1 ? 's' : ''}</b>${m.teams ? ', in pairs' : ''}.`;
+}
+
+function localNote() {
+  const humans = localRoster.filter((s) => s.kind === 'human').length;
+  const bots = localRoster.length - humans;
+  if (!humans) return 'All bots — sit back and <b>watch the match</b>.';
+  if (!bots) return `<b>${humans} players</b>, one device, passed around.`;
+  return `<b>${humans} ${humans > 1 ? 'players' : 'player'}</b> and <b>${bots} ${bots > 1 ? 'bots' : 'bot'}</b> on one device.`;
+}
+
+/** The "here's what you're about to play" card on every play screen. */
 function refreshShapeLines() {
   const m = currentMode();
-  const shape = `${m.name} · ${describeSetup(m)}`;
-  $('#solo-shape').textContent = `${shape}. You against ${m.seats - 1} bot${m.seats > 2 ? 's' : ''}.`;
-  $('#local-shape').textContent = `${shape}. One device — fill the seats with any mix of people and bots.`;
-  $('#online-shape').textContent = `${shape}. One player hosts and shares the room code.`;
+  // A fixed seed: the thumbnail shouldn't reshuffle every time a setting
+  // changes, and the real game rolls its own walls anyway.
+  const setup = buildSetup(modeKey, modeKey === 'custom' ? customCfg : null, 7);
+  paintPreview('solo', m, setup, soloNote(m));
+  paintPreview('local', m, setup, localNote());
+  paintPreview('online', m, setup, 'Host a room and share the code, or join a friend\'s.');
+  const note = $('#solo-diff-note');
+  if (note) note.innerHTML = DIFFICULTY_NOTES[segValue('solo-diff')] || '';
   paintModeHero('hero', m);
 }
+
+$('#solo-diff').addEventListener('click', (e) => {
+  if (e.target.closest('.seg-btn')) refreshShapeLines();
+});
 
 $('#solo-start').addEventListener('click', () => {
   const setup = currentSetup();
@@ -1178,6 +1291,7 @@ $('#local-roster').addEventListener('click', (e) => {
   if (btn.dataset.kind) localRoster[i].kind = btn.dataset.kind;
   else if (btn.dataset.diff) localRoster[i].difficulty = btn.dataset.diff;
   buildRoster();
+  refreshShapeLines();
 });
 
 $('#local-start').addEventListener('click', () => {
@@ -1378,7 +1492,19 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+$('#toggle-sound')?.addEventListener('click', () => {
+  settings.sound = !settings.sound;
+  saveSettings(); syncToggles();
+  unlockAudio(); sfx.ui(); haptic(8);
+});
+$('#toggle-haptics')?.addEventListener('click', () => {
+  settings.haptics = !settings.haptics;
+  saveSettings(); syncToggles();
+  unlockAudio(); sfx.ui(); haptic(12);
+});
+
 paintIcons();               // fill the static chrome's icon slots once
+syncToggles();
 applyTheme(MODES[modeKey].theme);
 renderModeGrid();
 syncRosterToMode();

@@ -5,18 +5,24 @@
    Six rules everything here follows:
 
    1. EXTRUDED, NOT FLAT. Every control sits on a hard bottom shadow
-      (`0 Npx 0`, never blurred) and a top highlight (`--edge`), and collapses
-      into the shadow on press. The highlight is what keeps a translucent panel
-      readable as a raised face on a field it is barely tinted against — without
-      it a screen of panels reads as one wash. Blurred shadows are reserved for
-      things genuinely floating above the app — modals and the board's tiles.
+      (`0 Npx 0`, never blurred), a top highlight (`--edge`) and a hairline
+      rim (`--rim`), and collapses into the shadow on press. Highlight + rim
+      are what keep a translucent panel readable as a raised face on a field
+      it is only slightly tinted against — without them a screen of panels
+      reads as one wash. Blurred shadows are reserved for things genuinely
+      floating above the app — modals and the board's tiles.
    2. ONE ACCENT PER SCREEN. The active mode owns the palette. The only other
       saturated colours allowed in the chrome are the eight seat colours, and
-      those belong to the board and the score chips.
+      those belong to the board and the score chips. (The rank tints on the
+      ranked screen are the one sanctioned exception: that screen is *about*
+      the rank.)
    3. BIG, ROUND, CONFIDENT. Radii step 12 / 18 / 26 / pill. Nunito 700-900
       only — this app has no light type.
    4. INVERT TO FOCUS. The app is a coloured field carrying near-white text.
       Anything that needs attention becomes a cream card with dark text.
+      Body copy is the one place the field decides: on the two light fields
+      (ember, gild) white can't reach WCAG AA, so running text there takes
+      the ink instead. Headings stay cream everywhere.
    5. NUMBERS ARE THE HERO. Scores, trophies and deltas get the largest type on
       screen, always tabular so they don't jitter as they count.
    6. MOTION IS PHYSICAL. Things overshoot a little and settle. Nothing moves
@@ -24,6 +30,10 @@
 
    Tokens live on `:root`. A mode swaps only the palette block via
    `<html data-theme>`; nothing else in the sheet knows which mode is active.
+   Each palette also picks one of two *surface* sets — light-field or
+   dark-field — which decide whether panels tint up or down and whether body
+   copy is ink or white. The mode cards carry their own `data-theme`, so they
+   inherit the right set automatically.
    ========================================================================== */
 
 :root {
@@ -37,32 +47,35 @@
   --tile-dim: #E0C6B4;
   --wall: #8B6B57;
 
-  /* ---- derived surfaces (theme-independent) ----
-     A panel is a *lit* face, not a wash: it carries a top highlight and a hard
-     bottom shadow so it reads as raised even when its tint is close to the
-     field behind it. `--edge` is that highlight, applied wherever a surface
-     needs to separate itself from the background. */
-  --panel: rgba(255, 255, 255, 0.19);
-  --panel-2: rgba(255, 255, 255, 0.29);
-  --panel-3: rgba(255, 255, 255, 0.44);
-  --sink: rgba(0, 0, 0, 0.22);
+  /* ---- surfaces (light-field set; the dark-field set is below) ----
+     A panel is a *lit* face, not a wash: a top highlight, a hairline rim and
+     a hard bottom shadow make it read as raised even when its tint is close
+     to the field behind it. */
+  --panel: rgba(255, 255, 255, 0.24);
+  --panel-2: rgba(255, 255, 255, 0.36);
+  --panel-3: rgba(255, 255, 255, 0.54);
+  --sink: rgba(0, 0, 0, 0.30);
   --card: #FBF1E4;
-  --hairline: rgba(255, 255, 255, 0.20);
-  --edge: inset 0 1px 0 rgba(255, 255, 255, 0.24);
-  --edge-in: inset 0 2px 4px rgba(0, 0, 0, 0.18);
+  --hairline: rgba(255, 255, 255, 0.22);
+  --rim: inset 0 0 0 1px rgba(255, 255, 255, 0.26);
+  --edge: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  --edge-in: inset 0 2px 4px rgba(0, 0, 0, 0.22);
 
   /* ---- ink ---- */
   --ink: #3E2015;          /* on --card */
-  --ink-dim: rgba(62, 32, 21, 0.60);
-  --on-bg: #FFFFFF;        /* on --bg */
-  --on-bg-dim: rgba(255, 255, 255, 0.82);
-  --on-bg-faint: rgba(255, 255, 255, 0.68);
+  --ink-dim: rgba(62, 32, 21, 0.62);
+  --on-bg: #FFFFFF;        /* headings on --bg */
+  --on-bg-dim: rgba(62, 32, 21, 0.90);    /* body copy on --bg */
+  --on-bg-faint: rgba(62, 32, 21, 0.78);  /* labels on --bg */
+  --on-panel: #3E2015;                    /* text on --panel */
+  --on-panel-dim: rgba(62, 32, 21, 0.74);
+  --on-sink: rgba(255, 255, 255, 0.94);   /* text on --sink, every theme */
 
   /* ---- elevation ---- */
-  --lift-1: 0 3px 0 rgba(0, 0, 0, 0.16);
-  --lift-2: 0 6px 0 rgba(0, 0, 0, 0.20);
-  --lift-3: 0 8px 0 rgba(0, 0, 0, 0.22);
-  --float: 0 18px 44px rgba(0, 0, 0, 0.34);
+  --lift-1: 0 3px 0 rgba(0, 0, 0, 0.20);
+  --lift-2: 0 6px 0 rgba(0, 0, 0, 0.22);
+  --lift-3: 0 8px 0 rgba(0, 0, 0, 0.24);
+  --float: 0 18px 44px rgba(0, 0, 0, 0.36);
 
   /* ---- radius ---- */
   --r-1: 12px;
@@ -104,9 +117,9 @@
   --tile: #F8EBDA; --tile-dim: #E0C6B4; --wall: #8B6B57;
 }
 [data-theme="tide"] {
-  --bg: #3F94A3; --bg-deep: #2F7B89;
+  --bg: #337D8B; --bg-deep: #296874;
   --accent: #FFC65C; --accent-deep: #D99B2E; --on-accent: #26343A;
-  --tile: #EAF6F5; --tile-dim: #C2DBDA; --wall: #245C68;
+  --tile: #EAF6F5; --tile-dim: #C2DBDA; --wall: #1E4F5A;
 }
 [data-theme="orchid"] {
   --bg: #7A5BA8; --bg-deep: #644789;
@@ -114,7 +127,7 @@
   --tile: #F3ECFA; --tile-dim: #D3C4E4; --wall: #452F66;
 }
 [data-theme="blaze"] {
-  --bg: #C4426F; --bg-deep: #A3325A;
+  --bg: #BE3F6B; --bg-deep: #9E3057;
   --accent: #FFC24B; --accent-deep: #D69A24; --on-accent: #46162C;
   --tile: #FDECF1; --tile-dim: #E5C3D0; --wall: #7A2647;
 }
@@ -132,6 +145,30 @@
   --bg: #54607A; --bg-deep: #434D63;
   --accent: #7FC8F8; --accent-deep: #4E9CD0; --on-accent: #17293A;
   --tile: #EDF1F7; --tile-dim: #C7CFDC; --wall: #2E3648;
+}
+
+/* Light fields: panels tint up, running text takes the ink. */
+[data-theme="ember"] { --ink: #3E2015; }
+[data-theme="gild"]  {
+  --ink: #3A2A08; --ink-dim: rgba(58, 42, 8, 0.62);
+  --on-bg-dim: rgba(58, 42, 8, 0.92); --on-bg-faint: rgba(58, 42, 8, 0.80);
+  --on-panel: #3A2A08; --on-panel-dim: rgba(58, 42, 8, 0.76);
+}
+
+/* Dark fields: panels tint *down*, so text on a panel is never worse off than
+   text on the field. The prominent surfaces (`-2`, `-3`) still lift, because
+   "brighter" is what selected and active have always meant here. */
+[data-theme="tide"], [data-theme="orchid"], [data-theme="blaze"],
+[data-theme="toxic"], [data-theme="slate"] {
+  --panel: rgba(0, 0, 0, 0.16);
+  --panel-2: rgba(255, 255, 255, 0.13);
+  --panel-3: rgba(255, 255, 255, 0.28);
+  --rim: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  --edge: inset 0 1px 0 rgba(255, 255, 255, 0.30);
+  --on-bg-dim: rgba(255, 255, 255, 0.94);
+  --on-bg-faint: rgba(255, 255, 255, 0.80);
+  --on-panel: #FFFFFF;
+  --on-panel-dim: rgba(255, 255, 255, 0.80);
 }
 
 /* ------------------------------------------------------------------- reset */
@@ -158,7 +195,7 @@ body::before {
   content: '';
   position: fixed; inset: 0; pointer-events: none; z-index: 0;
   background: radial-gradient(120% 80% at 50% 0%, transparent 40%, var(--bg-deep) 100%);
-  opacity: .55;
+  opacity: .6;
   transition: background var(--t-slow) var(--e-out);
 }
 
@@ -175,8 +212,36 @@ body::before {
   padding: calc(var(--safe-t) + var(--s-3)) calc(var(--safe-r) + var(--s-4))
            calc(var(--safe-b) + var(--s-4)) calc(var(--safe-l) + var(--s-4));
 }
-.screen.is-active { display: flex; animation: screen-in var(--t-base) var(--e-out); }
-@keyframes screen-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.screen.is-active { display: flex; animation: screen-in var(--t-slow) var(--e-out); }
+@keyframes screen-in {
+  from { opacity: 0; transform: translateY(14px) scale(.985); }
+  60%  { opacity: 1; }
+  to   { opacity: 1; transform: none; }
+}
+/* The blocks of a screen settle in one after another — a beat behind the
+   screen itself — so a change of screen reads as things arriving, not as a
+   slide swapping in. The shared pieces (rank strip → rank hero, mode hero →
+   mode grid) land first, which is what carries the eye across. */
+.screen.is-active .stack > *,
+.screen.is-active .scroller > *,
+.screen.is-active .pane > .scroller > * { animation: rise-in var(--t-slow) var(--e-out) both; }
+.screen.is-active .stack > :nth-child(2),
+.screen.is-active .scroller > :nth-child(2) { animation-delay: 30ms; }
+.screen.is-active .stack > :nth-child(3),
+.screen.is-active .scroller > :nth-child(3) { animation-delay: 60ms; }
+.screen.is-active .stack > :nth-child(4),
+.screen.is-active .scroller > :nth-child(4) { animation-delay: 90ms; }
+.screen.is-active .stack > :nth-child(n+5),
+.screen.is-active .scroller > :nth-child(n+5) { animation-delay: 120ms; }
+@keyframes rise-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+/* The shared elements come in with a little more life than the rest. */
+.screen.is-active .stack > .home-you { animation: none; }
+.screen.is-active .rank-strip,
+.screen.is-active .rank-hero,
+.screen.is-active .mode-hero,
+.screen.is-active .mode-grid { animation: pop-rise var(--t-slow) var(--e-pop) both; }
+.screen.is-active .home-you .mode-hero { animation-delay: 40ms; }
+@keyframes pop-rise { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
 
 .stack {
   flex: 1;
@@ -191,17 +256,27 @@ body::before {
 .scroller {
   flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
   display: flex; flex-direction: column; gap: var(--s-3);
-  padding-bottom: var(--s-5);
+  padding: var(--s-2) 0 var(--s-5);
   scrollbar-width: none;
+  width: min(440px, 100%); margin: 0 auto;
 }
 .scroller::-webkit-scrollbar { display: none; }
-/* A scroller that runs under a pinned footer button gets a soft bottom edge, so
-   a clipped row reads as "there is more" instead of as a layout mistake. */
+/* Content scrolls; it never squashes to fit. (A flex child with its own
+   `overflow` would otherwise be shrunk to nothing once the column overflows.) */
+.scroller > * { flex-shrink: 0; }
+/* A scroller that runs under a pinned footer button gets a soft edge top and
+   bottom, so a clipped row reads as "there is more" instead of as a layout
+   mistake. */
 .screen > .scroller,
 .pane > .scroller {
-  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 26px), transparent 100%);
-  mask-image: linear-gradient(180deg, #000 calc(100% - 26px), transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 18px, #000 calc(100% - 30px), transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 18px, #000 calc(100% - 30px), transparent 100%);
 }
+/* A setup screen's content is short; auto margins centre it in the space
+   above the pinned button when it fits, and behave like a normal scroller
+   when it doesn't (unlike `justify-content: center`, which clips the top). */
+.scroller.centred > :first-child { margin-top: auto; }
+.scroller.centred > :last-child { margin-bottom: auto; }
 
 /* A screen whose body is a scroller but that also carries its own pinned
    footer button (rather than the button being a direct child of .screen). */
@@ -210,12 +285,12 @@ body::before {
 /* The one primary action on a setup screen sits in the thumb zone: last child
    of the screen (or its .pane), never scrolling away with the content. */
 .screen > .btn-primary,
-.pane > .btn-primary { flex: none; margin-top: var(--s-3); }
+.pane > .btn-primary { flex: none; margin: var(--s-2) auto 0; width: min(440px, 100%); }
 
 /* -------------------------------------------------------------------- bar */
 
-.bar { display: flex; align-items: center; gap: var(--s-3); margin-bottom: var(--s-3); flex: none; }
-.bar h2 { margin: 0; font-size: var(--fs-title); font-weight: 900; color: var(--on-bg); letter-spacing: -.01em; }
+.bar { display: flex; align-items: center; gap: var(--s-3); margin-bottom: var(--s-2); flex: none; width: min(440px, 100%); margin-left: auto; margin-right: auto; }
+.bar h2 { margin: 0; font-size: var(--fs-title); font-weight: 900; color: var(--on-bg); letter-spacing: -.01em; text-shadow: 0 2px 0 rgba(0,0,0,.10); }
 .bar .bar-tail { margin-left: auto; }
 
 /* ---------------------------------------------------------------- controls */
@@ -232,29 +307,36 @@ body::before {
   cursor: pointer;
   transition: transform var(--t-fast) var(--e-out), box-shadow var(--t-fast) var(--e-out), opacity var(--t-base);
 }
-.btn:active { transform: translateY(5px); box-shadow: var(--lift-1); }
-.btn-primary { background: var(--accent); color: var(--on-accent); }
-.btn-ghost { background: var(--panel); color: var(--on-bg); box-shadow: var(--lift-1), var(--edge); }
+.btn:active { transform: translateY(5px); box-shadow: 0 1px 0 rgba(0,0,0,.2); }
+.btn-primary { background: var(--accent); color: var(--on-accent); box-shadow: var(--lift-2), inset 0 1px 0 rgba(255,255,255,.28); }
+.btn-primary:active { box-shadow: 0 1px 0 rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.28); }
+/* Secondary, not disabled: a real raised face in the panel tint with the
+   panel's own ink, so it is obviously a button — just not *the* button. */
+.btn-ghost {
+  background: var(--panel-2); color: var(--on-panel);
+  box-shadow: var(--lift-2), var(--edge), var(--rim);
+}
+.btn-ghost:active { box-shadow: 0 1px 0 rgba(0,0,0,.2), var(--edge), var(--rim); }
 .btn-sm { min-height: 46px; font-size: var(--fs-body); padding: var(--s-3); border-radius: var(--r-1); }
+.btn-sm:active { transform: translateY(4px); }
 .btn[disabled] { opacity: .4; pointer-events: none; }
 
 .icon-btn {
   appearance: none; border: 0;
   width: 44px; height: 44px; flex: none;
   border-radius: var(--r-1);
-  background: var(--panel);
-  color: var(--on-bg);
+  background: var(--panel-2);
+  color: var(--on-panel);
   display: grid; place-items: center;
   cursor: pointer;
-  box-shadow: var(--lift-1), var(--edge);
+  box-shadow: var(--lift-1), var(--edge), var(--rim);
   transition: transform var(--t-fast) var(--e-out), box-shadow var(--t-fast) var(--e-out);
 }
-.icon-btn:active { box-shadow: none; }
-.icon-btn:active { transform: scale(.92); }
+.icon-btn:active { transform: translateY(3px); box-shadow: var(--edge), var(--rim); }
 
 /* segmented control */
 .seg {
-  display: flex; gap: 6px;
+  display: flex; gap: 5px;
   background: var(--sink);
   padding: 5px; border-radius: var(--r-1);
   box-shadow: var(--edge-in);
@@ -264,12 +346,13 @@ body::before {
   font: inherit; font-size: 14px; font-weight: 800;
   padding: 11px 6px; min-height: 44px;
   border-radius: 9px;
-  background: transparent; color: var(--on-bg-dim);
+  background: transparent; color: var(--on-sink);
   cursor: pointer;
   transition: background var(--t-fast) var(--e-out), color var(--t-fast) var(--e-out), transform var(--t-fast);
 }
-.seg-btn:active { transform: scale(.96); }
+.seg-btn:active { transform: scale(.95); background: rgba(255,255,255,.12); }
 .seg-btn.is-on { background: var(--card); color: var(--ink); box-shadow: var(--lift-1); }
+.seg-btn.is-on:active { box-shadow: none; transform: translateY(2px) scale(.98); }
 .seg-tight .seg-btn { font-size: 12.5px; padding: 11px 2px; }
 
 /* labelled group */
@@ -281,29 +364,34 @@ body::before {
 
 .panel {
   background: var(--panel);
+  color: var(--on-panel);
   border-radius: var(--r-2);
   padding: var(--s-3);
-  box-shadow: var(--lift-1), var(--edge);
+  box-shadow: var(--lift-1), var(--edge), var(--rim);
 }
+.panel .label { color: var(--on-panel-dim); }
 
 .chip-toggle {
   appearance: none; border: 0; font: inherit;
   font-size: 13px; font-weight: 800;
   padding: 10px 15px; min-height: 40px; border-radius: var(--r-pill);
-  background: var(--panel); color: var(--on-bg-dim);
-  box-shadow: var(--lift-1), var(--edge);
+  background: var(--panel); color: var(--on-panel);
+  box-shadow: var(--lift-1), var(--edge), var(--rim);
   cursor: pointer;
+  transition: transform var(--t-fast) var(--e-out), box-shadow var(--t-fast) var(--e-out), opacity var(--t-base);
 }
-.chip-toggle:active { box-shadow: var(--edge); transform: translateY(3px); }
-.chip-toggle[aria-pressed="false"] { opacity: .45; text-decoration: line-through; }
+.chip-toggle:active { box-shadow: var(--edge), var(--rim); transform: translateY(3px); }
+.chip-toggle[aria-pressed="false"] { opacity: .55; text-decoration: line-through; }
 .toggles { display: flex; gap: var(--s-2); justify-content: center; }
 
-.hint { color: var(--on-bg-dim); font-weight: 700; font-size: 14px; line-height: 1.5; margin: 0; }
-.err { color: #FFE2DC; font-weight: 800; font-size: 14px; min-height: 20px; margin: 0; }
+.hint { color: var(--on-bg-dim); font-weight: 700; font-size: 14.5px; line-height: 1.5; margin: 0; }
+.err { color: #FFE2DC; font-weight: 800; font-size: 14px; min-height: 20px; margin: 0; text-shadow: 0 1px 0 rgba(0,0,0,.25); }
+.err:empty { display: none; }
 .is-hidden { display: none !important; }
 
 /* -------------------------------------------------------------------- home */
 
+.stack.home { gap: 0; }
 .logo {
   font-size: var(--fs-display);
   font-weight: 900;
@@ -313,6 +401,7 @@ body::before {
   color: var(--card);
   text-shadow: 0 6px 0 rgba(0, 0, 0, .16);
   display: flex; align-items: center; justify-content: center; gap: .1em;
+  line-height: 1;
 }
 .logo-dot {
   width: .2em; height: .2em; border-radius: 50%;
@@ -321,6 +410,14 @@ body::before {
   animation: bob 2.4s ease-in-out infinite;
 }
 @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-16%); } }
+.tagline {
+  text-align: center; margin: var(--s-3) 0 0;
+  color: var(--on-bg-dim); font-weight: 800; font-size: 15px; line-height: 1.4;
+}
+/* Home reads as three groups: the mark, who you are (rank + mode), what to do. */
+.home-you { display: flex; flex-direction: column; gap: var(--s-2); margin-top: var(--s-6); }
+.stack.home .menu { margin-top: var(--s-5); }
+.stack.home .toggles { margin-top: var(--s-5); }
 
 .menu { display: flex; flex-direction: column; gap: var(--s-2); }
 .menu-row { display: flex; gap: var(--s-2); }
@@ -353,17 +450,17 @@ body::before {
   appearance: none; border: 0; cursor: pointer;
   display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--s-3);
   width: 100%; text-align: left;
-  background: var(--panel-2); color: var(--on-bg);
+  background: var(--panel-2); color: var(--on-panel);
   border-radius: var(--r-3); padding: var(--s-3) var(--s-4);
-  box-shadow: var(--lift-2), var(--edge);
+  box-shadow: var(--lift-2), var(--edge), var(--rim);
   transition: transform var(--t-fast) var(--e-out), box-shadow var(--t-fast) var(--e-out);
 }
-.mode-hero:active { transform: translateY(4px); box-shadow: var(--lift-1), var(--edge); }
+.mode-hero:active { transform: translateY(4px); box-shadow: 0 1px 0 rgba(0,0,0,.2), var(--edge), var(--rim); }
 .mode-glyph {
   width: 46px; height: 46px; border-radius: var(--r-1);
   display: grid; place-items: center;
   background: var(--accent); color: var(--on-accent);
-  box-shadow: var(--lift-1);
+  box-shadow: var(--lift-1), inset 0 1px 0 rgba(255,255,255,.3);
 }
 /* The mark keeps a constant share of its tile at every size, so the optical
    padding around it never drifts between the hero and the picker cards. */
@@ -371,10 +468,14 @@ body::before {
 .mode-hero > span:nth-child(2) { min-width: 0; }
 .mode-hero-name { font-size: var(--fs-head); font-weight: 900; line-height: 1.15; }
 .mode-hero-sub {
-  display: block; font-size: 12.5px; font-weight: 800; color: var(--on-bg-faint); line-height: 1.35;
+  display: block; font-size: 12.5px; font-weight: 800; color: var(--on-panel-dim); line-height: 1.35;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.mode-hero-cue { font-size: 12px; font-weight: 900; color: var(--on-bg-faint); letter-spacing: .08em; }
+.mode-hero-cue {
+  font-size: 11px; font-weight: 900; color: var(--on-panel); letter-spacing: .08em;
+  padding: 6px 10px; border-radius: var(--r-pill);
+  background: var(--sink); color: var(--on-sink); box-shadow: var(--edge-in);
+}
 
 /* The picker grid. Each card previews its own theme. */
 .mode-grid { display: flex; flex-direction: column; gap: var(--s-2); }
@@ -384,56 +485,96 @@ body::before {
   gap: var(--s-3);
   /* Each card wears the palette it will switch the app to — which means the
      card for the *current* mode is painted the same colour as the field behind
-     it. The top sheen and the hard bottom shadow are what keep it a raised
-     object rather than a hole in the page. */
+     it. The top sheen and the hard bottom shadow keep it a raised object
+     rather than a hole in the page; the selected state below does the rest. */
   background:
-    linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,0) 58%),
+    linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0) 58%),
     linear-gradient(150deg, var(--bg) 0%, var(--bg-deep) 100%);
   color: #fff;
   border-radius: var(--r-2); padding: var(--s-3);
   min-height: 70px;
-  box-shadow: var(--lift-2), inset 0 0 0 1px rgba(255,255,255,.16);
+  box-shadow: var(--lift-2), inset 0 0 0 1px rgba(255,255,255,.18);
   transition: transform var(--t-fast) var(--e-out), box-shadow var(--t-fast) var(--e-out);
 }
-.mode-card:active { transform: translateY(4px); box-shadow: var(--lift-1), inset 0 0 0 1px rgba(255,255,255,.16); }
+.mode-card:active { transform: translateY(4px); box-shadow: 0 1px 0 rgba(0,0,0,.2), inset 0 0 0 1px rgba(255,255,255,.18); }
+/* Selected: a cream ring — the same cream as a card, the app's "look here"
+   colour — a lift off the page, and the tick lands in a well of the card's
+   own accent. Three tells, so it can never read as a hole. */
 .mode-card.is-on {
-  box-shadow: var(--lift-2), inset 0 0 0 2px rgba(255,255,255,.9), 0 0 0 3px rgba(0,0,0,.14);
+  transform: translateY(-2px);
+  box-shadow: var(--lift-3), 0 0 0 3px var(--card), inset 0 0 0 1px rgba(255,255,255,.28);
 }
+.mode-card.is-on:active { transform: translateY(2px); box-shadow: var(--lift-1), 0 0 0 3px var(--card), inset 0 0 0 1px rgba(255,255,255,.28); }
 .mode-card .mode-glyph { width: 44px; height: 44px; }
 .mode-card > span:nth-child(2) { min-width: 0; }
 .mode-card-name { font-size: 16px; font-weight: 900; text-shadow: 0 1px 3px rgba(0,0,0,.35); }
+/* Secondary text takes the card's own body-copy token, so it is ink on the
+   light cards and white on the dark ones — legible on every one of them. */
 .mode-card-tag {
-  display: block; font-size: 12.5px; font-weight: 800; color: rgba(255,255,255,.86);
-  text-shadow: 0 1px 2px rgba(0,0,0,.3);
+  display: block; font-size: 12.5px; font-weight: 800; color: var(--on-bg-dim);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-/* The tick sits in its own well so it reads as *selected*, not as decoration. */
 .mode-card-check {
-  width: 26px; height: 26px; flex: none; padding: 4px; border-radius: 50%;
+  width: 28px; height: 28px; flex: none; padding: 5px; border-radius: 50%;
   opacity: 0; transform: scale(.5);
-  background: rgba(255,255,255,.92); color: #1a1a1a;
+  background: var(--accent); color: var(--on-accent);
+  box-shadow: var(--lift-1), inset 0 1px 0 rgba(255,255,255,.3);
   transition: opacity var(--t-fast) var(--e-out), transform var(--t-base) var(--e-pop);
 }
 .mode-card.is-on .mode-card-check { opacity: 1; transform: scale(1); }
 .mode-blurb {
-  margin: 0; font-size: 13.5px; font-weight: 700; line-height: 1.5;
+  margin: 0; font-size: 14px; font-weight: 700; line-height: 1.5;
   color: var(--on-bg-dim);
 }
+
+/* --------------------------------------------------------------- preview --
+
+   "What you're about to play": a thumbnail of the board beside the facts. It
+   is the same panel on every setup screen, so Solo, Local and Online read as
+   three doors into one game rather than three unrelated forms. */
+.preview {
+  display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--s-4);
+  background: var(--panel); color: var(--on-panel);
+  border-radius: var(--r-3); padding: var(--s-3) var(--s-4) var(--s-3) var(--s-3);
+  box-shadow: var(--lift-2), var(--edge), var(--rim);
+}
+.preview-board {
+  width: 104px; height: 104px; flex: none;
+  border-radius: var(--r-1);
+  background: var(--sink); box-shadow: var(--edge-in);
+  padding: 7px;
+}
+.preview-board svg { display: block; width: 100%; height: 100%; }
+.preview-facts { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.preview-name { font-size: 22px; font-weight: 900; line-height: 1.1; letter-spacing: -.01em; }
+.preview-shape { font-size: 13px; font-weight: 800; color: var(--on-panel-dim); }
+.preview-note { font-size: 13.5px; font-weight: 700; color: var(--on-panel-dim); line-height: 1.4; margin-top: 4px; }
+.preview-note b { color: var(--on-panel); font-weight: 900; }
+
+/* The difficulty description under the segmented control: one line that
+   changes as you pick, so the control has something to say for itself. */
+.diff-note {
+  margin: 0; min-height: 40px;
+  font-size: 13.5px; font-weight: 700; line-height: 1.45; color: var(--on-bg-dim);
+  padding: 0 var(--s-1);
+}
+.diff-note b { color: var(--on-bg); font-weight: 900; text-shadow: 0 1px 0 rgba(0,0,0,.12); }
+[data-theme="ember"] .diff-note b, [data-theme="gild"] .diff-note b { color: var(--on-bg-dim); text-shadow: none; }
 
 /* --------------------------------------------------------------- line-up */
 
 .roster { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-2); }
 .roster-seat {
   display: flex; flex-direction: column; gap: 7px;
-  background: var(--panel); border-radius: var(--r-1); padding: var(--s-2) 10px;
-  box-shadow: var(--lift-1), var(--edge);
+  background: var(--panel); color: var(--on-panel); border-radius: var(--r-1); padding: var(--s-2) 10px;
+  box-shadow: var(--lift-1), var(--edge), var(--rim);
 }
 .roster-main { display: flex; align-items: center; gap: 10px; }
 .roster-seat .dot { width: 18px; height: 18px; border-radius: 50%; flex: none; box-shadow: inset 0 -2px 0 rgba(0,0,0,.16); }
 .roster-seat .who { font-size: 14px; font-weight: 800; flex: 1; }
 .roster-seat .team-tag {
   font-size: 10.5px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase;
-  color: var(--on-bg-faint); flex: none;
+  color: var(--on-panel-dim); flex: none;
 }
 .roster-seat .seg { padding: 4px; gap: 5px; }
 .roster-seat .seg-btn { min-height: 36px; font-size: 12.5px; padding: 8px 4px; }
@@ -452,19 +593,19 @@ body::before {
 .code-input::placeholder { color: rgba(62,32,21,.28); }
 .room-code {
   font-size: 44px; font-weight: 900; letter-spacing: .18em; text-align: center;
-  color: var(--on-bg); background: var(--panel); border-radius: var(--r-2);
+  color: var(--on-panel); background: var(--panel); border-radius: var(--r-2);
   padding: var(--s-4) 10px; text-indent: .18em;
-  box-shadow: var(--lift-1), var(--edge);
+  box-shadow: var(--lift-1), var(--edge), var(--rim);
 }
 .lobby-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .lobby-list li {
   display: flex; align-items: center; gap: 11px;
-  background: var(--panel); border-radius: var(--r-1); padding: 12px 15px;
+  background: var(--panel); color: var(--on-panel); border-radius: var(--r-1); padding: 12px 15px;
   font-weight: 800; font-size: 15px;
-  box-shadow: var(--lift-1), var(--edge);
+  box-shadow: var(--lift-1), var(--edge), var(--rim);
 }
 .lobby-list .dot { width: 16px; height: 16px; border-radius: 50%; flex: none; }
-.lobby-list .you { margin-left: auto; font-size: 12px; color: var(--on-bg-faint); }
+.lobby-list .you { margin-left: auto; font-size: 12px; color: var(--on-panel-dim); }
 
 /* ------------------------------------------------------------------ ranked */
 
@@ -473,20 +614,22 @@ body::before {
 .trophy-ico { display: inline-block; width: .92em; height: .92em; }
 .trophy-ico .ico { color: inherit; }
 
-/* A rank badge is a tinted tile carrying that rank's bomb. Same 60% inset at
-   every size — 28px in the ladder, 92px in the hero — so the ten bombs read as
-   one set rather than ten differently-cropped drawings. */
+/* A rank badge is a tinted tile carrying that rank's bomb. Same inset at every
+   size — 28px in the ladder, 92px in the hero — so the ten bombs read as one
+   set rather than ten differently-cropped drawings. The tint is set inline as
+   `--rank`, so the badge and anything that wants to echo it share one value. */
 .rank-badge {
+  --rank: var(--wall);
   display: inline-grid; place-items: center; flex: none;
   width: 36px; height: 36px; border-radius: var(--r-1);
   color: #fff;
-  background: var(--wall);
-  box-shadow: inset 0 -3px 0 rgba(0,0,0,.22);
+  background: var(--rank);
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.28);
 }
 .rank-badge .ico { width: 76%; height: 76%; }
 .rank-badge-xl {
-  width: 92px; height: 92px; border-radius: 28px;
-  box-shadow: inset 0 -6px 0 rgba(0,0,0,.22), var(--lift-3);
+  width: 96px; height: 96px; border-radius: 30px;
+  box-shadow: inset 0 -7px 0 rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.3), var(--lift-3);
 }
 
 /* home strip */
@@ -494,85 +637,120 @@ body::before {
   appearance: none; border: 0; cursor: pointer;
   display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--s-3);
   width: 100%; text-align: left;
-  background: var(--panel); color: var(--on-bg);
+  background: var(--panel); color: var(--on-panel);
   border-radius: var(--r-2); padding: 10px var(--s-3);
-  box-shadow: var(--lift-1), var(--edge);
-  transition: transform var(--t-fast) var(--e-out);
+  box-shadow: var(--lift-1), var(--edge), var(--rim);
+  transition: transform var(--t-fast) var(--e-out), box-shadow var(--t-fast) var(--e-out);
 }
-.rank-strip:active { transform: translateY(3px); }
-.rank-strip .rank-badge { width: 30px; height: 30px; border-radius: 9px; }
-.rank-strip-main { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.rank-strip:active { transform: translateY(3px); box-shadow: var(--edge), var(--rim); }
+.rank-strip .rank-badge { width: 34px; height: 34px; border-radius: 10px; }
+.rank-strip-main { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .rank-strip-name { font-size: 13px; font-weight: 900; }
-.rank-strip-trophies { display: flex; align-items: center; gap: 5px; font-size: 16px; font-weight: 900; }
+.rank-strip-trophies { display: flex; align-items: center; gap: 5px; font-size: 17px; font-weight: 900; }
 
-/* progress track */
-.track { height: 8px; border-radius: var(--r-pill); background: var(--sink); overflow: hidden; box-shadow: var(--edge-in); }
+/* progress track. The fill never drops below a round nub, so an empty track
+   reads as "the start of a bar", not as a stray line. */
+.track {
+  --track-fill: var(--accent);
+  height: 8px; border-radius: var(--r-pill); background: var(--sink); overflow: hidden;
+  box-shadow: var(--edge-in), inset 0 0 0 1px rgba(255,255,255,.10);
+}
 .track-lg { height: 12px; }
 .track > i {
   display: block; height: 100%; width: 0%;
-  background: var(--accent);
+  min-width: 8px;
+  background: var(--track-fill);
   border-radius: inherit;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .30);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .38), inset 0 -1px 0 rgba(0,0,0,.12);
   transition: width var(--t-slow) var(--e-out);
 }
+.track-lg > i { min-width: 12px; }
 
-/* ranked hero */
+/* ranked hero: the rank's own tint glows up behind the badge, so the one
+   colour the screen is about isn't confined to a 92px square. */
 .rank-hero {
+  --rank: var(--wall);
+  position: relative; overflow: hidden;
   display: flex; flex-direction: column; align-items: center; gap: var(--s-2);
   text-align: center;
-  background: var(--panel); border-radius: var(--r-3);
+  background: var(--panel-2); color: var(--on-panel); border-radius: var(--r-3);
   padding: var(--s-5) var(--s-4) var(--s-4);
-  box-shadow: var(--lift-2), var(--edge);
+  box-shadow: var(--lift-2), var(--edge), var(--rim);
 }
-.rank-hero-name { font-size: 22px; font-weight: 900; letter-spacing: -.01em; }
+.rank-hero::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(90% 70% at 50% 0%, var(--rank) 0%, transparent 70%);
+  opacity: .45;
+}
+.rank-hero > * { position: relative; }
+.rank-hero .rank-badge-xl { margin-bottom: var(--s-1); }
+.rank-hero-name { font-size: 23px; font-weight: 900; letter-spacing: -.01em; }
 .rank-hero-count {
   display: flex; align-items: center; gap: var(--s-2);
-  font-size: 40px; font-weight: 900; line-height: 1; letter-spacing: -.02em;
+  font-size: 44px; font-weight: 900; line-height: 1; letter-spacing: -.02em;
 }
-.rank-hero .track { width: 100%; }
-.rank-hero-next { font-size: 12.5px; font-weight: 800; color: var(--on-bg-faint); }
+.rank-hero .track { width: 100%; --track-fill: var(--rank); margin-top: var(--s-1); background: rgba(0,0,0,.28); }
+.rank-hero-next { font-size: 13px; font-weight: 800; color: var(--on-panel-dim); }
 
 .stat-row { display: flex; gap: var(--s-2); }
 .stat {
-  flex: 1; background: var(--panel); border-radius: var(--r-1);
+  flex: 1; background: var(--panel); color: var(--on-panel); border-radius: var(--r-1);
   padding: 10px var(--s-2); text-align: center;
-  box-shadow: var(--lift-1), var(--edge);
+  box-shadow: var(--lift-1), var(--edge), var(--rim);
 }
 .stat-v { font-size: 20px; font-weight: 900; line-height: 1.1; }
-.stat-k { font-size: 10.5px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: var(--on-bg-faint); }
+.stat-k { font-size: 10.5px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: var(--on-panel-dim); }
 
-/* ladder */
-.ladder { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+/* ladder. Three states: climbed (full), here (lit, tinted bar, YOU), and
+   ahead (the badge stays in full colour — it is the thing you are climbing
+   towards — while the row's own text steps back and a lock says why). */
+.ladder { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
 .ladder li {
+  --rank: var(--wall);
+  position: relative;
   display: flex; align-items: center; gap: 10px;
-  background: var(--panel); border-radius: var(--r-1); padding: 8px 11px;
-  color: var(--on-bg-dim); font-weight: 800; font-size: 13.5px;
-  box-shadow: var(--edge);
-  transition: background var(--t-base) var(--e-out);
+  background: var(--panel); border-radius: var(--r-1); padding: 7px 12px 7px 10px;
+  color: var(--on-panel); font-weight: 800; font-size: 14px;
+  box-shadow: var(--edge), var(--rim);
+  transition: background var(--t-base) var(--e-out), transform var(--t-fast) var(--e-out);
 }
-.ladder li .rank-badge { width: 28px; height: 28px; border-radius: 8px; }
+.ladder li .rank-badge { width: 30px; height: 30px; border-radius: 9px; }
 .ladder li .lad-min {
   margin-left: auto; display: flex; align-items: center; gap: 4px;
-  font-size: 12px; color: var(--on-bg-faint);
+  font-size: 12.5px; color: var(--on-panel-dim);
+}
+.ladder li .lad-lock { width: 14px; height: 14px; margin-right: 4px; opacity: .75; }
+.ladder li .lad-you {
+  font-size: 9.5px; font-weight: 900; letter-spacing: .12em;
+  padding: 3px 7px; border-radius: var(--r-pill);
+  background: var(--rank); color: #fff;
+  box-shadow: inset 0 -2px 0 rgba(0,0,0,.2);
 }
 .ladder li.is-here {
-  background: var(--panel-3); color: var(--on-bg);
-  box-shadow: var(--lift-1), var(--edge), inset 4px 0 0 var(--accent);
-  padding-left: 15px;
+  background: var(--panel-3); color: var(--on-panel);
+  box-shadow: var(--lift-1), var(--edge), var(--rim), inset 4px 0 0 var(--rank);
+  padding-left: 14px;
+  font-weight: 900;
 }
-.ladder li.is-locked { opacity: .66; }
+.ladder li.is-here .lad-min { color: var(--on-panel); }
+.ladder li.is-locked { color: var(--on-panel-dim); }
+.ladder li.is-locked .rank-badge { box-shadow: inset 0 -3px 0 rgba(0,0,0,.22), inset 0 0 0 30px rgba(0,0,0,.18); }
 
-/* trophy tally on the result card */
-.tally { display: flex; flex-direction: column; align-items: center; gap: var(--s-2); width: 100%; }
+/* trophy tally on the result card. The tally is its own block with its own
+   rhythm — hero delta, then the new total and rank, then the bar, then the
+   line items — sitting between the result and the buttons with real air
+   above and below it. */
+.tally { display: flex; flex-direction: column; align-items: center; gap: var(--s-2); width: 100%; padding: var(--s-2) 0 var(--s-1); }
 .tally[hidden] { display: none; }
-.tally-delta { font-size: 44px; font-weight: 900; line-height: 1; letter-spacing: -.02em; }
+.tally-delta { font-size: 46px; font-weight: 900; line-height: 1; letter-spacing: -.02em; }
 .tally-delta.up { color: #2F9E5B; }
 .tally-delta.down { color: #C6392F; }
 .tally-total {
   display: flex; align-items: center; gap: var(--s-2);
-  font-size: 22px; font-weight: 900; color: var(--ink);
+  font-size: 22px; font-weight: 900; color: var(--ink); line-height: 1;
 }
-.tally .track { width: 100%; background: rgba(62,32,21,.14); }
+.tally-total .rank-badge { width: 30px; height: 30px; border-radius: 9px; margin-left: var(--s-1); }
+.tally .track { width: 100%; background: rgba(62,32,21,.14); margin-top: var(--s-1); }
 .tally .track > i { background: var(--accent-deep); }
 .rank-jump {
   font-size: 13.5px; font-weight: 900;
@@ -584,8 +762,8 @@ body::before {
 .rank-jump.demo { background: rgba(198,57,47,.14); color: #A22C23; }
 @keyframes pop-in { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .tally-list {
-  list-style: none; margin: 6px 0 0; padding: 10px 0 0;
-  display: flex; flex-direction: column; gap: 4px; width: 100%;
+  list-style: none; margin: var(--s-2) 0 0; padding: var(--s-3) 0 0;
+  display: flex; flex-direction: column; gap: 5px; width: 100%;
   border-top: 2px solid rgba(62, 32, 21, .10);
 }
 .tally-list li { display: flex; justify-content: space-between; gap: var(--s-3); font-size: 12.5px; font-weight: 800; color: var(--ink-dim); }
@@ -615,7 +793,21 @@ body::before {
            calc(var(--safe-b) + 4px) calc(var(--safe-l) + 4px);
 }
 .board-area { grid-area: board; position: relative; min-width: 0; min-height: 0; display: grid; place-items: center; }
-#board { display: block; touch-action: none; }
+/* The canvas is the board's tray: a raised face the tiles sit in, sized by
+   `fitBoard` to the board plus a margin. Keyboard focus lights the tray up
+   softly rather than drawing a selection rectangle around it. */
+#board {
+  display: block; touch-action: none;
+  border-radius: var(--r-2);
+  background: var(--panel);
+  box-shadow: var(--lift-2), var(--edge), var(--rim);
+  transition: box-shadow var(--t-base) var(--e-out);
+}
+#board:focus { outline: none; }
+#board:focus-visible {
+  outline: none;
+  box-shadow: var(--lift-2), var(--edge), inset 0 0 0 1px rgba(255,255,255,.4), 0 0 0 4px rgba(255,255,255,.22), 0 0 24px rgba(255,255,255,.28);
+}
 
 .seat { display: none; align-items: center; justify-content: center; padding: 2px; min-width: 0; }
 .seat.is-shown { display: flex; }
@@ -632,18 +824,16 @@ body::before {
 
 /* No rotated edge seats: used past four players, and for every solo / online
    game (the device isn't being passed around).
-   
-   Here the HUD is a single centred column — rail, board, share bar, rail —
-   rather than chips pinned to the screen's edges. Pinning them there left a
-   200px gulf of empty field between a player's score and the board it
-   describes; grouping them means the whole readout moves as one object and the
-   slack lands *outside* it, above and below. The board is sized to its own box
-   by `fitBoard` so this column can shrink-wrap it. */
+
+   Here the HUD is a single centred column — banner, rail, board, share bar,
+   rail — on one 8px rhythm, so the whole readout moves as one object and the
+   slack lands *outside* it, above and below. The board is sized to its own
+   box by `fitBoard` so this column can shrink-wrap it. */
 .screen-game.is-crowded {
   flex-direction: column;
   justify-content: center;
-  align-items: stretch;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
   padding-top: calc(var(--safe-t) + 4px);
 }
 /* The banner joins the group rather than floating alone at the top of an empty
@@ -652,68 +842,72 @@ body::before {
    capped, the button sits in the right margin. */
 .screen-game.is-crowded .turn-banner {
   position: static; order: 0;
-  transform: none; margin: 0 auto;
+  transform: none; margin: 0 auto 2px;
   max-width: calc(100% - 108px);
 }
 .screen-game.is-crowded .seat-top { order: 1; }
-.screen-game.is-crowded .board-area { order: 2; flex: 0 1 auto; min-height: 0; }
+.screen-game.is-crowded .board-area { order: 2; flex: 0 1 auto; min-height: 0; width: 100%; }
 .screen-game.is-crowded .share-bar { order: 3; }
 .screen-game.is-crowded .seat-bottom { order: 4; }
 .screen-game.is-crowded .seat-left, .screen-game.is-crowded .seat-right { display: none; }
-.screen-game.is-crowded .seat { flex-wrap: wrap; gap: 5px; padding: 0; }
-.screen-game.is-crowded .score-chip { transform: none; padding: 4px 10px 4px 5px; gap: 6px; }
-.screen-game.is-crowded .score-chip .val { font-size: 15px; }
+.screen-game.is-crowded .seat { flex-wrap: wrap; gap: 6px; padding: 0; }
+.screen-game.is-crowded .score-chip { transform: none; padding: 5px 12px 5px 6px; gap: 7px; }
+.screen-game.is-crowded .score-chip .val { font-size: 16px; }
 .screen-game.is-crowded .score-chip .who { display: none; }
-.screen-game.is-crowded .score-chip .dot { width: 14px; height: 14px; }
+.screen-game.is-crowded .score-chip .dot { width: 16px; height: 16px; }
+.screen-game.is-crowded .score-chip.is-turn { transform: scale(1.05); }
 
 .screen-game.is-crowded .seat-top,
 .screen-game.is-crowded .seat-bottom {
   flex-wrap: wrap;
   justify-content: center;
-  gap: 5px;
+  gap: 6px;
   padding-left: var(--s-2);
   padding-right: var(--s-2);
 }
 
 .score-chip {
   display: flex; align-items: center; gap: 8px;
-  background: var(--panel); border-radius: var(--r-pill);
+  background: var(--panel-2); color: var(--on-panel); border-radius: var(--r-pill);
   padding: 6px 13px 6px 7px;
   white-space: nowrap;
-  box-shadow: var(--lift-1), var(--edge);
+  box-shadow: var(--lift-1), var(--edge), var(--rim);
   transition: background var(--t-base) var(--e-out), box-shadow var(--t-base) var(--e-out),
-              opacity var(--t-base), transform var(--t-base) var(--e-out);
+              opacity var(--t-base), transform var(--t-base) var(--e-pop);
 }
-.score-chip .dot { width: 18px; height: 18px; border-radius: 50%; flex: none; box-shadow: inset 0 -2px 0 rgba(0,0,0,.14); }
+.score-chip .dot { width: 18px; height: 18px; border-radius: 50%; flex: none; box-shadow: inset 0 -2px 0 rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.3); }
 .score-chip .val { font-size: 18px; font-weight: 900; min-width: 1.1em; text-align: center; }
-.score-chip .who { font-size: 11.5px; font-weight: 800; color: var(--on-bg-faint); }
+.score-chip .who { font-size: 11.5px; font-weight: 800; color: var(--on-panel-dim); }
 /* Which of these is me? On a rail of eight identical pills that is the first
    thing you look for, so the seat this device plays says so outright. */
 .score-chip .me {
   font-size: 9.5px; font-weight: 900; letter-spacing: .1em;
   padding: 2px 6px; border-radius: var(--r-pill);
-  background: rgba(255,255,255,.28); color: var(--on-bg);
+  background: var(--sink); color: var(--on-sink); box-shadow: var(--edge-in);
 }
+/* The active seat is lit: brighter face, a ring in the seat's own colour
+   (set inline as `--seat`), and a touch bigger. */
 .score-chip.is-turn {
+  --seat: var(--on-bg);
   background: var(--panel-3);
-  box-shadow: 0 0 0 3px var(--on-bg-faint), var(--lift-1);
+  box-shadow: 0 0 0 3px var(--seat), var(--lift-1), var(--edge);
   transform: translateY(-1px) scale(1.04);
 }
-.score-chip.is-out { opacity: .34; box-shadow: none; }
+.score-chip.is-out { opacity: .4; box-shadow: var(--rim); }
 .score-chip.is-out .val { text-decoration: line-through; }
 
 /* ------------------------------------------------------------- share bar --
 
    How much of the board each side holds, as one stacked rail directly under
-   it. Two numbers on opposite rails never answered "am I winning" at a glance;
-   a bar you can read the split off in one look does, and it earns the space
-   the centred HUD column freed up. */
+   it. Whatever is left over is unclaimed board — so the bar is painted in the
+   tile colour, and a fresh game shows a clean cream bar that the seat colours
+   then eat into, exactly like the board above it. */
 .share-bar {
   display: none;
-  height: 12px; flex: none;
+  height: 10px; flex: none;
   border-radius: var(--r-pill);
-  background: var(--sink);
-  box-shadow: var(--edge-in);
+  background: var(--tile);
+  box-shadow: var(--edge-in), var(--lift-1);
   overflow: hidden;
   margin: 0 auto;
   width: 100%;
@@ -721,7 +915,7 @@ body::before {
 .screen-game.is-crowded .share-bar.is-shown { display: flex; }
 .share-bar > i {
   display: block; height: 100%;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.32);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.32), inset -1px 0 0 rgba(255,255,255,.45);
   transition: width var(--t-base) var(--e-out), opacity var(--t-base);
 }
 /* The seat this device plays gets a brighter face than the rest, so your own
@@ -733,9 +927,11 @@ body::before {
 .turn-banner {
   position: absolute; left: 50%; top: calc(var(--safe-t) + 8px);
   transform: translateX(-50%);
-  padding: 7px 16px; border-radius: var(--r-pill);
+  padding: 8px 18px; border-radius: var(--r-pill);
   background: var(--panel-2);
-  color: var(--on-bg); font-size: 13px; font-weight: 900; letter-spacing: .05em;
+  color: #fff; font-size: 13px; font-weight: 900; letter-spacing: .05em;
+  text-shadow: 0 1px 0 rgba(0,0,0,.22);
+  box-shadow: var(--lift-1), inset 0 1px 0 rgba(255,255,255,.35);
   pointer-events: none; z-index: 3; max-width: 66vw; text-align: center;
   transition: background var(--t-base) var(--e-out);
 }
@@ -756,38 +952,53 @@ body::before {
 .card {
   background: var(--card);
   border-radius: var(--r-3);
-  padding: var(--s-5) var(--s-4) var(--s-4);
+  padding: var(--s-5) var(--s-5) var(--s-5);
   width: min(360px, 100%);
   max-height: 88vh; overflow-y: auto;
   display: flex; flex-direction: column; gap: 10px; align-items: stretch;
   box-shadow: var(--float);
   animation: card-in var(--t-slow) var(--e-pop);
+  scrollbar-width: none;
 }
+.card::-webkit-scrollbar { display: none; }
 @keyframes card-in { from { transform: scale(.88) translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
 .card h2 { margin: 0; text-align: center; font-size: 27px; font-weight: 900; color: var(--ink); }
 .card .hint { color: var(--ink-dim); text-align: center; }
+/* Result cards: the token, title and subtitle form one tight hero; the first
+   button sits a clear step below whatever comes before it. */
+.card .winner-disc + h2, .card .winner-team + h2 { margin-top: var(--s-2); }
+.card h2 + .hint { margin-top: -4px; }
+.card .btn-primary { margin-top: var(--s-2); }
+.card .hint + .btn-primary { margin-top: var(--s-3); }
 /* A plain .btn is cream — the same cream as the card it sits on — so inside a
    card it takes a white face and an ink hairline to stay a button. */
 .card .btn { background: #FFF; box-shadow: var(--lift-2), inset 0 0 0 2px rgba(62,32,21,.11); }
-.card .btn:active { box-shadow: var(--lift-1), inset 0 0 0 2px rgba(62,32,21,.11); }
-.card .btn-primary { background: var(--accent); color: var(--on-accent); box-shadow: var(--lift-2); }
-.card .btn-primary:active { box-shadow: var(--lift-1); }
+.card .btn:active { box-shadow: 0 1px 0 rgba(0,0,0,.2), inset 0 0 0 2px rgba(62,32,21,.11); }
+.card .btn-primary { background: var(--accent); color: var(--on-accent); box-shadow: var(--lift-2), inset 0 1px 0 rgba(255,255,255,.28); }
+.card .btn-primary:active { box-shadow: 0 1px 0 rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.28); }
 .card .btn-ghost { background: rgba(62,32,21,.09); color: var(--ink); box-shadow: var(--lift-1); }
 .card .btn-ghost:active { box-shadow: none; }
 
+/* The win token: the winner's colour carrying the trophy, on a spark of the
+   card's cream — a reward, not a status dot. `--seat` is set inline. */
 .winner-disc {
-  width: 76px; height: 76px; border-radius: 50%;
-  margin: 0 auto; background: var(--accent);
+  --seat: var(--accent);
+  position: relative;
+  width: 84px; height: 84px; border-radius: 50%;
+  margin: var(--s-1) auto 0; background: var(--seat);
   display: grid; place-items: center;
-  box-shadow: 0 6px 0 rgba(0,0,0,.16);
+  color: #fff;
+  box-shadow: 0 6px 0 rgba(0,0,0,.16), inset 0 2px 0 rgba(255,255,255,.35), inset 0 -4px 0 rgba(0,0,0,.14);
   animation: bob 1.8s ease-in-out infinite;
 }
-.winner-disc::after {
-  content: ''; width: 13px; height: 13px; border-radius: 50%; background: #fff;
-  box-shadow: -19px 0 0 #fff, 19px 0 0 #fff;
+.winner-disc .ico { width: 54%; height: 54%; filter: drop-shadow(0 2px 0 rgba(0,0,0,.18)); }
+.winner-disc::before {
+  content: ''; position: absolute; inset: -14px; border-radius: 50%; z-index: -1;
+  background: radial-gradient(circle, var(--seat) 0%, transparent 70%);
+  opacity: .28;
 }
 .winner-team { display: flex; gap: 8px; justify-content: center; }
-.winner-team .dot { width: 20px; height: 20px; border-radius: 50%; }
+.winner-team .dot { width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 -3px 0 rgba(0,0,0,.16); }
 
 /* Knocked out. The one card in the app that shouts — it is the only moment the
    player is told something they did not choose, so it gets the biggest type on
@@ -798,12 +1009,13 @@ body::before {
 }
 #overlay-out .winner-disc {
   animation: sink var(--t-slow) var(--e-out) both;
-  opacity: .55;
-  filter: grayscale(.35);
+  opacity: .6;
+  filter: grayscale(.4);
 }
+#overlay-out .winner-disc::before { display: none; }
 @keyframes sink {
   from { transform: translateY(-14px) scale(1.08); opacity: 1; }
-  to { transform: translateY(0) scale(1); opacity: .55; }
+  to { transform: translateY(0) scale(1); opacity: .6; }
 }
 
 /* ----------------------------------------------------------------- a11y */
@@ -813,41 +1025,73 @@ body::before {
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 :focus-visible { outline: 3px solid var(--on-bg); outline-offset: 3px; }
-#board:focus-visible { outline-offset: -3px; }
 
 /* --------------------------------------------------------------- responsive */
 
+@media (max-width: 340px) {
+  .screen { padding-left: calc(var(--safe-l) + var(--s-3)); padding-right: calc(var(--safe-r) + var(--s-3)); }
+  .menu-row .btn-sm { padding-left: 6px; padding-right: 6px; font-size: 14px; }
+  .preview-board { width: 84px; height: 84px; }
+  .preview-name { font-size: 19px; }
+  .seg-tight .seg-btn { font-size: 11.5px; padding-left: 0; padding-right: 0; }
+  .rule { grid-template-columns: 1fr; }
+  .rule-fig { display: none; }
+}
+
 @media (orientation: landscape) and (max-height: 560px) {
   .stack { justify-content: flex-start; }
+  .stack.home { justify-content: center; }
   .logo { font-size: 42px; }
   .tagline { display: none; }
+  .home-you { margin-top: var(--s-3); }
+  .stack.home .menu, .stack.home .toggles { margin-top: var(--s-3); }
   .btn { min-height: 48px; padding: 12px 16px; font-size: 16px; }
   .rank-hero { padding: var(--s-3); }
   .rank-hero-count { font-size: 30px; }
   .rank-badge-xl { width: 60px; height: 60px; border-radius: 20px; }
+  .screen-game.is-crowded { gap: 6px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .01ms !important; animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
     transition-duration: .01ms !important;
   }
 }
 
-.tagline {
-  text-align: center; margin: -4px 0 var(--s-2);
-  color: var(--on-bg-dim); font-weight: 700; font-size: 15px; line-height: 1.45;
-}
+/* ------------------------------------------------------------------- rules --
+
+   One card per rule, each with a small drawing of the thing it describes —
+   this is a game you understand by watching, so the page shows rather than
+   tells wherever it can. Figures are inline SVG in the same two-tone style as
+   icons.js: seat colours for balls, the theme's own tile colour for tiles. */
 .rules { gap: var(--s-2); }
 .rule {
-  background: var(--panel); border-radius: var(--r-2);
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--s-3);
+  background: var(--panel); color: var(--on-panel); border-radius: var(--r-2);
   padding: var(--s-3) var(--s-4) 14px;
-  box-shadow: var(--lift-1), var(--edge);
+  box-shadow: var(--lift-1), var(--edge), var(--rim);
 }
+.rule.no-fig { grid-template-columns: 1fr; }
 .rules h3 {
-  color: var(--on-bg); font-size: 12px; margin: 0 0 7px; font-weight: 900;
+  color: var(--on-panel); font-size: 12px; margin: 0 0 6px; font-weight: 900;
   letter-spacing: .12em; text-transform: uppercase;
 }
-.rules p { color: var(--on-bg-dim); font-weight: 700; font-size: 14.5px; line-height: 1.55; margin: 0; }
-.rules p + p { margin-top: 9px; }
-.rules b { color: var(--on-bg); }
+.rules p { color: var(--on-panel-dim); font-weight: 700; font-size: 14.5px; line-height: 1.5; margin: 0; }
+.rules p + p { margin-top: 8px; }
+.rules b { color: var(--on-panel); font-weight: 900; }
+.rule-fig {
+  width: 96px; height: 96px; flex: none;
+  border-radius: var(--r-1);
+  background: var(--sink); box-shadow: var(--edge-in);
+  padding: 8px;
+}
+.rule-fig svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.rule-fig .t { fill: var(--tile); }
+.rule-fig .t-dim { fill: var(--tile-dim); }
+.rule-fig .w { fill: var(--wall); }
+.rule-fig .arrow { stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.rule-fig .ring { fill: none; stroke-width: 2.4; }
+.rule-fig .pip { fill: #fff; }
+.rule-fig .lost { opacity: .45; }

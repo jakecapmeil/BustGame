@@ -241,15 +241,28 @@ export function drawBoard(ctx, L, view) {
       ctx.restore();
     }
 
-    // Playable hint for the local player.
+    // Playable hint for the local player, in the seat's own colour. During
+    // the opening the board is bare and this is the only thing saying "tap
+    // here", so the bed tints as well as rings; in play the tiles already
+    // carry your colour and a breathing ring is enough.
     if (legal && legal.has(i)) {
       const p = view.pulse || 0;
+      const col = view.hintColor || '#FFFFFF';
       ctx.save();
-      roundRect(ctx, x + 1.5, y + 1.5, L.tile - 3, L.tile - 3, radius - 1.5);
-      ctx.strokeStyle = o === EMPTY
-        ? `rgba(255,255,255,${0.30 + 0.30 * p})`
-        : `rgba(255,255,255,${0.45 + 0.35 * p})`;
-      ctx.lineWidth = Math.max(1.5, L.tile * 0.035);
+      if (view.opening) {
+        roundRect(ctx, x, y, L.tile, L.tile, radius);
+        ctx.globalAlpha = 0.06 + 0.08 * p;
+        ctx.fillStyle = col;
+        ctx.fill();
+        ctx.globalAlpha = 0.40 + 0.50 * p;
+        ctx.lineWidth = Math.max(2, L.tile * 0.055);
+      } else {
+        ctx.globalAlpha = 0.40 + 0.40 * p;
+        ctx.lineWidth = Math.max(1.5, L.tile * 0.04);
+      }
+      const inset = ctx.lineWidth / 2 + 0.5;
+      roundRect(ctx, x + inset, y + inset, L.tile - inset * 2, L.tile - inset * 2, Math.max(2, radius - inset));
+      ctx.strokeStyle = view.opening ? col : '#FFFFFF';
       ctx.stroke();
       ctx.restore();
     }

@@ -26,27 +26,27 @@ export const MODES = {
     seats: 2, board: [7, 7], teams: null, wallDensity: 0, theme: 'ember', icon: 'duel',
   },
   rumble: {
-    key: 'rumble', name: 'Rumble', tagline: '4-player free-for-all',
+    key: 'rumble', name: 'Rumble', tagline: 'Four-way free-for-all',
     blurb: 'Four colours, one board. Everyone for themselves.',
     seats: 4, board: [8, 8], teams: null, wallDensity: 0, theme: 'tide', icon: 'rumble',
   },
   arena: {
-    key: 'arena', name: 'Big Arena', tagline: '4 players · big map',
+    key: 'arena', name: 'Big Arena', tagline: 'Four-way, room to move',
     blurb: 'The same four-way brawl with room to manoeuvre — and longer chains.',
     seats: 4, board: [10, 10], teams: null, wallDensity: 0, theme: 'orchid', icon: 'arena',
   },
   mayhem: {
-    key: 'mayhem', name: 'Mayhem', tagline: '8 players · big map',
+    key: 'mayhem', name: 'Mayhem', tagline: 'Eight-player brawl',
     blurb: 'Eight colours on a huge board. Total chaos, and only one survivor.',
     seats: 8, board: [12, 12], teams: null, wallDensity: 0, theme: 'blaze', icon: 'mayhem',
   },
   duos: {
-    key: 'duos', name: 'Duos', tagline: 'Play in pairs',
+    key: 'duos', name: 'Duos', tagline: 'Two on two',
     blurb: 'Partners share a win. Busts feed your team-mate instead of stealing from them.',
     seats: 4, board: [10, 10], teams: [0, 1, 0, 1], wallDensity: 0, theme: 'gild', icon: 'duos',
   },
   chaos: {
-    key: 'chaos', name: 'Chaos', tagline: 'A mirrored maze',
+    key: 'chaos', name: 'Chaos', tagline: 'Four-way in a mirrored maze',
     blurb: 'A mirrored maze of walls. Balls fired into a wall are gone — pick your angles.',
     seats: 4, board: [10, 10], teams: null, wallDensity: 0.13, theme: 'toxic', icon: 'chaos',
   },

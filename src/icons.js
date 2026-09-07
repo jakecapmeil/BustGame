@@ -265,6 +265,20 @@ export const UI_ICONS = {
 
   rise: `<path d="M12 19V6.4M6.4 11.6 12 5.8l5.6 5.8" fill="none" stroke="currentColor"
                stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`,
+
+  /* A padlock, for the ranks still above you on the ladder. */
+  lock: `
+    <path d="M7.6 10.6V7.8a4.4 4.4 0 0 1 8.8 0v2.8" fill="none" stroke="currentColor"
+          stroke-width="2.2" stroke-linecap="round"/>
+    <rect x="4.8" y="10.4" width="14.4" height="11" rx="3" fill="currentColor"/>
+    <circle cx="12" cy="15.4" r="1.7" fill="${SHADE}"/>
+    <rect x="11.1" y="15.4" width="1.8" height="3.2" rx=".9" fill="${SHADE}"/>`,
+
+  /* A tile going up — the eight-point burst on the knocked-out card. */
+  burst: `
+    <path d="M12 1.8L14.1 6.8L19.2 4.8L17.2 9.9L22.2 12L17.2 14.1L19.2 19.2L14.1 17.2L12 22.2L9.9 17.2L4.8 19.2L6.8 14.1L1.8 12L6.8 9.9L4.8 4.8L9.9 6.8Z"
+          fill="currentColor"/>
+    <circle cx="12" cy="12" r="3.6" fill="${SHADE}"/>`,
 };
 
 /* ------------------------------------------------------------------ render -- */

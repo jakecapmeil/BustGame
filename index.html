@@ -26,27 +26,30 @@
 
 <!-- ------------------------------------------------------------------ home -- -->
 <section class="screen is-active" id="screen-home">
-  <div class="stack">
+  <div class="stack home">
     <h1 class="logo">BUST<span class="logo-dot"></span></h1>
-    <p class="tagline">Load a tile past three.<br>Watch the board go up.</p>
+    <p class="tagline">Load a tile past three. Watch it go up.</p>
 
-    <button class="rank-strip" id="rank-strip" data-goto="screen-ranked" aria-label="Your rank">
-      <span class="rank-badge" id="strip-badge" aria-hidden="true"></span>
-      <span class="rank-strip-main">
-        <span class="rank-strip-name" id="strip-name">Firecracker</span>
-        <span class="track"><i id="strip-fill"></i></span>
-      </span>
-      <span class="rank-strip-trophies num"><span class="trophy-ico" data-icon="trophy"></span><span id="strip-count">0</span></span>
-    </button>
+    <!-- Who you are: your rank, and the mode you're set to play. -->
+    <div class="home-you">
+      <button class="rank-strip" id="rank-strip" data-goto="screen-ranked" aria-label="Your rank">
+        <span class="rank-badge" id="strip-badge" aria-hidden="true"></span>
+        <span class="rank-strip-main">
+          <span class="rank-strip-name" id="strip-name">Firecracker</span>
+          <span class="track"><i id="strip-fill"></i></span>
+        </span>
+        <span class="rank-strip-trophies num"><span class="trophy-ico" data-icon="trophy"></span><span id="strip-count">0</span></span>
+      </button>
 
-    <button class="mode-hero" id="mode-hero" data-goto="screen-modes" aria-label="Change game mode">
-      <span class="mode-glyph" id="hero-glyph" aria-hidden="true"></span>
-      <span>
-        <span class="mode-hero-name" id="hero-name">Duel</span><br>
-        <span class="mode-hero-sub" id="hero-sub">One on one · 7×7</span>
-      </span>
-      <span class="mode-hero-cue">CHANGE</span>
-    </button>
+      <button class="mode-hero" id="mode-hero" data-goto="screen-modes" aria-label="Change game mode">
+        <span class="mode-glyph" id="hero-glyph" aria-hidden="true"></span>
+        <span>
+          <span class="mode-hero-name" id="hero-name">Duel</span><br>
+          <span class="mode-hero-sub" id="hero-sub">One on one · 7×7</span>
+        </span>
+        <span class="mode-hero-cue">CHANGE</span>
+      </button>
+    </div>
 
     <nav class="menu">
       <button class="btn btn-primary" data-goto="screen-ranked">Ranked</button>
@@ -68,7 +71,7 @@
 <!-- ----------------------------------------------------------------- modes -- -->
 <section class="screen" id="screen-modes">
   <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back" data-icon="back"></button><h2>Game mode</h2></header>
-  <div class="scroller">
+  <div class="scroller centred">
     <p class="hint" id="modes-blurb">Pick a shape of match. You choose solo, local or online after.</p>
     <div class="mode-grid" id="mode-grid"></div>
 
@@ -112,8 +115,15 @@
 <!-- ------------------------------------------------------------------ solo -- -->
 <section class="screen" id="screen-solo">
   <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back" data-icon="back"></button><h2>Solo</h2></header>
-  <div class="scroller">
-    <p class="hint" id="solo-shape">—</p>
+  <div class="scroller centred">
+    <div class="preview" id="solo-preview">
+      <span class="preview-board" id="solo-preview-board" aria-hidden="true"></span>
+      <span class="preview-facts">
+        <span class="preview-name" id="solo-preview-name">Duel</span>
+        <span class="preview-shape" id="solo-preview-shape">—</span>
+        <span class="preview-note" id="solo-preview-note"></span>
+      </span>
+    </div>
     <fieldset class="field"><legend>Bot difficulty</legend>
       <div class="seg seg-tight" id="solo-diff">
         <button class="seg-btn" type="button" data-v="easy">Easy</button>
@@ -122,6 +132,7 @@
         <button class="seg-btn" type="button" data-v="expert">Expert</button>
         <button class="seg-btn" type="button" data-v="brutal">Brutal</button>
       </div>
+      <p class="diff-note" id="solo-diff-note"></p>
     </fieldset>
     <button class="btn btn-ghost btn-sm" data-goto="screen-modes">Change mode</button>
   </div>
@@ -131,8 +142,15 @@
 <!-- ----------------------------------------------------------------- local -- -->
 <section class="screen" id="screen-local">
   <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back" data-icon="back"></button><h2>Local</h2></header>
-  <div class="scroller">
-    <p class="hint" id="local-shape">One device, passed around. Fill the seats with any mix of people and bots.</p>
+  <div class="scroller centred">
+    <div class="preview" id="local-preview">
+      <span class="preview-board" id="local-preview-board" aria-hidden="true"></span>
+      <span class="preview-facts">
+        <span class="preview-name" id="local-preview-name">Duel</span>
+        <span class="preview-shape" id="local-preview-shape">—</span>
+        <span class="preview-note" id="local-preview-note"></span>
+      </span>
+    </div>
     <fieldset class="field"><legend>Line-up</legend>
       <ul class="roster" id="local-roster"></ul>
     </fieldset>
@@ -145,8 +163,15 @@
 <section class="screen" id="screen-online">
   <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back" data-icon="back"></button><h2>Online</h2></header>
   <div class="pane" id="online-setup">
-    <div class="scroller">
-      <p class="hint" id="online-shape">Play across devices. One player hosts and shares the room code.</p>
+    <div class="scroller centred">
+      <div class="preview" id="online-preview">
+        <span class="preview-board" id="online-preview-board" aria-hidden="true"></span>
+        <span class="preview-facts">
+          <span class="preview-name" id="online-preview-name">Duel</span>
+          <span class="preview-shape" id="online-preview-shape">—</span>
+          <span class="preview-note" id="online-preview-note"></span>
+        </span>
+      </div>
       <fieldset class="field"><legend>Join a room</legend>
         <div class="join-row">
           <input id="online-code" class="code-input" inputmode="text" autocapitalize="characters"
@@ -178,7 +203,7 @@
     <h2>Ranked</h2>
   </header>
   <div class="scroller">
-    <div class="rank-hero">
+    <div class="rank-hero" id="rank-hero">
       <span class="rank-badge rank-badge-xl" id="rank-hero-badge" aria-hidden="true"></span>
       <div class="rank-hero-name" id="rank-hero-name">Firecracker</div>
       <div class="rank-hero-count num"><span class="trophy-ico" data-icon="trophy"></span><span id="rank-hero-count">0</span></div>
@@ -192,6 +217,12 @@
       <div class="stat"><div class="stat-v num" id="stat-best">0</div><div class="stat-k">Best</div></div>
     </div>
 
+    <fieldset class="field"><legend>Ladder</legend>
+      <ol class="ladder" id="ladder-list" reversed></ol>
+    </fieldset>
+
+    <!-- The match you'd play sits last: the ladder is the point of this screen,
+         the mode is a setting. -->
     <button class="mode-hero" id="ranked-mode-hero" data-goto="screen-modes" aria-label="Change game mode">
       <span class="mode-glyph" id="ranked-hero-glyph" aria-hidden="true"></span>
       <span>
@@ -200,10 +231,6 @@
       </span>
       <span class="mode-hero-cue">CHANGE</span>
     </button>
-
-    <fieldset class="field"><legend>Ladder</legend>
-      <ol class="ladder" id="ladder-list" reversed></ol>
-    </fieldset>
   </div>
   <button class="btn btn-primary" id="ranked-play">Play match</button>
 </section>
@@ -212,44 +239,99 @@
 <section class="screen" id="screen-rules">
   <header class="bar"><button class="icon-btn" data-goto="screen-home" aria-label="Back" data-icon="back"></button><h2>How to play</h2></header>
   <div class="scroller rules">
-    <!-- One card per rule. A single column of headings and paragraphs read as
-         one undifferentiated wall; carded, you can find your way back to the
-         rule you half-remember. -->
-    <section class="rule">
+    <!-- One card per rule, each with a drawing of the thing it describes.
+         Figures are 3x3 tile diagrams: tiles at x/y 0, 35, 70 (30 wide, 5 gap)
+         on a 100x100 grid, discs r=9, pips r=2.1. -->
+    <section class="rule no-fig">
       <h3>The goal</h3>
       <p>Wipe every other colour off the board. Last side standing wins.</p>
     </section>
 
     <section class="rule">
-      <h3>Opening</h3>
-      <p>Everyone picks one tile on the empty board. It <b>busts immediately</b>, throwing a ball to each of its four neighbours — so you start with up to four tiles.</p>
-      <p>Openings claim a <b>3×3 zone</b> and no two zones may overlap, so nobody can crowd anyone out on move one. Reach for a tile inside someone's zone and it <b>flashes red</b> at you.</p>
+      <div>
+        <h3>Opening</h3>
+        <p>Everyone picks one tile on the empty board. It <b>busts on the spot</b>, throwing a ball to each of its four neighbours — so you start with up to four tiles.</p>
+        <p>Openings claim a <b>3×3 zone</b> and zones can't overlap. Reach into someone's zone and it <b>flashes red</b>.</p>
+      </div>
+      <span class="rule-fig" aria-hidden="true"><svg viewBox="0 0 100 100">
+        <rect class="t" x="0" y="0" width="30" height="30" rx="7"/><rect class="t" x="35" y="0" width="30" height="30" rx="7"/><rect class="t" x="70" y="0" width="30" height="30" rx="7"/>
+        <rect class="t" x="0" y="35" width="30" height="30" rx="7"/><rect class="t" x="35" y="35" width="30" height="30" rx="7"/><rect class="t" x="70" y="35" width="30" height="30" rx="7"/>
+        <rect class="t" x="0" y="70" width="30" height="30" rx="7"/><rect class="t" x="35" y="70" width="30" height="30" rx="7"/><rect class="t" x="70" y="70" width="30" height="30" rx="7"/>
+        <rect x="35" y="0" width="30" height="30" rx="7" fill="rgba(242,86,75,.22)"/><rect x="0" y="35" width="30" height="30" rx="7" fill="rgba(242,86,75,.22)"/>
+        <rect x="70" y="35" width="30" height="30" rx="7" fill="rgba(242,86,75,.22)"/><rect x="35" y="70" width="30" height="30" rx="7" fill="rgba(242,86,75,.22)"/>
+        <rect x="-3.5" y="-3.5" width="107" height="107" rx="11" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="7 5" opacity=".75"/>
+        <circle cx="50" cy="50" r="7" fill="none" stroke="#F2564B" stroke-width="2" opacity=".5"/>
+        <circle cx="50" cy="50" r="12" fill="none" stroke="#F2564B" stroke-width="1.5" opacity=".25"/>
+        <circle cx="50" cy="15" r="9" fill="#F2564B"/><circle class="pip" cx="50" cy="15" r="2.1"/>
+        <circle cx="15" cy="50" r="9" fill="#F2564B"/><circle class="pip" cx="15" cy="50" r="2.1"/>
+        <circle cx="85" cy="50" r="9" fill="#F2564B"/><circle class="pip" cx="85" cy="50" r="2.1"/>
+        <circle cx="50" cy="85" r="9" fill="#F2564B"/><circle class="pip" cx="50" cy="85" r="2.1"/>
+      </svg></span>
     </section>
 
     <section class="rule">
-      <h3>Your turn</h3>
-      <p>Tap any tile you own to add a ball. Tiles hold <b>three</b>.</p>
+      <div>
+        <h3>Reading a tile</h3>
+        <p>The pips on a disc are its balls. Tiles hold <b>three</b>, so a disc showing three pips is <b>loaded</b> — one more ball and it goes.</p>
+        <p>On your turn, tap any tile you own to add a ball.</p>
+      </div>
+      <span class="rule-fig" aria-hidden="true"><svg viewBox="0 0 100 100">
+        <rect class="t" x="0" y="35" width="30" height="30" rx="7"/><rect class="t" x="35" y="35" width="30" height="30" rx="7"/><rect class="t" x="70" y="35" width="30" height="30" rx="7"/>
+        <rect x="0" y="35" width="30" height="30" rx="7" fill="rgba(242,86,75,.22)"/>
+        <rect x="35" y="35" width="30" height="30" rx="7" fill="rgba(37,183,232,.22)"/>
+        <rect x="70" y="35" width="30" height="30" rx="7" fill="rgba(240,164,48,.24)"/>
+        <circle cx="15" cy="50" r="10.5" fill="#F2564B"/><circle class="pip" cx="15" cy="50" r="2.1"/>
+        <circle cx="50" cy="50" r="10.5" fill="#25B7E8"/><circle class="pip" cx="45.6" cy="50" r="2.1"/><circle class="pip" cx="54.4" cy="50" r="2.1"/>
+        <circle cx="85" cy="50" r="10.5" fill="#F0A430"/>
+        <circle class="pip" cx="80.6" cy="46.8" r="2.1"/><circle class="pip" cx="89.4" cy="46.8" r="2.1"/><circle class="pip" cx="85" cy="53.8" r="2.1"/>
+      </svg></span>
     </section>
 
     <section class="rule">
-      <h3>Busting</h3>
-      <p>Add a ball to a tile that already holds three and it <b>busts</b>: the tile empties and fires one ball into each of the four neighbouring tiles. Every tile a ball lands on becomes yours.</p>
-      <p>If a landing ball pushes a tile past three, that one busts too — chains can run away across the whole board.</p>
+      <div>
+        <h3>Busting</h3>
+        <p>Add a ball to a tile that already holds three and it <b>busts</b>: the tile empties and fires one ball into each of its four neighbours. Every tile a ball lands on <b>becomes yours</b>.</p>
+        <p>If a landing ball pushes a tile past three, that one busts too — chains can run away across the whole board.</p>
+      </div>
+      <span class="rule-fig" aria-hidden="true"><svg viewBox="0 0 100 100">
+        <rect class="t" x="0" y="0" width="30" height="30" rx="7"/><rect class="t" x="35" y="0" width="30" height="30" rx="7"/><rect class="t" x="70" y="0" width="30" height="30" rx="7"/>
+        <rect class="t" x="0" y="35" width="30" height="30" rx="7"/><rect class="t" x="35" y="35" width="30" height="30" rx="7"/><rect class="t" x="70" y="35" width="30" height="30" rx="7"/>
+        <rect class="t" x="0" y="70" width="30" height="30" rx="7"/><rect class="t" x="35" y="70" width="30" height="30" rx="7"/><rect class="t" x="70" y="70" width="30" height="30" rx="7"/>
+        <rect x="70" y="35" width="30" height="30" rx="7" fill="rgba(37,183,232,.22)"/>
+        <rect x="35" y="35" width="30" height="30" rx="7" fill="rgba(242,86,75,.14)"/>
+        <path d="M50 38C51.8 46.4 53.6 48.2 62 50C53.6 51.8 51.8 53.6 50 62C48.2 53.6 46.4 51.8 38 50C46.4 48.2 48.2 46.4 50 38Z" fill="#F2564B" opacity=".85"/>
+        <circle cx="50" cy="28" r="5.5" fill="#F2564B" opacity=".3"/><circle cx="28" cy="50" r="5.5" fill="#F2564B" opacity=".3"/>
+        <circle cx="72" cy="50" r="5.5" fill="#F2564B" opacity=".3"/><circle cx="50" cy="72" r="5.5" fill="#F2564B" opacity=".3"/>
+        <circle cx="50" cy="15" r="9" fill="#F2564B"/><circle class="pip" cx="50" cy="15" r="2.1"/>
+        <circle cx="15" cy="50" r="9" fill="#F2564B"/><circle class="pip" cx="15" cy="50" r="2.1"/>
+        <circle cx="50" cy="85" r="9" fill="#F2564B"/><circle class="pip" cx="50" cy="85" r="2.1"/>
+        <circle cx="85" cy="50" r="9" fill="#F2564B"/><circle class="pip" cx="80.6" cy="50" r="2.1"/><circle class="pip" cx="89.4" cy="50" r="2.1"/>
+      </svg></span>
     </section>
 
     <section class="rule">
-      <h3>The edge tax</h3>
-      <p>A bust always fires four balls, even with nowhere to put them. Bust on an edge and one ball falls off the board; bust in a corner and you lose two. <b>Walls eat balls the same way.</b> Edges are cheap to hold and expensive to attack from.</p>
+      <div>
+        <h3>The edge tax</h3>
+        <p>A bust always fires four balls, even with nowhere to put them. Bust on an edge and one ball <b>falls off the board</b>; bust in a corner and you lose two. <b>Walls eat balls the same way.</b></p>
+        <p>Edges are cheap to hold and expensive to attack from.</p>
+      </div>
+      <span class="rule-fig" aria-hidden="true"><svg viewBox="0 0 100 100">
+        <rect class="t" x="0" y="0" width="30" height="30" rx="7"/><rect class="t" x="35" y="0" width="30" height="30" rx="7"/><rect class="w" x="70" y="0" width="30" height="30" rx="7"/>
+        <rect class="t" x="0" y="35" width="30" height="30" rx="7"/><rect class="t" x="35" y="35" width="30" height="30" rx="7"/><rect class="t" x="70" y="35" width="30" height="30" rx="7"/>
+        <rect class="t" x="0" y="70" width="30" height="30" rx="7"/><rect class="t" x="35" y="70" width="30" height="30" rx="7"/><rect class="t" x="70" y="70" width="30" height="30" rx="7"/>
+        <path d="M70 30 100 0M70 15 85 0M85 30 100 15" stroke="rgba(0,0,0,.25)" stroke-width="2.4" stroke-linecap="round"/>
+        <rect x="0" y="35" width="30" height="30" rx="7" fill="rgba(242,86,75,.14)"/>
+        <path d="M15 38C16.8 46.4 18.6 48.2 27 50C18.6 51.8 16.8 53.6 15 62C13.2 53.6 11.4 51.8 3 50C11.4 48.2 13.2 46.4 15 38Z" fill="#F2564B" opacity=".85"/>
+        <circle cx="15" cy="15" r="9" fill="#F2564B"/><circle class="pip" cx="15" cy="15" r="2.1"/>
+        <circle cx="15" cy="85" r="9" fill="#F2564B"/><circle class="pip" cx="15" cy="85" r="2.1"/>
+        <circle cx="50" cy="50" r="9" fill="#F2564B"/><circle class="pip" cx="50" cy="50" r="2.1"/>
+        <g class="lost"><circle cx="-13" cy="50" r="8" fill="#F2564B"/><path d="M-17 46l8 8M-9 46l-8 8" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></g>
+      </svg></span>
     </section>
 
-    <section class="rule">
+    <section class="rule no-fig">
       <h3>Teams</h3>
       <p>In <b>Duos</b> your balls <b>reinforce</b> a partner's tile instead of stealing it, and your side only loses when both of you are wiped out.</p>
-    </section>
-
-    <section class="rule">
-      <h3>Reading a tile</h3>
-      <p>The dots inside a disc are its balls. A disc with a <b>ring</b> around it is loaded — one more ball and it goes.</p>
     </section>
   </div>
 </section>
@@ -285,7 +367,7 @@
      given a choice rather than just watched. -->
 <div class="overlay" id="overlay-out" hidden>
   <div class="card">
-    <div class="winner-disc" id="out-disc"></div>
+    <div class="winner-disc" id="out-disc" aria-hidden="true"></div>
     <h2 class="lose-title">YOU LOSE</h2>
     <p id="out-sub" class="hint"></p>
     <button class="btn btn-primary" id="out-spectate">Spectate</button>
@@ -295,7 +377,7 @@
 
 <div class="overlay" id="overlay-over" hidden>
   <div class="card">
-    <div class="winner-disc" id="over-disc"></div>
+    <div class="winner-disc" id="over-disc" aria-hidden="true"></div>
     <div class="winner-team is-hidden" id="over-team"></div>
     <h2 id="over-title">—</h2>
     <p id="over-sub" class="hint"></p>

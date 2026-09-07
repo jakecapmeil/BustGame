@@ -19,6 +19,10 @@ GitHub Pages from the repo root as-is.
 - A bust always fires four balls, **even with nowhere to put them**. Bust on an edge
   and one ball falls off the board; bust in a corner and two do. Edges are cheap to
   hold and expensive to attack from — this is the game's main strategic texture.
+- Walls eat a ball the same way the edge does — unless **bouncy walls** are turned on
+  (a Custom option), in which case a ball thrown at a wall rebounds and stays on the
+  tile it left, capped at the tile's own capacity of three. The board edge always
+  taxes a bust; only walls are negotiable.
 - **Opening round:** each player picks one tile on the empty board, which busts on
   the spot. An opening claims a **3×3 zone** and no two zones may overlap — the
   board is not shaded to show this; reach into someone's zone and it flashes red.
@@ -48,7 +52,7 @@ that mode's palette.
 | **Mayhem** | 8 players | 12×12 |
 | **Duos** | 2 v 2 teams | 10×10 |
 | **Chaos** | 4 players + a mirrored maze of walls | 10×10 |
-| **Custom** | 2–8 seats, board size, teams and wall density all yours | up to 13×13 |
+| **Custom** | 2–8 seats, board size, teams, wall density and wall behaviour all yours | up to 13×13 |
 
 Two modes change the rules, not just the numbers:
 
@@ -60,16 +64,53 @@ Two modes change the rules, not just the numbers:
   A ball fired into a wall is **gone** — walls tax a bust exactly the way the
   board edge does, which is the whole tactical point.
 
+**Custom** can invert that last rule. With **bouncy walls** on, a ball thrown at a
+wall comes back and stays on the tile it left, so a walled-in tile is no longer
+punished for its neighbours and the maze becomes cover rather than a tax. The
+rebound is capped at capacity, which is what keeps it a rule and not a bomb: a
+tile can never re-detonate itself off its own rebound.
+
+The bots know about it: the hand-written evaluation prices a tile by how many
+of its sides actually *eat* a ball, so with bouncy walls on it stops paying a
+safety bonus for hugging a wall and counts only the board's own edge.
+
 ### Then: solo, local or online
 
 - **Ranked** — the current mode, against matchmade bots, for trophies (below).
 - **Solo** — the current mode against bots at one difficulty. No trophies.
 - **Local** — one device, passed around. Fill every seat with **any mix of people
   and bots**. All humans is classic pass-and-play; all bots is a spectator match.
-- **Online** — across devices over WebRTC (PeerJS). One player hosts and shares a
-  5-character room code; the mode, board, teams and wall map all ride along in the
-  start packet so every client builds a byte-identical board. Because the engine is
-  deterministic, only move indices cross the wire after that.
+- **Online** — across devices over WebRTC (PeerJS). See below.
+
+## Online is a party, not a match
+
+The unit is a **group of people**, not a single game. You get everyone in once and
+then play round after round out of the same room.
+
+- **Host once.** One player hosts and gets a 5-character code and a **shareable
+  link** (`?party=CODE`). Opening that link drops you straight into the room, so
+  nobody has to read a code off a screenshot.
+- **Everyone has a name.** Type it once; it is remembered, it shows on every
+  lobby row, and it rides the score chips during the round.
+- **Everyone ticks ready.** The host's Start button only appears once the whole
+  party has, so a round never begins on somebody still finding their seat.
+- **The party sets the table.** The *mode* supplies the map — board size, teams,
+  walls — and the *party* supplies the seat count, with the board growing to fit
+  however many turned up (`buildPartySetup`). So a room is never capped at
+  whatever the mode happens to seat.
+- **Play again is a vote.** When a round ends, everyone gets the result card with
+  the party on it. Each "Play again" is a tick; when the last one lands the next
+  round deals itself. Nobody is re-invited, and the host can **change the map**
+  from that same card between rounds.
+- **A round can end without the party ending.** If someone drops mid-game the
+  round is abandoned — every client is replaying a move stream keyed to seat
+  indices, so it has to be — but everyone lands back in the lobby together.
+
+The mode, board, teams, wall map and wall behaviour all ride along in the start
+packet so every client builds a byte-identical board. Because the engine is
+deterministic, only move indices cross the wire after that, and the host judges
+each one against the board it will actually land on rather than against whatever
+it was showing when the packet arrived.
 
 ## Ranked ladder
 
@@ -100,7 +141,7 @@ get matchmade to your level.
 
 ## Bot difficulty
 
-Five rungs, each strictly stronger than the last:
+Six rungs, each stronger than the last:
 
 | Rung   | Search        | Notes |
 |--------|---------------|-------|
@@ -109,31 +150,132 @@ Five rungs, each strictly stronger than the last:
 | Hard   | 2-ply alpha-beta | punishes loose play |
 | Expert | 3-ply         | no noise, no blunders |
 | Brutal | 3-ply, long clock | widest search, plays to win |
+| Neural | learned net (+ MCTS at 1v1) | trained by self-play; no team play |
 
-The search runs on a wall-clock budget so it never janks a phone mid-turn.
+The first five run a hand-written positional evaluation on a wall-clock budget,
+so they never jank a phone mid-turn.
+
+**Neural** is a different animal. It is a small residual network — 464k
+parameters, policy and value — trained from scratch by AlphaZero-style
+self-play against nothing but the rules (the trainer lives in `../bustai`), and
+it searches with Gumbel MCTS rather than alpha-beta. It brings its own idea of
+what a position is worth instead of the hand-written one.
+
+In Duel it is a long way clear of the rest of the ladder. Played bot against
+bot in the browser, with both sides on their real clocks, it beats **Brutal
+40-0** over 40 games — twenty opening, twenty replying. Its raw policy, with no
+search at all, still beats `hard` 73%.
+
+Worth knowing while reading that: `expert` and `brutal` are the same search
+here, differing only in `budgetMs`, and at 7x7 that search finishes in about
+3 ms — so neither rung ever reaches its clock and the two play identically.
+Full numbers in [`EVALUATION.md`](EVALUATION.md).
+
+It also plans its search around the device. A forward pass costs an order of
+magnitude more on a budget phone than on a laptop, so the bot measures what one
+actually costs, works out how many simulations fit in its 1.4-second turn, and
+plans the schedule for that number. A fast device gets the full search; a slow
+one gets a shallower one rather than an overrunning turn.
+
+Three things worth knowing:
+
+- **The weights are a ~900 KB download**, so they are deliberately *not* in the
+  service worker's install list. Only a player who picks this rung fetches
+  them, on selection rather than on the first turn; after that they are cached
+  and the rung works offline like everything else. If the fetch fails, the seat
+  silently plays Brutal rather than freezing.
+- **It plays a free-for-all differently, and deliberately.** The *network*
+  generalises to four seats perfectly well. Its *search* does not: the backprop
+  assumes a point for me is a point against you, which against three opponents
+  is false enough that adding simulations makes the same weights play steadily
+  worse — in a Rumble seat against three `hard` bots, 64% wins with no search,
+  49% at 8 simulations, 19% at 32 and 16% at 96, where the `hard` bot in the
+  same seat wins 26%. So at three seats or more it plays the raw prior plus a
+  check for a move that wins on the spot: one evaluation, about 30 ms, and the
+  strongest option measured. Two seats get the full search.
+- **No teams and no walls.** In Duos a team-mate's tiles land in the *opponent*
+  planes of the encoding, so the network would be reading a board that is not
+  the one being played. Walls it simply never saw: at a walled four-seat table
+  it wins 21% where the `hard` bot it would replace wins 28%. The rung greys out
+  in Duos and Chaos (and in a Custom table with either turned on), and any seat
+  still set to it falls back to Brutal. Both want their own training run.
+
+## Playing
+
+- **Game speed.** A `1×` / `2×` chip on the home screen (and in the pause card).
+  `2×` halves the beat a bot waits before committing and the pace a cascade plays
+  back at. It is not a difficulty setting — the bot's search budget is untouched.
+- **Planned moves.** Most of a four-way game is spent watching other people think.
+  **Double-tap** one of your own tiles while you are waiting and it gets a dashed
+  ring; it plays itself the instant your turn comes round. **Tap it again** to
+  undo. Only where one seat is yours — in pass-and-play every seat is, so there
+  is no wait to plan through.
 
 ## The game screen
 
-The HUD is one object, not four corners. Banner, the opponents' rail, the board,
-a share bar and your own rail sit in a single centred column, so a score is
-always next to the board it counts rather than a couple of hundred pixels away
-at the edge of the screen. `fitBoard` shrink-wraps the canvas to the board for
-exactly this reason — a canvas that filled the free space would push the rails
-back out to the edges.
+The HUD is one object, not four corners. Banner, rails, board and share bar sit
+together, so a score is always next to the board it counts rather than a couple
+of hundred pixels away at the edge of the screen. `fitBoard` shrink-wraps the
+canvas to the board **on both axes** for exactly that reason: the chips sit
+against the canvas, so whichever axis has slack is exactly how far they get
+thrown from the board.
 
+The board is square, so which axis binds depends on the screen — and the HUD
+turns to suit:
+
+| Screen | Layout |
+|---|---|
+| Taller than wide (a phone, a tablet upright) | Rails above and below the board, in a centred column. |
+| Wider than tall (a phone on its side, a tablet in landscape, any desktop window) | Rails become columns **beside** the board, which then gets the full height. |
+| A roomy touch device playing pass-and-play | Rotated edge seats, one per side, facing outwards. |
+
+- **Rotated edge seats need touch and room.** They exist because the device
+  really is being turned around a table — but the two side columns cost the
+  board a quarter of its width, which on a 390pt phone is the difference
+  between a 366px board and a 277px one. A tablet loses about a tenth and keeps
+  them; a phone gets the flat rails and the bigger board; a desktop, where
+  nobody rotates the monitor, never sees them.
+- **On a wide screen the rails live in the gutters.** A square board on a 16:9
+  window leaves several hundred pixels of empty field down each side while the
+  scarce axis — height — is what the rails were eating. Turning them through
+  ninety degrees uses the space the board cannot.
 - The **share bar** under the board is one stacked rail of how much each seat
   holds; whatever is left over is unclaimed board. Two numbers on opposite rails
   never answered "am I winning" at a glance.
+- The seat whose **turn it is** inverts to a cream chip with dark ink — rule 4
+  of the design language, spent on the one thing on the screen that genuinely
+  demands attention.
 - The seat this device plays is marked **YOU** — but only when there is one such
-  seat. In pass-and-play every seat is yours, and the marker would say nothing.
-- **Pass-and-play keeps the rotated edge seats**, because the device really is
-  being turned around. Everywhere else the chips go into flat rails, which also
-  hands the board back the width the side columns would have eaten.
+  seat, and only when its name does not already say so. In pass-and-play every
+  seat is yours, and the marker would say nothing.
+- **Scores scale with the screen.** A flat size was one third of a tile on a
+  phone and one ninth of one on a monitor; rule 5 says the numbers are the hero
+  at every size.
+
+## Mobile, iOS and desktop
+
+Designed at phone width and kept that way: on a desktop the menus sit in one
+centred column rather than stretching to 1920px, and the extra room goes to the
+things that can use it — the mode picker and the rules run two-up, and the
+board grows.
+
+iOS in particular:
+
+- Screens are sized in `dvh` and the field's shading covers `lvh`, so a
+  retracting Safari toolbar cannot uncover a strip of bare page beneath them.
+- No focusable field is under 16px, because below that Safari zooms the whole
+  page in the moment one takes focus.
+- Long-press callouts are off over the board and the controls, scrollers do not
+  rubber-band the page behind them, and safe-area insets are honoured on every
+  screen and overlay.
+- `orientation: any` — landscape is a first-class layout, not a fallback.
 
 ## Accessibility
 
 - The board canvas is focusable. **Arrow keys** (or WASD) move a cursor, **Enter** or
   **Space** plays the highlighted tile.
+- Every control takes a visible focus ring on `:focus-visible`, and hover states
+  are behind `(hover: hover)` so a tap never leaves a button stuck lit.
 - An `aria-live` region announces whose turn it is, the tile counts, and the result.
 - Honours `prefers-reduced-motion`.
 
@@ -164,6 +306,15 @@ node --test test/*.mjs
   fight over a frame handle.
 - `rank.test.mjs` — trophy maths: Elo direction, the margin / "how badly you lost"
   multipliers, free-for-all placement, rank floors, and promotion detection.
+- `net.test.mjs` — the online party protocol over a loopback `Peer`: rosters and
+  names, ready ticks, what a client is told on start, seat compaction when
+  somebody leaves the lobby, and a mid-round drop ending the round but not the
+  party. Real WebRTC needs a signalling server and two browsers, which is
+  exactly why this layer went untested and exactly why it drifted.
+- `nn.test.mjs` — the neural rung against the model it was exported from: the
+  encoder must produce identical planes, the forward pass must match PyTorch at
+  the precision that ships, and the JS search must reproduce the Python search
+  move for move with the noise off. Skips itself if `assets/net/` is absent.
 
 ## Deploy to GitHub Pages
 
@@ -184,13 +335,16 @@ in the background (stale-while-revalidate), so an update lands on the next load.
 | File | Role |
 |---|---|
 | `src/engine.js` | Pure rules. Deterministic — no DOM, no randomness, no timers. |
-| `src/ai.js` | The five bots: positional eval + alpha-beta on a time budget. |
+| `src/ai.js` | The bot ladder: positional eval + alpha-beta, plus the neural rung. |
+| `src/nn.js` | Network inference and board encoding. No dependencies, no build step. |
+| `src/nn-bot.js` | Gumbel MCTS over `engine.js`, guided by the network. |
+| `assets/net/` | The trained weights (float16) and their manifest. |
 | `src/rank.js` | Trophy ladder: ranks, Elo + margin scoring, matchmaking, profile storage. |
 | `src/modes.js` | Mode table, seeded mirrored wall generation, per-mode setup. |
 | `src/render.js` | Canvas renderer and the cascade animator. |
 | `src/icons.js` | Every mark in the app, hand-drawn on one 24×24 grid. No emoji. |
 | `src/main.js` | Screens, input, the serial move queue, AI scheduling, online glue. |
-| `src/net.js` | PeerJS host/join, room codes, move relay. |
+| `src/net.js` | PeerJS party rooms: codes, names, ready ticks, rounds, move relay. |
 | `src/audio.js` | Synthesised WebAudio SFX — zero audio assets. |
 | `index.html` / `styles.css` | Mobile-first shell. |
 | `sw.js` / `manifest.webmanifest` / `assets/` | PWA offline cache, installable manifest, icons. |

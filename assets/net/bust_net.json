@@ -1,0 +1,391 @@
+{
+ "format": "bust-net-1",
+ "dtype": "float16",
+ "channels": 64,
+ "blocks": 6,
+ "planes": 12,
+ "total": 462754,
+ "source": "final.pt",
+ "iter": 120,
+ "trained_on": {
+  "cols": 7,
+  "rows": 7,
+  "seats": 2
+ },
+ "layers": [
+  {
+   "name": "stem.w",
+   "kind": "conv3",
+   "shape": [
+    64,
+    12,
+    3,
+    3
+   ],
+   "offset": 0,
+   "count": 6912
+  },
+  {
+   "name": "stem.b",
+   "kind": "conv3",
+   "shape": [
+    64
+   ],
+   "offset": 6912,
+   "count": 64
+  },
+  {
+   "name": "block0_c1.w",
+   "kind": "conv3",
+   "shape": [
+    64,
+    64,
+    3,
+    3
+   ],
+   "offset": 6976,
+   "count": 36864
+  },
+  {
+   "name": "block0_c1.b",
+   "kind": "conv3",
+   "shape": [
+    64
+   ],
+   "offset": 43840,
+   "count": 64
+  },
+  {
+   "name": "block0_c2.w",
+   "kind": "conv3",
+   "shape": [
+    64,
+    64,
+    3,
+    3
+   ],
+   "offset": 43904,
+   "count": 36864
+  },
+  {
+   "name": "block0_c2.b",
+   "kind": "conv3",
+   "shape": [
+    64
+   ],
+   "offset": 80768,
+   "count": 64
+  },
+  {
+   "name": "block1_c1.w",
+   "kind": "conv3",
+   "shape": [
+    64,
+    64,
+    3,
+    3
+   ],
+   "offset": 80832,
+   "count": 36864
+  },
+  {
+   "name": "block1_c1.b",
+   "kind": "conv3",
+   "shape": [
+    64
+   ],
+   "offset": 117696,
+   "count": 64
+  },
+  {
+   "name": "block1_c2.w",
+   "kind": "conv3",
+   "shape": [
+    64,
+    64,
+    3,
+    3
+   ],
+   "offset": 117760,
+   "count": 36864
+  },
+  {
+   "name": "block1_c2.b",
+   "kind": "conv3",
+   "shape": [
+    64
+   ],
+   "offset": 154624,
+   "count": 64
+  },
+  {
+   "name": "block2_c1.w",
+   "kind": "conv3",
+   "shape": [
+    64,
+    64,
+    3,
+    3
+   ],
+   "offset": 154688,
+   "count": 36864
+  },
+  {
+   "name": "block2_c1.b",
+   "kind": "conv3",
+   "shape": [
+    64
+   ],
+   "offset": 191552,
+   "count": 64
+  },
+  {
+   "name": "block2_c2.w",
+   "kind": "conv3",
+   "shape": [
+    64,
+    64,
+    3,
+    3
+   ],
+   "offset": 191616,
+   "count": 36864
+  },
+  {
+   "name": "block2_c2.b",
+   "kind": "conv3",
+   "shape": [
+    64
+   ],
+   "offset": 228480,
+   "count": 64
+  },
+  {
+   "name": "block3_c1.w",
+   "kind": "conv3",
+   "shape": [
+    64,
+    64,
+    3,
+    3
+   ],
+   "offset": 228544,
+   "count": 36864
+  },
+  {
+   "name": "block3_c1.b",
+   "kind": "conv3",
+   "shape": [
+    64
+   ],
+   "offset": 265408,
+   "count": 64
+  },
+  {
+   "name": "block3_c2.w",
+   "kind": "conv3",
+   "shape": [
+    64,
+    64,
+    3,
+    3
+   ],
+   "offset": 265472,
+   "count": 36864
+  },
+  {
+   "name": "block3_c2.b",
+   "kind": "conv3",
+   "shape": [
+    64
+   ],
+   "offset": 302336,
+   "count": 64
+  },
+  {
+   "name": "block4_c1.w",
+   "kind": "conv3",
+   "shape": [
+    64,
+    64,
+    3,
+    3
+   ],
+   "offset": 302400,
+   "count": 36864
+  },
+  {
+   "name": "block4_c1.b",
+   "kind": "conv3",
+   "shape": [
+    64
+   ],
+   "offset": 339264,
+   "count": 64
+  },
+  {
+   "name": "block4_c2.w",
+   "kind": "conv3",
+   "shape": [
+    64,
+    64,
+    3,
+    3
+   ],
+   "offset": 339328,
+   "count": 36864
+  },
+  {
+   "name": "block4_c2.b",
+   "kind": "conv3",
+   "shape": [
+    64
+   ],
+   "offset": 376192,
+   "count": 64
+  },
+  {
+   "name": "block5_c1.w",
+   "kind": "conv3",
+   "shape": [
+    64,
+    64,
+    3,
+    3
+   ],
+   "offset": 376256,
+   "count": 36864
+  },
+  {
+   "name": "block5_c1.b",
+   "kind": "conv3",
+   "shape": [
+    64
+   ],
+   "offset": 413120,
+   "count": 64
+  },
+  {
+   "name": "block5_c2.w",
+   "kind": "conv3",
+   "shape": [
+    64,
+    64,
+    3,
+    3
+   ],
+   "offset": 413184,
+   "count": 36864
+  },
+  {
+   "name": "block5_c2.b",
+   "kind": "conv3",
+   "shape": [
+    64
+   ],
+   "offset": 450048,
+   "count": 64
+  },
+  {
+   "name": "policy_conv.w",
+   "kind": "conv1",
+   "shape": [
+    32,
+    64,
+    1,
+    1
+   ],
+   "offset": 450112,
+   "count": 2048
+  },
+  {
+   "name": "policy_conv.b",
+   "kind": "conv1",
+   "shape": [
+    32
+   ],
+   "offset": 452160,
+   "count": 32
+  },
+  {
+   "name": "policy_head.w",
+   "kind": "conv1",
+   "shape": [
+    1,
+    32,
+    1,
+    1
+   ],
+   "offset": 452192,
+   "count": 32
+  },
+  {
+   "name": "policy_head.b",
+   "kind": "conv1",
+   "shape": [
+    1
+   ],
+   "offset": 452224,
+   "count": 1
+  },
+  {
+   "name": "value_conv.w",
+   "kind": "conv1",
+   "shape": [
+    32,
+    64,
+    1,
+    1
+   ],
+   "offset": 452225,
+   "count": 2048
+  },
+  {
+   "name": "value_conv.b",
+   "kind": "conv1",
+   "shape": [
+    32
+   ],
+   "offset": 454273,
+   "count": 32
+  },
+  {
+   "name": "value_fc1.w",
+   "kind": "linear",
+   "shape": [
+    128,
+    64
+   ],
+   "offset": 454305,
+   "count": 8192
+  },
+  {
+   "name": "value_fc1.b",
+   "kind": "linear",
+   "shape": [
+    128
+   ],
+   "offset": 462497,
+   "count": 128
+  },
+  {
+   "name": "value_fc2.w",
+   "kind": "linear",
+   "shape": [
+    1,
+    128
+   ],
+   "offset": 462625,
+   "count": 128
+  },
+  {
+   "name": "value_fc2.b",
+   "kind": "linear",
+   "shape": [
+    1
+   ],
+   "offset": 462753,
+   "count": 1
+  }
+ ]
+}

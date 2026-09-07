@@ -12,16 +12,19 @@ import {
   openingMask, blockingStarts,
   PHASE_PLACE, PHASE_PLAY, PHASE_OVER,
 } from './engine.js';
-import { chooseMove, difficultyLabel, DIFFICULTY_ORDER } from './ai.js';
+import { chooseMoveAsync, difficultyLabel, DIFFICULTY_ORDER, NEEDS_NET, warmNeural } from './ai.js';
 import {
   RANKS, rankFor, rankIndexFor, progressToNext, nextRank,
   matchmake, scoreResult, recordMatch, loadProfile, saveProfile,
 } from './rank.js';
 import { BoardAnimator, PLAYER_COLORS, hitTest, setBoardSkin } from './render.js';
-import { MODES, MODE_ORDER, modeFor, buildSetup, describeSetup } from './modes.js';
+import {
+  MODES, MODE_ORDER, MAX_SEATS, modeFor, buildSetup, buildPartySetup, describeSetup,
+  minBoardFor,
+} from './modes.js';
 import { icon, paintIcons } from './icons.js';
 import { sfx, unlock as unlockAudio, setEnabled as setSoundEnabled, buzz } from './audio.js';
-import { hostRoom, joinRoom, normaliseCode } from './net.js';
+import { hostRoom, joinRoom, normaliseCode, cleanName, MAX_PARTY } from './net.js';
 
 /* ---------------------------------------------------------------- settings -- */
 
@@ -29,7 +32,11 @@ const SETTINGS_KEY = 'bust.settings.v1';
 const settings = loadSettings();
 
 function loadSettings() {
-  const base = { sound: true, haptics: true, mode: 'duel', custom: null };
+  const base = {
+    sound: true, haptics: true, mode: 'duel', custom: null,
+    speed: 1,        // 1x or 2x — how fast a bot thinks and a cascade plays
+    name: '',        // what other players see you as online
+  };
   try {
     return { ...base, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') };
   } catch { return base; }
@@ -48,6 +55,37 @@ function syncToggles() {
   if (s) { s.setAttribute('aria-pressed', String(settings.sound)); s.textContent = settings.sound ? 'Sound on' : 'Sound off'; }
   if (h) { h.setAttribute('aria-pressed', String(settings.haptics)); h.textContent = settings.haptics ? 'Haptics on' : 'Haptics off'; }
   setSoundEnabled(settings.sound);
+}
+
+/* ------------------------------------------------------------------- speed -- */
+
+// Two gears, and nothing in between: 1x is the pace the game was tuned at, 2x
+// halves the bot's thinking pause and the cascade's playback for anyone who
+// already knows what a bust looks like. It is not a difficulty setting — the
+// bot's search budget is untouched, only the beat it waits before committing.
+const SPEEDS = [1, 2];
+
+function gameSpeed() {
+  return SPEEDS.includes(settings.speed) ? settings.speed : 1;
+}
+
+/** Push the current speed into the animator and repaint every control for it. */
+function applySpeed() {
+  animator.speed = gameSpeed();
+  const chip = $('#toggle-speed');
+  if (chip) {
+    chip.textContent = `Speed ${gameSpeed()}\u00D7`;
+    chip.classList.toggle('is-fast', gameSpeed() > 1);
+  }
+  document.querySelectorAll('#pause-speed .seg-btn').forEach((b) => {
+    b.classList.toggle('is-on', Number(b.dataset.v) === gameSpeed());
+  });
+}
+
+function setSpeed(v) {
+  settings.speed = SPEEDS.includes(v) ? v : 1;
+  saveSettings();
+  applySpeed();
 }
 
 /* ------------------------------------------------------------------- modes -- */
@@ -118,6 +156,7 @@ const boardArea = $('#board-area');
 const shareBar = $('#share-bar');
 const turnBanner = $('#turn-banner');
 const turnText = $('#turn-text');
+const turnDot = $('#turn-dot');
 const liveRegion = $('#a11y-live');
 const animator = new BoardAnimator(canvas);
 
@@ -144,6 +183,23 @@ function show(id) {
   if (id === 'screen-game') requestAnimationFrame(fitBoard);
   if (id === 'screen-home') renderHomeStrip();
   if (id === 'screen-ranked') renderRankedScreen();
+  requestAnimationFrame(syncScrollFades);
+}
+
+/**
+ * A scroller wears its fade-out mask only while there is genuinely more below
+ * it. Applied unconditionally, every short screen faded its own last row into
+ * the background — which reads as a rendering fault, not as a hint.
+ */
+function syncScrollFades() {
+  $$('.scroller').forEach((el) => {
+    const over = el.scrollHeight - el.clientHeight;
+    el.classList.toggle('is-clipped', over - el.scrollTop > 8);
+    el.classList.toggle('is-clipped-top', el.scrollTop > 8);
+    // Measured on overflow rather than on the fade, so it cannot flip as the
+    // player scrolls to the end of a long screen.
+    el.classList.toggle('is-short', over <= 1);
+  });
 }
 
 function closeOverlays() {
@@ -162,21 +218,6 @@ function playerLabel(p) {
   return p.name;
 }
 
-function makePlayers(mode, count, difficulty) {
-  const colours = PLAYER_COLORS;
-  if (mode === 'solo') {
-    return Array.from({ length: count }, (_, i) => ({
-      name: i === 0 ? 'You' : (count === 2 ? 'Bot' : `Bot ${i}`),
-      kind: i === 0 ? 'human' : 'ai',
-      difficulty,
-    }));
-  }
-  if (mode === 'online') {
-    return Array.from({ length: count }, (_, i) => ({ name: `Player ${i + 1}`, kind: 'human' }));
-  }
-  return Array.from({ length: count }, (_, i) => ({ name: colours[i].name, kind: 'human' }));
-}
-
 /**
  * @param {object} opts
  * @param {'solo'|'local'|'online'|'ranked'} opts.mode
@@ -185,10 +226,11 @@ function makePlayers(mode, count, difficulty) {
  * @param {number} [opts.localSeat] which player this device controls (online)
  * @param {object} [opts.room] net room handle (online)
  * @param {number[]} [opts.ratings] trophy-equivalent rating per player id (ranked)
+ * @param {boolean} [opts.bounce]   walls hand a bust its balls back
  */
 function startGame({
   mode, cols, rows, players, localSeat = 0, room = null, ratings = null,
-  teams = null, blocked = null, modeKey: mk = modeKey,
+  teams = null, blocked = null, bounce = false, modeKey: mk = modeKey,
 }) {
   epoch++;
   animator.cancel();
@@ -201,18 +243,23 @@ function startGame({
     localSeat,
     ratings,
     elimTurn: {},   // pid -> state.turnNumber it was knocked out on
-    state: createGame({ cols, rows, players, teams, blocked }),
+    state: createGame({ cols, rows, players, teams, blocked, bounce }),
     queue: [],
     pumping: false,
     aiTimer: 0,
     over: false,
     outShown: false,   // the "you lose" card has had its one chance to appear
     spectating: false, // knocked out, chose to watch the rest
+    planned: null,     // tile this device will play the moment its turn comes
+    pending: null,     // online: a move proposed to the host, not yet echoed
+    pendingTimer: 0,
   };
 
   keyCursor = Math.floor((rows * cols) / 2);
   keyActive = false;
+  lastTap = null;
   lastAnnounced = '';
+  applySpeed();
 
   buildSeats();
   show('screen-game');
@@ -239,7 +286,10 @@ function chipHtml(state, pid) {
   // identical pills gives you no way to find your own score.
   // Pass-and-play controls every seat, so "YOU" there would be on all of them
   // and say nothing. It only earns its place when one seat is yours.
-  const you = mySeats().length === 1 && controlsPlayer(pid) ? '<span class="me">YOU</span>' : '';
+  // ...unless the seat's name already says it. In solo and ranked the local
+  // player is literally called "You", and "YOU You" is nobody's idea of a chip.
+  const mine = mySeats().length === 1 && controlsPlayer(pid);
+  const you = mine && state.players[pid].name !== 'You' ? '<span class="me">YOU</span>' : '';
   return `
     <div class="score-chip" data-pid="${pid}">
       <span class="dot" style="background:${PLAYER_COLORS[pid].ball}"></span>
@@ -260,12 +310,27 @@ function buildSeats() {
   // around. Everywhere else (and always past four players) the chips go into
   // flat rails, which hands the board back the ~25% of width the side columns
   // would have eaten.
-  const crowded = n > 4 || session.mode !== 'local';
+  // Rotated edge seats exist for a device that is physically turned round a
+  // table, so they need touch AND enough screen to spend on them. On a desktop
+  // nobody rotates the monitor and upside-down names are simply wrong; on a
+  // phone the two side columns cost the board a quarter of its width, which on
+  // a 390px screen shrank it from 366px to 277px and left half the display
+  // empty. A tablet has the room and loses about a tenth — there it is worth it.
+  const roomy = typeof matchMedia === 'function'
+    ? matchMedia('(pointer: coarse) and (min-width: 700px) and (min-height: 620px)').matches
+    : false;
+  const crowded = n > 4 || session.mode !== 'local' || !roomy;
   screen.classList.toggle('is-crowded', crowded);
+  // Reading order: you first, then round the table. Both layouts use it — the
+  // gauge under the board is the same gauge whichever way the chips are turned.
+  const rot = (pid) => (pid - localSeat + n) % n;
+  const ordered = [...state.players].sort((a, b) => rot(a.id) - rot(b.id)).map((p) => p.id);
+  // Names are dropped from the flat rails because eight of them do not fit —
+  // but four do, and in an online party the names are the whole point of
+  // having asked for them.
+  screen.classList.toggle('is-few', n <= 4);
 
   if (crowded) {
-    const rot = (pid) => (pid - localSeat + n) % n;   // you always sit first
-    const ordered = [...state.players].sort((a, b) => rot(a.id) - rot(b.id)).map((p) => p.id);
     // Both rails now sit hard against the board rather than at the screen's
     // edges, so the split is simply "you and your near neighbours below, the
     // rest above" — the clockwise corner loop it used to describe no longer
@@ -281,9 +346,8 @@ function buildSeats() {
     buildShareBar(ordered);
     return;
   }
-  shareBar.classList.remove('is-shown');
-  shareBar.innerHTML = '';
 
+  buildShareBar(ordered);
   const order = SEAT_ORDER[n] || SEAT_ORDER[4];
   for (let pid = 0; pid < n; pid++) {
     // Rotate so the device's own player always sits at the bottom edge.
@@ -360,27 +424,35 @@ function fitBoard() {
   const cs = getComputedStyle(screen);
   const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
   const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-  const gap = parseFloat(cs.rowGap) || 0;
+  const gapY = parseFloat(cs.rowGap) || 0;
+  const gapX = parseFloat(cs.columnGap) || gapY;
 
-  // Everything in the column that is not the board: the rails, the share bar,
-  // and (when it is in flow) the turn banner. Absolutely-positioned chrome and
-  // the hidden side rails cost nothing.
+  // Which siblings cost the board height and which cost it width depends on the
+  // arrangement, and there are three. A phone on its side turns the crowded
+  // column through ninety degrees — rails beside the board rather than above
+  // and below it — and that is the only case where a crowded screen lays itself
+  // out as a grid, so the computed display tells the two apart.
+  const sideways = crowded && cs.display === 'grid';
+  const isSideRail = (el) => (sideways
+    ? el.classList.contains('seat-top') || el.classList.contains('seat-bottom')
+    : !crowded && (el.classList.contains('seat-left') || el.classList.contains('seat-right')));
+
+  // Everything that is not the board: the rails, the share bar, and (when it is
+  // in flow) the turn banner. Absolutely-positioned chrome and hidden rails
+  // cost nothing.
   let taken = 0;
   let stacked = 0;
+  let sides = 0;
   for (const el of screen.children) {
     if (el === boardArea || el.offsetParent === null) continue;
     if (getComputedStyle(el).position === 'absolute') continue;
-    if (!crowded && (el.classList.contains('seat-left') || el.classList.contains('seat-right'))) continue;
+    if (isSideRail(el)) { sides += el.offsetWidth + gapX; continue; }
     taken += el.offsetHeight;
     stacked++;
   }
 
-  // The rotated layout keeps a rail down each side; the crowded one does not.
-  const sides = crowded ? 0 : ['.seat-left', '.seat-right']
-    .reduce((w, sel) => w + ($(sel).offsetParent ? $(sel).offsetWidth + gap : 0), 0);
-
   const availW = Math.max(80, screen.clientWidth - padX - sides);
-  const availH = Math.max(80, screen.clientHeight - padY - taken - gap * stacked);
+  const availH = Math.max(80, screen.clientHeight - padY - taken - gapY * stacked);
 
   const probe = animator.resize(availW, availH, cols, rows);
   // The canvas is the board's tray, so it is cut to the board on *both* axes:
@@ -389,17 +461,20 @@ function fitBoard() {
   // landscape the board is height-bound and this is what stops the tray
   // running the full width of the screen.
   const margin = Math.max(10, Math.min(availW, availH) * 0.026);
-  const wrappedH = Math.min(availH, probe.boardH + margin * 2);
-  const wrappedW = Math.min(availW, probe.boardW + margin * 2);
-  const L = (Math.abs(wrappedH - availH) > 1 || Math.abs(wrappedW - availW) > 1)
-    ? animator.resize(wrappedW, wrappedH, cols, rows) : probe;
+  // Shrink-wrap the canvas to the board on BOTH axes. Whichever axis is not
+  // the binding one leaves the canvas full of slack, and the chips sit against
+  // the canvas — so that slack is exactly how far the score rails get thrown
+  // from the board they describe. In portrait width binds and the spare height
+  // is small; on a phone held sideways height binds and the spare width is
+  // enormous, which put a player's own score at the far edge of the screen.
+  const wrapW = Math.min(availW, probe.boardW + margin * 2);
+  const wrapH = Math.min(availH, probe.boardH + margin * 2);
+  const L = (Math.abs(wrapW - availW) > 1 || Math.abs(wrapH - availH) > 1)
+    ? animator.resize(wrapW, wrapH, cols, rows) : probe;
 
   // The share bar describes the board, so it is exactly as wide as the board.
   shareBar.style.width = `${Math.round(L.boardW)}px`;
-  // Shrink-wrap the board's own box: in both layouts the chips sit against the
-  // board, so a canvas that kept filling the free space would push them back
-  // out to the screen's edges.
-  boardArea.style.height = `${Math.round(wrappedH)}px`;
+  boardArea.style.height = `${Math.round(wrapH)}px`;
 
   refreshBoardOnly();
 }
@@ -411,6 +486,7 @@ function chrome() {
   // the legal tiles already pulse, and a collision now announces itself when
   // you actually cause one (see `showMaskClash`).
   const view = { walls: s.blocked, teams: s.teams };
+  if (session.planned !== null) view.planned = session.planned;
   if (s.phase !== PHASE_OVER && controlsPlayer(s.turn)) {
     view.legal = new Set(legalMoves(s));
     // The hint wears the colour of the seat it is inviting, and shouts a
@@ -443,9 +519,10 @@ function refresh() {
   refreshShareBar(tiles);
 
   turnText.textContent = bannerText();
-  turnBanner.style.background = s.phase === PHASE_OVER
-    ? 'rgba(255,255,255,0.24)'
-    : hexToSoft(PLAYER_COLORS[s.turn].ball);
+  // The pill itself is cream and stays cream; the seat's colour is the dot.
+  turnDot.style.background = s.phase === PHASE_OVER
+    ? 'var(--ink-dim)'
+    : PLAYER_COLORS[s.turn].ball;
 
   if (s.phase !== PHASE_OVER) {
     const you = tiles.map((t, pid) => `${playerLabel(s.players[pid])} ${t}`).join(', ');
@@ -455,14 +532,13 @@ function refresh() {
   refreshBoardOnly();
 }
 
-function hexToSoft(hex) {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.85)`;
-}
-
 function bannerText() {
   const s = session.state;
   if (s.phase === PHASE_OVER) return 'Game over';
+  // A planned move is the one thing you want confirmed while you wait, and the
+  // banner is already the "what is happening" line.
+  if (movePending()) return 'Move sent…';
+  if (session.planned !== null && !controlsPlayer(s.turn)) return 'Move planned · tap to undo';
   if (session.spectating) return `Spectating · ${playerLabel(s.players[s.turn])}`;
   const p = s.players[s.turn];
   const mine = controlsPlayer(s.turn);
@@ -480,9 +556,9 @@ function bannerText() {
  * All moves funnel through here. `source` is 'local' (this device acted),
  * 'ai', or 'net' (already validated and echoed by the host).
  */
-function enqueue(idx, source) {
+function enqueue(idx, source, from) {
   if (!session || session.over) return;
-  session.queue.push({ idx, source });
+  session.queue.push({ idx, source, from });
   pump();
 }
 
@@ -493,12 +569,19 @@ async function pump() {
 
   try {
     while (session && epoch === myEpoch && session.queue.length) {
-      const { idx, source } = session.queue.shift();
+      const { idx, source, from } = session.queue.shift();
       const s = session.state;
 
       // Host referees: an illegal or out-of-turn packet is simply dropped, and
       // because clients only apply on echo they stay in step automatically.
+      //
+      // Both checks happen *here*, against the board the move would actually
+      // land on, rather than when the packet arrived. A client that plays the
+      // instant its own animation ends can beat the host's animation to the
+      // punch, and judging it against the host's mid-cascade turn threw away a
+      // perfectly legal move — which is most of what made online feel flaky.
       if (source === 'net' && session.room?.isHost) {
+        if (from !== undefined && s.turn !== from) continue;
         if (!isLegalMove(s, idx)) continue;
       } else if (source !== 'net' && !isLegalMove(s, idx)) {
         continue;
@@ -522,6 +605,7 @@ async function pump() {
       }
 
       session.state = r.state;
+      session.pending = null;   // whatever we were waiting on has landed
       refresh();
 
       if (r.state.phase === PHASE_OVER) { finish(); return; }
@@ -533,6 +617,9 @@ async function pump() {
   } finally {
     if (session && epoch === myEpoch) session.pumping = false;
   }
+  // Only once the queue has actually drained: `canActNow` refuses while the
+  // pump is running, so a plan judged from inside the loop could never fire.
+  if (session && epoch === myEpoch) flushPlan();
 }
 
 async function animateMove(frames) {
@@ -550,8 +637,9 @@ async function animateMove(frames) {
 
 /* ----------------------------------------------------------------- AI turns -- */
 
-// How long a bot pauses before it plays. Openings get a little longer, because
-// a placement changes the map more than a single ball does.
+// How long a bot pauses before it plays, at 1x. Openings get a little longer,
+// because a placement changes the map more than a single ball does. The speed
+// setting divides both — see `gameSpeed`.
 const AI_THINK = 550;
 const AI_THINK_OPEN = 650;
 
@@ -571,13 +659,25 @@ function scheduleAI() {
   // this is the single biggest lever on how fast the game *feels*.
   session.aiTimer = setTimeout(() => {
     if (!session || epoch !== myEpoch) return;
-    const move = chooseMove(session.state, p.difficulty);
-    if (move === null || move === undefined) return;
-    enqueue(move, 'ai');
-  }, s.phase === PHASE_PLACE ? AI_THINK_OPEN : AI_THINK);
+    // The neural rung has to fetch its weights the first time, so the choice is
+    // a promise. Every other rung resolves in the same tick. Re-check that the
+    // board is still the one we asked about before committing the move: a
+    // restart, or the player leaving the screen, can land while we wait.
+    const asked = session.state;
+    Promise.resolve(chooseMoveAsync(asked, p.difficulty)).then((move) => {
+      if (!session || epoch !== myEpoch || session.state !== asked) return;
+      if (move === null || move === undefined) return;
+      enqueue(move, 'ai');
+    });
+  }, (s.phase === PHASE_PLACE ? AI_THINK_OPEN : AI_THINK) / gameSpeed());
 }
 
 /* -------------------------------------------------------------------- input -- */
+
+// How long a client waits on the host to echo its move before letting go of the
+// turn. Long enough to cover a bad connection, short enough that a packet the
+// host dropped never locks the player out of their own turn.
+const PENDING_MS = 5000;
 
 /** True when this device may act on the current turn right now. */
 function canActNow() {
@@ -586,7 +686,14 @@ function canActNow() {
   if (s.phase === PHASE_OVER) return false;
   if (!controlsPlayer(s.turn)) return false;
   if (session.queue.length || session.pumping) return false; // mid-cascade
+  if (movePending()) return false;                           // already sent one
   return true;
+}
+
+/** A proposed move still waiting on the host, within its patience window. */
+function movePending() {
+  const p = session && session.pending;
+  return !!p && performance.now() - p.at < PENDING_MS;
 }
 
 /**
@@ -617,21 +724,120 @@ function commitTile(idx) {
     return;
   }
   if (session.mode === 'online' && !session.room?.isHost) {
-    // Clients propose; they apply only when the host echoes it back.
+    // Clients propose; they apply only when the host echoes it back. Until it
+    // does, the turn is spoken for: without that, a tap on a slow connection
+    // reads as "nothing happened", gets repeated, and sends a second move for
+    // the same turn. The host drops the extra, so the board was never at risk —
+    // but the player was left tapping at a board that would not answer.
+    session.pending = { idx, at: performance.now() };
     session.room.sendMove(idx);
+    refresh();
+    // Nothing else would repaint if the host simply never answers, so the
+    // "sent" banner would outlive the wait it describes.
+    const myEpoch = epoch;
+    clearTimeout(session.pendingTimer);
+    session.pendingTimer = setTimeout(() => {
+      if (!session || epoch !== myEpoch || !session.pending) return;
+      session.pending = null;
+      refresh();
+    }, PENDING_MS + 40);
     return;
   }
   enqueue(idx, 'local');
 }
 
+/* --------------------------------------------------------- planned moves -- */
+
+// Most of a four-way game is spent watching other people think. A planned move
+// turns that dead time into the turn itself: pick the tile now, and it plays
+// the instant the turn comes round.
+//
+// Double-tap to plan rather than single-tap, because a single tap on the board
+// while you wait is far more often a misfire than an intention. Undoing is a
+// single tap on the planned tile — by then the dashed ring has told you the
+// tile is armed, so there is nothing to guard against.
+const DOUBLE_TAP_MS = 420;
+let lastTap = null;   // { idx, at } — the tap a double-tap would complete
+
+/**
+ * Can this device plan a move on `idx` right now?
+ *
+ * Only where one seat is yours: in pass-and-play every seat is, so there is
+ * never a wait to plan through, and a "plan" would just be a move played early.
+ */
+function canPlan(idx) {
+  if (!session || session.over || session.spectating) return false;
+  const s = session.state;
+  if (s.phase !== PHASE_PLAY) return false;      // an opening is picked, not queued
+  const seats = mySeats();
+  if (seats.length !== 1) return false;
+  return s.owner[idx] === seats[0];
+}
+
+function setPlan(idx) {
+  session.planned = idx;
+  sfx.place(); haptic(14);
+  // `refresh` announces the banner, so the spoken word goes last or it is the
+  // one that gets overwritten.
+  refresh();
+  announce('Move planned. It plays as soon as your turn comes round.');
+}
+
+function clearPlan(say = 'Planned move cleared.') {
+  if (!session || session.planned === null) return;
+  session.planned = null;
+  if (session.state) refresh();
+  if (say) announce(say);
+}
+
+/** A tap on the board while this device cannot move: plan, or undo a plan. */
+function planTap(idx) {
+  if (session.planned === idx) { sfx.ui(); haptic(8); clearPlan(); lastTap = null; return; }
+  if (!canPlan(idx)) { lastTap = null; return; }
+  const now = performance.now();
+  if (lastTap && lastTap.idx === idx && now - lastTap.at < DOUBLE_TAP_MS) {
+    lastTap = null;
+    setPlan(idx);
+    return;
+  }
+  lastTap = { idx, at: now };
+}
+
+/**
+ * Play the planned move the moment it becomes playable. Called after every
+ * move settles, so a plan fires on the turn it was made for and never sits
+ * around waiting for a tap.
+ */
+function flushPlan() {
+  if (!session || session.planned === null) return;
+  const idx = session.planned;
+  if (!canActNow()) return;
+  // The tile can have been taken while the plan sat waiting — say so rather
+  // than letting the ring quietly vanish.
+  if (!isLegalMove(session.state, idx)) {
+    clearPlan('Your planned tile is gone — pick another.');
+    return;
+  }
+  session.planned = null;
+  announce('Playing your planned move.');
+  commitTile(idx);
+}
+
 function onBoardPointer(ev) {
   unlockAudio();
-  if (!canActNow()) return;
+  // The board can still be on screen for a beat after a session is torn down
+  // (a dropped connection, say), and planning would reach straight into it.
+  if (!session || !animator.L) return;
   const rect = canvas.getBoundingClientRect();
   const pt = ev.changedTouches ? ev.changedTouches[0] : ev;
   const idx = hitTest(animator.L, pt.clientX - rect.left, pt.clientY - rect.top);
   if (idx < 0) return;
   keyActive = false; // a tap takes over from the keyboard cursor
+  if (!canActNow()) { planTap(idx); return; }
+  lastTap = null;
+  // A tile you already planned is played by the plan, not by this tap — so a
+  // tap on it as your turn opens undoes it rather than playing it twice.
+  if (session.planned === idx) { sfx.ui(); haptic(8); clearPlan(); return; }
   commitTile(idx);
 }
 
@@ -653,6 +859,8 @@ function onBoardKey(ev) {
       ev.preventDefault();
       unlockAudio();
       if (canActNow()) commitTile(keyCursor);
+      else if (session.planned === keyCursor) { sfx.ui(); clearPlan(); }
+      else if (canPlan(keyCursor)) setPlan(keyCursor);
       return;
     default: return;
   }
@@ -756,6 +964,11 @@ function finish() {
   const tally = session.mode === 'ranked' ? settleRanked() : null;
   $('#over-trophies').hidden = !tally;
   $('#overlay-over').hidden = false;
+  // The round is over; the party is not. Reopening it lets people join or
+  // leave before the next one and clears everybody's ready tick, so "play
+  // again" starts from a fresh vote.
+  if (session.mode === 'online' && room?.isHost) room.openParty();
+  renderPartyOver();
 
   if (isSelf || (session.mode === 'local' && won)) sfx.win(); else sfx.lose();
   haptic(50);
@@ -876,7 +1089,12 @@ function renderHomeStrip() {
   paintBadge($('#strip-badge'), rank);
   $('#strip-name').textContent = rank.name;
   countTo($('#strip-count'), profile.trophies);
-  $('#strip-fill').style.width = `${Math.round(progressToNext(profile.trophies).frac * 100)}%`;
+  const prog = progressToNext(profile.trophies);
+  $('#strip-fill').style.width = `${Math.round(prog.frac * 100)}%`;
+  // An empty meter with no caption reads as a broken loading bar, which is
+  // exactly what a brand-new player sees on their very first screen.
+  const nxt = nextRank(profile.trophies);
+  $('#strip-next').textContent = nxt ? `${prog.need - prog.have} to ${nxt.name}` : 'Top rank';
   paintModeHero('hero', currentMode());
 }
 
@@ -951,7 +1169,7 @@ function startRankedMatch() {
   startGame({
     mode: 'ranked',
     cols: setup.cols, rows: setup.rows,
-    teams: setup.teams, blocked: setup.blocked,
+    teams: setup.teams, blocked: setup.blocked, bounce: setup.bounce,
     players: m.players,
     ratings: m.ratings,
   });
@@ -968,22 +1186,35 @@ function restartGame() {
   if (!session) return;
   // "Play again" in ranked means a fresh matchmade opponent, not a rematch.
   if (session.mode === 'ranked') { startRankedMatch(); return; }
-  const { mode, state, localSeat, room } = session;
+  // Online, a rematch is the party's decision rather than one player's.
+  if (session.mode === 'online') { partyPlayAgain(); return; }
+
+  const { mode, state, localSeat } = session;
   const players = state.players.map((p) => ({ name: p.name, kind: p.kind, difficulty: p.difficulty }));
-  if (mode === 'online') {
-    if (!room?.isHost) return;
-    room.restart(players);
-  }
-  startGame({ mode, cols: state.cols, rows: state.rows, players, localSeat, room });
+  // Deal a fresh map rather than replaying the one just learned — a walled
+  // mode is a map, and a rematch on the identical maze is a different game.
+  // Only when the table still fits, though: the mode cannot change mid-game,
+  // but a defensive mismatch would silently drop or duplicate a seat.
+  const setup = currentSetup();
+  const fits = setup.seats === players.length;
+  startGame({
+    mode, localSeat, players,
+    cols: fits ? setup.cols : state.cols,
+    rows: fits ? setup.rows : state.rows,
+    teams: fits ? setup.teams : state.teams,
+    blocked: fits ? setup.blocked : state.blocked,
+    bounce: fits ? setup.bounce : state.bounce,
+  });
 }
 
 function quitToMenu() {
   epoch++;
   animator.cancel();
-  if (session?.room) { try { session.room.destroy(); } catch { /* ignore */ } }
+  if (session?.room) teardownRoom();
   if (session) clearTimeout(session.aiTimer);
   session = null;
   closeOverlays();
+  partyReturn = '';
   applyTheme(MODES[modeKey].theme);
   renderModeGrid();
   syncRosterToMode();
@@ -1001,19 +1232,38 @@ const tap = (sel, fn) => $(sel)?.addEventListener('click', () => {
 
 tap('#btn-pause', () => {
   if (!session || session.over) return;
-  // An online game keeps running for everyone else, so there is nothing to pause.
-  if (session.mode === 'online') { quitToMenu(); return; }
+  // An online round keeps running for everyone else, so this pauses nothing —
+  // but it is still the way out, and it used to quit on the first tap with no
+  // confirmation at all. Restarting alone is not one player's call there.
+  const online = session.mode === 'online';
+  $('#pause-restart').classList.toggle('is-hidden', online);
+  $('#pause-quit').textContent = online ? 'Leave the round' : 'Quit to menu';
   $('#overlay-pause').hidden = false;
 });
 tap('#pause-resume', () => { $('#overlay-pause').hidden = true; });
 tap('#pause-restart', () => { $('#overlay-pause').hidden = true; restartGame(); });
-tap('#pause-quit', quitToMenu);
+tap('#pause-quit', () => {
+  // Leaving an online round drops you back to the party, not out of it.
+  if (session?.mode === 'online' && room) {
+    if (room.isHost) room.endRound('The host left the round');
+    returnToLobby();
+    return;
+  }
+  quitToMenu();
+});
 
 tap('#out-spectate', spectate);
-tap('#out-exit', quitToMenu);
+tap('#out-exit', () => {
+  if (session?.mode === 'online' && room) { returnToLobby(); return; }
+  quitToMenu();
+});
 
 tap('#over-again', restartGame);
-tap('#over-menu', quitToMenu);
+tap('#over-map', () => openMapPicker('over'));
+tap('#over-menu', () => {
+  if (session?.mode === 'online' && room) { returnToLobby(); return; }
+  quitToMenu();
+});
 
 /* ----------------------------------------------------------------- segments -- */
 
@@ -1028,6 +1278,9 @@ $$('.seg').forEach((seg) => {
     if (!btn) return;
     unlockAudio(); sfx.ui(); haptic(8);
     seg.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('is-on', b === btn));
+    // Start the neural weights downloading the moment the rung is chosen, so
+    // the fetch overlaps the rest of the menu instead of the first turn.
+    if (btn.dataset.v && NEEDS_NET.has(btn.dataset.v)) warmNeural().catch(() => {});
   });
 });
 
@@ -1035,6 +1288,9 @@ $$('.seg').forEach((seg) => {
 
 $$('[data-goto]').forEach((b) => b.addEventListener('click', () => {
   unlockAudio(); sfx.ui(); haptic(8);
+  // The mode screen is also the party's map picker; when it was opened that
+  // way, Back belongs to the party rather than to the main menu.
+  if (partyReturn && b.dataset.goto === 'screen-home') { closeMapPicker(); return; }
   show(b.dataset.goto);
 }));
 
@@ -1091,6 +1347,19 @@ function selectMode(key) {
   renderHomeStrip();
   syncRosterToMode();
   refreshShapeLines();
+  // Custom opens a panel of settings below the picker, and on a small phone
+  // that panel lands entirely behind the pinned Done bar — you tap Custom and
+  // nothing appears to happen.
+  if (key === 'custom') requestAnimationFrame(revealCustomPanel);
+}
+
+function revealCustomPanel() {
+  const panel = $('#custom-panel');
+  const scroller = panel?.closest('.scroller');
+  if (!panel || !scroller) return;
+  const delta = panel.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+  scroller.scrollTop = Math.max(0, scroller.scrollTop + delta - 12);
+  syncScrollFades();
 }
 
 $('#mode-grid').addEventListener('click', (e) => {
@@ -1106,6 +1375,7 @@ $('#modes-done').addEventListener('click', () => {
   renderModeGrid();
   syncRosterToMode();
   refreshShapeLines();
+  if (partyReturn) { closeMapPicker(); return; }
   show('screen-home');
 });
 
@@ -1116,22 +1386,41 @@ function readCustom() {
   const n = Number(segValue('custom-board')) || 9;
   const wallDensity = Number(segValue('custom-walls')) || 0;
   const wantTeams = segValue('custom-teams') === 'on';
+  const bounceWalls = segValue('custom-bounce') === 'on';
   // Teams need an even table; seats alternate so turn order alternates sides.
   const teams = wantTeams && seats % 2 === 0
     ? Array.from({ length: seats }, (_, i) => i % 2) : null;
-  customCfg = { seats, board: [n, n], teams, wallDensity };
+  customCfg = { seats, board: [n, n], teams, wallDensity, bounceWalls };
   settings.custom = customCfg;
   saveSettings();
   $('#custom-err').textContent = wantTeams && seats % 2
     ? 'Teams need an even number of seats — playing free-for-all.' : '';
+  // Nothing to ask about the behaviour of walls that aren't there.
+  $('#custom-bounce-wrap').classList.toggle('is-hidden', !wallDensity);
+  $('#custom-bounce-note').textContent = bounceWalls
+    ? 'A ball thrown into a wall bounces back and stays on the tile it left. Only the board edge still costs you material.'
+    : 'A ball thrown into a wall is gone, exactly like one thrown off the edge.';
   renderModeGrid();
   refreshShapeLines();
   syncRosterToMode();
 }
 
-['custom-seats', 'custom-board', 'custom-teams', 'custom-walls'].forEach((id) => {
+['custom-seats', 'custom-board', 'custom-teams', 'custom-walls', 'custom-bounce'].forEach((id) => {
   $(`#${id}`).addEventListener('click', (e) => { if (e.target.closest('.seg-btn')) readCustom(); });
 });
+
+/** Put the custom panel's controls where the saved settings say they are. */
+function paintCustomPanel() {
+  const on = (id, val) => document.querySelectorAll(`#${id} .seg-btn`).forEach((b) => {
+    b.classList.toggle('is-on', b.dataset.v === String(val));
+  });
+  on('custom-seats', customCfg.seats);
+  on('custom-board', customCfg.board[0]);
+  on('custom-teams', customCfg.teams ? 'on' : 'off');
+  on('custom-walls', customCfg.wallDensity || 0);
+  on('custom-bounce', customCfg.bounceWalls ? 'on' : 'off');
+  $('#custom-bounce-wrap').classList.toggle('is-hidden', !customCfg.wallDensity);
+}
 
 /* ------------------------------------------------------------- play screens -- */
 
@@ -1217,12 +1506,30 @@ function refreshShapeLines() {
   paintPreview('online', m, setup, 'Host a room and share the code, or join a friend\'s.');
   const note = $('#solo-diff-note');
   if (note) note.innerHTML = DIFFICULTY_NOTES[segValue('solo-diff')] || '';
+  syncNeuralAvailability(!m.teams && !m.wallDensity);
   paintModeHero('hero', m);
 }
 
 $('#solo-diff').addEventListener('click', (e) => {
   if (e.target.closest('.seg-btn')) refreshShapeLines();
 });
+
+/**
+ * The Neural rung plays any number of seats, but not teams and not walls (see
+ * `neuralSupports`), so it greys out in Duos and Chaos and in a Custom table
+ * with either turned on. Greying it out with a reason beats letting a player
+ * pick a rung that would quietly hand the seat back to Brutal.
+ */
+function syncNeuralAvailability(ok) {
+  const btn = $('#solo-diff [data-v="neural"]');
+  if (!btn) return;
+  btn.disabled = !ok;
+  btn.title = ok ? '' : 'Not trained for teams or walls — those seats play Brutal';
+  if (!ok && btn.classList.contains('is-on')) {
+    btn.classList.remove('is-on');
+    $('#solo-diff [data-v="brutal"]')?.classList.add('is-on');
+  }
+}
 
 $('#solo-start').addEventListener('click', () => {
   const setup = currentSetup();
@@ -1234,7 +1541,7 @@ $('#solo-start').addEventListener('click', () => {
   }));
   startGame({
     mode: 'solo', cols: setup.cols, rows: setup.rows,
-    teams: setup.teams, blocked: setup.blocked, players,
+    teams: setup.teams, blocked: setup.blocked, bounce: setup.bounce, players,
   });
 });
 
@@ -1265,9 +1572,15 @@ function buildRoster() {
     const li = document.createElement('li');
     li.className = 'roster-seat' + (seat.kind === 'human' ? ' is-human' : '');
     li.dataset.seat = String(i);
-    const diffBtns = DIFFICULTY_ORDER.map((k) => (
-      `<button class="seg-btn${seat.difficulty === k ? ' is-on' : ''}" type="button" data-diff="${k}">${escapeHtml(difficultyLabel(k))}</button>`
-    )).join('');
+    // The neural rung has no team play and no walls, so those modes neither
+    // offer it nor keep a seat pointed at it from before the mode changed.
+    const solo = !teams && !currentMode().wallDensity;
+    if (!solo && NEEDS_NET.has(seat.difficulty)) seat.difficulty = 'brutal';
+    const diffBtns = DIFFICULTY_ORDER
+      .filter((k) => solo || !NEEDS_NET.has(k))
+      .map((k) => (
+        `<button class="seg-btn${seat.difficulty === k ? ' is-on' : ''}" type="button" data-diff="${k}">${escapeHtml(difficultyLabel(k))}</button>`
+      )).join('');
     const teamTag = teams ? `<span class="team-tag">Team ${teams[i] + 1}</span>` : '';
     li.innerHTML = `
       <div class="roster-main">
@@ -1292,7 +1605,10 @@ $('#local-roster').addEventListener('click', (e) => {
   const i = Number(li.dataset.seat);
   unlockAudio(); sfx.ui(); haptic(8);
   if (btn.dataset.kind) localRoster[i].kind = btn.dataset.kind;
-  else if (btn.dataset.diff) localRoster[i].difficulty = btn.dataset.diff;
+  else if (btn.dataset.diff) {
+    localRoster[i].difficulty = btn.dataset.diff;
+    if (NEEDS_NET.has(btn.dataset.diff)) warmNeural().catch(() => {});
+  }
   buildRoster();
   refreshShapeLines();
 });
@@ -1306,18 +1622,70 @@ $('#local-start').addEventListener('click', () => {
   }));
   startGame({
     mode: 'local', cols: setup.cols, rows: setup.rows,
-    teams: setup.teams, blocked: setup.blocked, players,
+    teams: setup.teams, blocked: setup.blocked, bounce: setup.bounce, players,
   });
 });
 
 /* ------------------------------------------------------------------- online -- */
 
-let room = null;
-let lobbyInfo = { count: 0, capacity: 0, seat: 0 };
-let onlineSetup = null;   // host: the setup this room was opened with
+/**
+ * Online is a **party**, not a match.
+ *
+ * You get a group together once — names, a shareable link, a ready tick each —
+ * and then play round after round out of the same room, changing the map
+ * between rounds if you like. The lobby is where the party lives; the result
+ * card is the same lobby wearing a different hat, because "play again" is a
+ * vote the whole party casts rather than a button one person presses.
+ *
+ * The seat count comes from the party, not from the mode: the mode supplies
+ * the map (board, teams, walls) and `buildPartySetup` grows the board to fit
+ * however many people turned up.
+ */
 
-/** Join a game the host has described; the theme follows their chosen mode. */
+let room = null;
+let lobby = { roster: [], capacity: MAX_PARTY, seat: 0, started: false };
+let partyReturn = '';     // which card the map picker has to return to
+
+function myName() {
+  return cleanName(settings.name, 'Player');
+}
+
+/** One name, two inputs (setup and lobby) plus the wire — keep them in step. */
+function syncNameInputs() {
+  for (const sel of ['#online-name', '#lobby-name']) {
+    const el = $(sel);
+    if (el && document.activeElement !== el) el.value = settings.name || '';
+  }
+}
+
+function setMyName(raw) {
+  // Stored raw (so a half-typed name isn't fought with mid-keystroke) and
+  // cleaned only on the way out to the wire, where it has to be safe.
+  settings.name = String(raw || '').slice(0, 14);
+  saveSettings();
+  syncNameInputs();
+  if (room) { try { room.setName(myName()); } catch { /* not connected */ } }
+}
+
+/** The setup this party would play right now: its mode's map, its own seats. */
+function partySetup(seed = Date.now()) {
+  const count = Math.max(2, Math.min(MAX_SEATS, lobby.roster.length));
+  return buildPartySetup(modeKey, modeKey === 'custom' ? customCfg : null, count, seed);
+}
+
+function partySeatNames() {
+  return lobby.roster.map((r, i) => ({ name: r.name || `Player ${i + 1}`, kind: 'human' }));
+}
+
+/** Join a round the host has described; the theme follows their chosen mode. */
 function startOnline(config, players, seat) {
+  // A packet can just about outrun the roster it was built from: connect in the
+  // instant the host presses Start and you get the `start` without a seat in
+  // it. Sit the round out rather than opening a board with no seat to play.
+  if (!config || !Array.isArray(players) || !(seat >= 0) || seat >= players.length) {
+    returnToLobby('That round started without you — you are in for the next one.');
+    return;
+  }
   if (config.modeKey && MODES[config.modeKey]) {
     modeKey = config.modeKey;
     applyTheme(MODES[modeKey].theme);
@@ -1326,6 +1694,7 @@ function startOnline(config, players, seat) {
     mode: 'online', cols: config.cols, rows: config.rows,
     teams: config.teams || null,
     blocked: config.blocked || null,
+    bounce: !!config.bounce,
     players, localSeat: seat, room,
   });
 }
@@ -1342,126 +1711,311 @@ function showOnlineLobby() {
   $('#online-lobby').classList.remove('is-hidden');
 }
 
-function renderLobby() {
-  $('#online-room-code').textContent = room?.code || '—';
-  const list = $('#online-players');
-  list.innerHTML = '';
-  for (let i = 0; i < lobbyInfo.capacity; i++) {
-    const seated = i < lobbyInfo.count;
+/** Am I ticked ready, according to the host's last roster? */
+function iAmReady() {
+  return !!lobby.roster[lobby.seat]?.ready;
+}
+
+function readyCount() {
+  return lobby.roster.filter((r) => r.ready).length;
+}
+
+/** One row per player: colour, name, host mark, ready tick. */
+function rosterRows(ul) {
+  ul.innerHTML = '';
+  lobby.roster.forEach((r, i) => {
     const li = document.createElement('li');
-    li.innerHTML = `<span class="dot" style="background:${seated ? PLAYER_COLORS[i].ball : 'rgba(255,255,255,.25)'}"></span>
-      <span>${seated ? `Player ${i + 1}` : 'Waiting…'}</span>
-      ${i === lobbyInfo.seat ? '<span class="you">you</span>' : ''}`;
-    list.appendChild(li);
+    li.className = r.ready ? 'is-ready' : '';
+    li.innerHTML = `<span class="dot" style="background:${PLAYER_COLORS[i % PLAYER_COLORS.length].ball}"></span>
+      <span class="lobby-who">${escapeHtml(r.name || `Player ${i + 1}`)}</span>
+      ${r.host ? '<span class="tag">host</span>' : ''}
+      ${i === lobby.seat ? '<span class="you">you</span>' : ''}
+      <span class="ready-tick" aria-hidden="true">${r.ready ? icon('check') : ''}</span>`;
+    ul.appendChild(li);
+  });
+  if (!lobby.roster.length) {
+    ul.innerHTML = '<li><span class="lobby-who">Connecting…</span></li>';
   }
-  const ready = lobbyInfo.count === lobbyInfo.capacity;
+}
+
+function renderLobby() {
+  if (!room || currentScreen !== 'screen-online') return;
+  $('#online-room-code').textContent = room.code || '—';
+  rosterRows($('#online-players'));
+
+  const n = lobby.roster.length;
+  const ready = readyCount();
+  const all = n >= 2 && ready === n;
+
+  const readyBtn = $('#online-ready');
+  readyBtn.textContent = iAmReady() ? 'Ready — tap to cancel' : "I'm ready";
+  readyBtn.setAttribute('aria-pressed', String(iAmReady()));
+  readyBtn.classList.toggle('is-armed', iAmReady());
+
   const begin = $('#online-begin');
-  begin.classList.toggle('is-hidden', !(room?.isHost && ready));
-  lobbyMsg.textContent = room?.isHost
-    ? (ready ? '' : `Waiting for ${lobbyInfo.capacity - lobbyInfo.count} more…`)
-    : 'Waiting for the host to start…';
+  begin.classList.toggle('is-hidden', !(room.isHost && all));
+
+  // Only the host picks the map, so only the host is shown the control.
+  const hero = $('#lobby-mode-hero');
+  hero.classList.toggle('is-hidden', !room.isHost);
+  if (room.isHost) {
+    // Described from the mode and the head count rather than by building a
+    // setup: generating a wall map to write a caption would run the whole
+    // opening-round feasibility check on every roster change.
+    const m = currentMode();
+    const size = Math.max(m.board[0], minBoardFor(Math.max(2, n)));
+    const bits = [`${size}×${size}`, `${n} player${n === 1 ? '' : 's'}`];
+    if (m.teams && n % 2 === 0) bits.push('2v2');
+    if (m.wallDensity) bits.push(m.bounceWalls ? 'bouncy walls' : 'walls');
+    paintModeHero('lobby-hero', m, bits.join(' · '));
+  }
+
+  lobbyMsg.textContent = n < 2
+    ? 'Share the code or the link — the party needs at least two of you.'
+    : all
+      ? (room.isHost ? 'Everyone is ready.' : 'Everyone is ready — waiting for the host.')
+      : `${ready} of ${n} ready.`;
+}
+
+/** The result card, wearing the lobby's hat: who has voted to play again. */
+function renderPartyOver() {
+  const wrap = $('#over-party');
+  const isParty = session && session.mode === 'online' && room;
+  wrap.classList.toggle('is-hidden', !isParty);
+  $('#over-map').classList.toggle('is-hidden', !(isParty && room.isHost));
+  const again = $('#over-again');
+  if (!isParty) { again.textContent = 'Play again'; again.classList.remove('is-armed'); return; }
+
+  rosterRows($('#over-party-list'));
+  const n = lobby.roster.length;
+  again.textContent = iAmReady() ? `Ready · ${readyCount()}/${n}` : 'Play again';
+  again.classList.toggle('is-armed', iAmReady());
+}
+
+/** Host: deal a round to whoever is in the party right now. */
+function hostStartRound() {
+  if (!room?.isHost) return;
+  const setup = partySetup();
+  const players = partySeatNames().slice(0, setup.seats);
+  if (players.length < 2) return;
+  const config = {
+    cols: setup.cols, rows: setup.rows, modeKey,
+    teams: setup.teams ? Array.from(setup.teams) : null,
+    blocked: setup.blocked ? Array.from(setup.blocked) : null,
+    bounce: !!setup.bounce,
+  };
+  room.start(config, players);
+  startGame({
+    mode: 'online', cols: setup.cols, rows: setup.rows,
+    teams: setup.teams, blocked: setup.blocked, bounce: setup.bounce,
+    players, localSeat: 0, room,
+  });
+}
+
+/** Host: the whole party has voted to play again, so deal the next round. */
+function maybeAutoStart() {
+  if (!room?.isHost || !room.everyoneReady()) return;
+  // Only from the result card — in the lobby the host presses Start, so a party
+  // that readies up early isn't thrown into a round nobody asked for yet.
+  if ($('#overlay-over').hidden) return;
+  hostStartRound();
+}
+
+/** Every "play again" is a vote; the round starts when the party is unanimous. */
+function partyPlayAgain() {
+  if (!room) return;
+  const want = !iAmReady();
+  room.setReady(want);
+  if (!room.isHost) {
+    // Optimistic, so the button responds before the host's roster comes back.
+    if (lobby.roster[lobby.seat]) lobby.roster[lobby.seat].ready = want;
+    renderPartyOver();
+  }
+}
+
+/** Back to the party after a round is abandoned. The room survives. */
+function returnToLobby(msg = '') {
+  epoch++;
+  animator.cancel();
+  if (session) clearTimeout(session.aiTimer);
+  session = null;
+  closeOverlays();
+  partyReturn = '';
+  onlineErr.textContent = '';
+  showOnlineLobby();
+  show('screen-online');
+  renderLobby();
+  if (msg) lobbyMsg.textContent = msg;
+}
+
+/** The room itself is gone: back to the setup pane with the reason. */
+function netFail(err) {
+  const msg = err?.message || 'Connection problem';
+  epoch++;
+  animator.cancel();
+  if (session) clearTimeout(session.aiTimer);
+  session = null;
+  closeOverlays();
+  partyReturn = '';
+  teardownRoom();
+  onlineErr.textContent = msg;
+  showOnlineSetup();
+  show('screen-online');
 }
 
 function teardownRoom() {
   if (room) { try { room.destroy(); } catch { /* ignore */ } }
   room = null;
+  lobby = { roster: [], capacity: MAX_PARTY, seat: 0, started: false };
 }
 
-function netFail(err) {
-  const msg = err?.message || 'Connection problem';
-  if (currentScreen === 'screen-game') {
-    epoch++;
-    animator.cancel();
-    session = null;
-    closeOverlays();
-    onlineErr.textContent = msg;
-    showOnlineSetup();
-    show('screen-online');
-  } else {
-    onlineErr.textContent = msg;
-    showOnlineSetup();
-  }
-  teardownRoom();
+/** Roster updates land here from both ends and repaint whichever view is up. */
+function onLobbyUpdate(info) {
+  lobby = { ...lobby, ...info };
+  renderLobby();
+  if (!$('#overlay-over').hidden) renderPartyOver();
+  maybeAutoStart();
 }
+
+const hostHandlers = () => ({
+  onLobby: onLobbyUpdate,
+  onMove: ({ idx, from }) => enqueue(idx, 'net', from),
+  onEnded: ({ reason, mid }) => {
+    // Somebody dropped mid-round. The round cannot continue — every client is
+    // replaying a move stream keyed to seat indices — but the party can.
+    if (mid && room) room.endRound(reason);
+    returnToLobby(reason || 'A player left the game');
+  },
+  onError: netFail,
+});
 
 const clientHandlers = () => ({
-  onLobby: (info) => { lobbyInfo = info; renderLobby(); },
+  onLobby: onLobbyUpdate,
   onStart: ({ config, players, seat }) => startOnline(config, players, seat),
-  onRestart: ({ config, players, seat }) => startOnline(config, players, seat),
   onMove: ({ idx }) => enqueue(idx, 'net'),
+  onEnded: ({ reason }) => returnToLobby(reason),
   onError: netFail,
-  onClose: ({ mid }) => { if (mid) netFail(new Error('A player left the game')); },
 });
+
+/* ----------------------------------------------------------- the map picker */
+
+/**
+ * The host changing the map between rounds. The result card is a fixed overlay,
+ * so it has to be put away while the picker is up and brought back after —
+ * otherwise it floats on top of the mode grid.
+ */
+function openMapPicker(from) {
+  partyReturn = from;
+  $('#overlay-over').hidden = true;
+  show('screen-modes');
+}
+
+function closeMapPicker() {
+  const from = partyReturn;
+  partyReturn = '';
+  if (from === 'over' && session) {
+    show('screen-game');
+    $('#overlay-over').hidden = false;
+    renderPartyOver();
+  } else {
+    show('screen-online');
+    showOnlineLobby();
+    renderLobby();
+  }
+}
+
+$$('[data-map-picker]').forEach((b) => b.addEventListener('click', () => {
+  unlockAudio(); sfx.ui(); haptic(8);
+  openMapPicker('lobby');
+}));
+
+/* ------------------------------------------------------------ online wiring */
+
+$('#online-name').addEventListener('input', (e) => setMyName(e.target.value));
+$('#lobby-name').addEventListener('input', (e) => setMyName(e.target.value));
 
 $('#online-host').addEventListener('click', async () => {
   unlockAudio(); sfx.ui();
-  onlineErr.textContent = 'Connecting…';
-  const setup = currentSetup();
-  const capacity = setup.seats;
-  onlineSetup = setup;
+  onlineErr.textContent = 'Opening a party…';
   try {
     teardownRoom();
-    room = await hostRoom({
-      capacity,
-      // Everything a client needs to build a byte-identical board.
-      config: {
-        cols: setup.cols, rows: setup.rows, modeKey,
-        teams: setup.teams ? Array.from(setup.teams) : null,
-        blocked: setup.blocked ? Array.from(setup.blocked) : null,
-      },
-      handlers: {
-        onLobby: (info) => { lobbyInfo = info; renderLobby(); },
-        onMove: ({ idx, from }) => {
-          // Only honour a packet from the player whose turn it actually is.
-          if (session && session.state.turn === from) enqueue(idx, 'net');
-        },
-        onError: netFail,
-        onClose: ({ mid }) => { if (mid) netFail(new Error('A player left the game')); },
-      },
-    });
+    room = await hostRoom({ capacity: MAX_PARTY, name: myName(), handlers: hostHandlers() });
     onlineErr.textContent = '';
     showOnlineLobby();
     renderLobby();
   } catch (e) { netFail(e); }
 });
 
-$('#online-join').addEventListener('click', async () => {
-  unlockAudio(); sfx.ui();
-  const code = normaliseCode($('#online-code').value);
-  if (code.length < 5) { onlineErr.textContent = 'Enter the 5-character room code'; return; }
+async function joinWithCode(code) {
   onlineErr.textContent = 'Connecting…';
   try {
     teardownRoom();
-    room = await joinRoom({ code, handlers: clientHandlers() });
+    room = await joinRoom({ code, name: myName(), handlers: clientHandlers() });
     onlineErr.textContent = '';
     showOnlineLobby();
     renderLobby();
   } catch (e) { netFail(e); }
+}
+
+$('#online-join').addEventListener('click', () => {
+  unlockAudio(); sfx.ui();
+  const code = normaliseCode($('#online-code').value);
+  if (code.length < 5) { onlineErr.textContent = 'Enter the 5-character party code'; return; }
+  joinWithCode(code);
 });
 
 $('#online-code').addEventListener('input', (e) => {
   e.target.value = normaliseCode(e.target.value);
 });
 
+$('#online-ready').addEventListener('click', () => {
+  if (!room) return;
+  sfx.ui(); haptic(10);
+  room.setReady(!iAmReady());
+  if (!room.isHost && lobby.roster[lobby.seat]) {
+    lobby.roster[lobby.seat].ready = !lobby.roster[lobby.seat].ready;
+    renderLobby();
+  }
+});
+
 $('#online-begin').addEventListener('click', () => {
   if (!room?.isHost) return;
   sfx.ui();
-  const setup = onlineSetup || currentSetup();
-  const players = makePlayers('online', lobbyInfo.capacity);
-  room.start(players);
-  startGame({
-    mode: 'online', cols: setup.cols, rows: setup.rows,
-    teams: setup.teams, blocked: setup.blocked,
-    players, localSeat: 0, room,
-  });
+  hostStartRound();
+});
+
+/** A link beats a code: it carries the room and opens straight into it. */
+function partyLink() {
+  const url = new URL(location.href);
+  url.hash = '';
+  url.search = `?party=${room?.code || ''}`;
+  return url.toString();
+}
+
+$('#online-share').addEventListener('click', async () => {
+  if (!room?.code) return;
+  sfx.ui();
+  const url = partyLink();
+  const text = `Join my BUST party — code ${room.code}`;
+  try {
+    if (navigator.share) { await navigator.share({ title: 'BUST', text, url }); return; }
+    await navigator.clipboard.writeText(url);
+    lobbyMsg.textContent = 'Link copied — paste it to your friends';
+    setTimeout(renderLobby, 2000);
+  } catch {
+    // A cancelled share throws too, so only say something if there is nothing
+    // useful the player could do next.
+    if (!navigator.share) lobbyMsg.textContent = url;
+  }
 });
 
 $('#online-copy').addEventListener('click', async () => {
   if (!room?.code) return;
+  sfx.ui();
   try {
     await navigator.clipboard.writeText(room.code);
     lobbyMsg.textContent = 'Code copied';
-    setTimeout(renderLobby, 1400);
+    setTimeout(renderLobby, 1600);
   } catch { lobbyMsg.textContent = `Share this code: ${room.code}`; }
 });
 
@@ -1472,12 +2026,97 @@ $('#online-leave').addEventListener('click', () => {
   showOnlineSetup();
 });
 
+/**
+ * A party link, opened cold: drop straight into the room rather than making
+ * someone read a code off it and type it back in. The query is stripped after,
+ * so a refresh doesn't try to rejoin a party that has since moved on.
+ */
+function joinFromLink() {
+  const code = normaliseCode(new URLSearchParams(location.search).get('party') || '');
+  if (code.length < 5) return;
+  try { history.replaceState(null, '', location.pathname); } catch { /* file:// */ }
+  $('#online-code').value = code;
+  show('screen-online');
+  showOnlineSetup();
+  joinWithCode(code);
+}
+
+/* ---------------------------------------------------------------- settings -- */
+
+/**
+ * The three chips on the home screen. Sound and haptics were rendered with a
+ * stored setting behind them but nothing ever read the taps or applied the
+ * stored value, so sound could not be turned off and a saved preference was
+ * forgotten on every load.
+ */
+function paintToggles() {
+  const sound = $('#toggle-sound');
+  const hap = $('#toggle-haptics');
+  if (sound) {
+    sound.textContent = settings.sound ? 'Sound on' : 'Sound off';
+    sound.setAttribute('aria-pressed', String(!!settings.sound));
+  }
+  if (hap) {
+    hap.textContent = settings.haptics ? 'Haptics on' : 'Haptics off';
+    hap.setAttribute('aria-pressed', String(!!settings.haptics));
+  }
+  setSoundEnabled(!!settings.sound);
+  applySpeed();
+}
+
+$('#toggle-sound')?.addEventListener('click', () => {
+  settings.sound = !settings.sound;
+  saveSettings();
+  paintToggles();
+  unlockAudio(); sfx.ui();   // after the repaint, so turning it on is audible
+  haptic(8);
+});
+
+$('#toggle-haptics')?.addEventListener('click', () => {
+  settings.haptics = !settings.haptics;
+  saveSettings();
+  paintToggles();
+  sfx.ui(); haptic(14);
+});
+
+// Two gears, so the chip cycles rather than toggling on and off.
+$('#toggle-speed')?.addEventListener('click', () => {
+  unlockAudio(); sfx.ui(); haptic(8);
+  setSpeed(gameSpeed() === 1 ? 2 : 1);
+});
+
+$('#pause-speed')?.addEventListener('click', (e) => {
+  const btn = e.target.closest('.seg-btn');
+  if (!btn) return;
+  setSpeed(Number(btn.dataset.v));
+});
+
 /* ------------------------------------------------------------------ chrome -- */
 
 // Watch the screen, not the board area: `fitBoard` resizes the board area, so
 // observing that would feed its own output straight back in.
 const ro = new ResizeObserver(() => { if (currentScreen === 'screen-game') fitBoard(); });
 ro.observe($('#screen-game'));
+
+$$('.scroller').forEach((el) => el.addEventListener('scroll', syncScrollFades, { passive: true }));
+window.addEventListener('resize', syncScrollFades);
+
+// A scroller overflows because of what is *inside* it — a party roster growing
+// by a row, a ladder being built — and a ResizeObserver on the box never sees
+// that: the box is the same size either way. So watch the content instead,
+// coalesced onto one frame so a full rebuild costs one measurement.
+const scrollRo = new ResizeObserver(syncScrollFades);
+let fadeQueued = false;
+const queueScrollFades = () => {
+  if (fadeQueued) return;
+  fadeQueued = true;
+  requestAnimationFrame(() => { fadeQueued = false; syncScrollFades(); });
+};
+const scrollMo = new MutationObserver(queueScrollFades);
+$$('.scroller').forEach((el) => {
+  scrollRo.observe(el);
+  scrollMo.observe(el, { childList: true, subtree: true, characterData: true });
+});
 window.addEventListener('orientationchange', () => setTimeout(fitBoard, 220));
 
 document.addEventListener('visibilitychange', () => {
@@ -1509,7 +2148,12 @@ $('#toggle-haptics')?.addEventListener('click', () => {
 paintIcons();               // fill the static chrome's icon slots once
 syncToggles();
 applyTheme(MODES[modeKey].theme);
+paintCustomPanel();
+paintToggles();
+syncNameInputs();
 renderModeGrid();
 syncRosterToMode();
 refreshShapeLines();
 show('screen-home');
+joinFromLink();             // a shared party link opens straight into the room
+

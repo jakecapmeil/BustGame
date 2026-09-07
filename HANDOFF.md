@@ -1,6 +1,6 @@
 # HANDOFF — read this first
 
-> ## Status — 2026-09-02 pass
+> ## Status — 2026-09-03 pass
 >
 > **Done:**
 > - **Bug #1 (cascade freeze) fixed.** `BoardAnimator` rewritten around a single rAF
@@ -102,12 +102,78 @@
 >   animator owns the flash clock so `drawBoard` stays a pure function of its view.
 >   `blockedPlacementTiles` is gone.
 >
+> **Added in the neural-opponent pass (2026-09-03):**
+> - **A sixth bot rung, `neural`.** A 464k-parameter policy+value residual network
+>   trained from scratch by AlphaZero-style self-play against nothing but the
+>   rules, searching with Gumbel MCTS instead of alpha-beta. Trainer lives outside
+>   this repo in `../bustai` (its README is the full account); what ships here is
+>   `src/nn.js` (dependency-free forward pass and board encoding), `src/nn-bot.js`
+>   (the same Gumbel search as the trainer, in JS) and `assets/net/` (float16
+>   weights, ~900 KB, with BatchNorm folded into the convolutions at export).
+>   **In Duel it beats Brutal 40-0**, browser code against browser code with the
+>   real clocks on both sides, twenty games opening and twenty replying. Its raw
+>   policy with no search still beats `hard` 73%. Note that `expert` and `brutal`
+>   are the same search differing only in `budgetMs`, and at 7x7 it finishes in
+>   ~3 ms, so neither rung ever reaches its clock. Full numbers in
+>   [`EVALUATION.md`](EVALUATION.md).
+> - **The weights are lazy.** Deliberately *not* in the service worker's install
+>   list — only a player who picks the rung fetches them, on selection rather than
+>   on the first turn, and the fetch handler caches them afterwards. A failed fetch
+>   falls back to Brutal instead of freezing the seat.
+> - **`scheduleAI` now awaits.** `chooseMoveAsync` is a promise for every rung
+>   (immediate for the five alpha-beta ones). The callback re-checks `epoch` *and*
+>   `session.state` identity before enqueueing, because a restart can land while
+>   the network is thinking.
+> - **A free-for-all takes a different path, on purpose.** The network generalises
+>   to four seats; its *search* does not, because the backprop assumes a point for
+>   me is a point against you. In a Rumble seat against three `hard` bots, 112
+>   games each: 64% wins with no search, 49% at 8 simulations, 19% at 32, 16% at
+>   96 — against 26% for the `hard` bot in the same seat and 25% by chance. So
+>   three or more seats play the raw prior plus a check for a move that wins on
+>   the spot (one evaluation, ~30 ms); two seats get the full search. If you ever
+>   want a *searching* free-for-all bot, the value head needs one output per seat
+>   and its own training run.
+> - **No teams, no walls.** In Duos a team-mate's tiles land in the opponent
+>   planes, so the network reads the wrong board. Walls it never saw in training:
+>   at a walled four-seat table it wins 21% where `hard` wins 28%. The rung greys
+>   out in Duos and Chaos and in a Custom table with either; a local-roster seat
+>   left on it is coerced to Brutal.
+> - **Two findings about the game itself, in [`EVALUATION.md`](EVALUATION.md).** Duel's
+>   7x7 board gives the opening seat an 87% win rate between strong players, and
+>   the cause is isolated: take away the opener's *choice* of zone and it drops
+>   to 40% (the advantage changes hands), while 9x9 and 11x11 sit at 56-59%
+>   whatever you do to the openings. One central 3x3 zone is worth having and the
+>   non-overlap rule hands it to whoever asks first. Separately, the engine's
+>   `Uint8Array` ball counts can wrap during an enormous cascade and leave a tile
+>   owned with zero balls (repro in `../bustai/tests/wraparound_case.json`).
+> - **5 new tests** in `test/nn.test.mjs`: the encoder must produce planes identical
+>   to the trainer's, the forward pass must match PyTorch at the precision that
+>   ships, the net must run on a board size it never trained on, and the JS search
+>   must reproduce the Python search *move for move* with the noise off. That last
+>   one caught a real divergence (the JS root was not counting its own evaluation
+>   as a visit). Tests skip themselves if `assets/net/` is absent. 72/72 pass.
+> - **One engine finding, not fixed.** `count` is a `Uint8Array` and an escalating
+>   cascade can push a tile past 255; when it wraps to exactly 0 the tile is left
+>   **owned with no balls on it** — drawn as owned but empty, still counted for
+>   elimination, still clickable. Reachable only through enormous chains; a real
+>   6x6 four-player repro is in `../bustai/tests/wraparound_case.json`. Widening
+>   `count` to `Uint16Array` would close it. Left alone here because the Python
+>   port's job was to agree with this engine, not to change it — but it is a real
+>   bug and it is yours to decide on.
+>
 > **Still needs a live test (could not be done here):**
 > - **Online multiplayer** — still never had two clients connected. One real bug fixed
 >   on inspection: the client forced `serialization: 'json'` while the host used the
 >   PeerJS default, which would garble every packet; the override is removed. Test
 >   host/join/lobby/replicate/disconnect with two devices.
-> - **PWA offline install** — sw.js logic reviewed, not verified installed-and-offline.
+>
+> **Now verified (2026-09-03):**
+> - **PWA offline.** Loaded the app at 375x812, picked the Neural rung so the
+>   weights were fetched, then *stopped the server* and reloaded. The app booted
+>   entirely from `bust-v9`, `fetch` to the origin failed as expected, and the
+>   neural bot still loaded its weights from cache and played a legal move. The
+>   cache after one visit holds every listed asset plus `assets/net/*`, which is
+>   the lazy path working as intended.
 
 
 > **To any AI agent picking up this repo: your job is to fix everything listed under
@@ -249,10 +315,14 @@ Ordered. Each item assumes the one before it is done.
 |---|---|---|
 | `src/engine.js` | Pure rules. Board, placement legality, `applyMove`, cascade resolution, win detection. Returns an animation frame script. | **Tested, 17/17 pass** |
 | `test/engine.test.mjs` | Rules tests incl. a 40-trial self-play fuzz asserting no tile ever exceeds capacity. | Passing |
-| `src/ai.js` | 4 difficulties (easy/medium/hard/brutal), alpha-beta with a wall-clock budget, positional eval built around loaded-tile threat and the edge tax. | **Verified strong**: hard beats medium 11–1 from the *second* seat; brutal beats hard 6–0; worst-case move 28 ms |
+| `src/ai.js` | 6 rungs. Five are alpha-beta on a wall-clock budget with a positional eval built around loaded-tile threat and the edge tax; `neural` delegates to `nn-bot.js` and falls back to Brutal when the weights are missing or the table is wider than two seats. | **Verified strong**: hard beats medium 11–1 from the *second* seat; brutal beats hard 6–0; worst-case move 28 ms |
 | `src/render.js` | Canvas renderer, die-face pip discs, cascade animation. | **Has bug #1** |
 | `src/main.js` | Screens, input, serial move queue, AI scheduling, online glue. | Written, barely exercised |
 | `src/net.js` | PeerJS host/join, room codes, move relay. | **Never tested** |
+| `src/nn.js` | Neural rung's forward pass and board encoding. Dependency-free; BatchNorm was folded in at export so there are no normalisation layers here. | **Tested against PyTorch** |
+| `src/nn-bot.js` | Gumbel MCTS over `engine.js` guided by `nn.js`; plans its search around measured device speed. | **Tested**: reproduces the trainer's search move for move |
+| `assets/net/` | float16 weights (~900 KB) plus manifest. Fetched on demand, not precached. | Exported from `../bustai` |
+| `test/nn.test.mjs` | Encoder parity, forward-pass parity, unseen board size, search parity, adaptive budget. Skips itself if `assets/net/` is missing. | 6 tests, passing |
 | `src/audio.js` | Synthesised WebAudio SFX, zero audio assets. | Written, unverified |
 | `index.html` / `styles.css` | Mobile-first shell, seat chips rotated to each player's screen edge. | Home screen verified at 375×812 |
 | `sw.js` / `manifest.webmanifest` / `assets/` | PWA offline cache, installable manifest, generated icons. | Written, unverified |

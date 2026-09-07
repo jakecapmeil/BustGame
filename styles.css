@@ -1095,3 +1095,89 @@ body::before {
 .rule-fig .ring { fill: none; stroke-width: 2.4; }
 .rule-fig .pip { fill: #fff; }
 .rule-fig .lost { opacity: .45; }
+
+/* ==========================================================================
+   Party-play, speed toggle, and name fields
+   --------------------------------------------------------------------------
+   Carried over from the online-party + two-speed work that landed on main
+   while this polish pass was on its own branch. Styled in the same extruded
+   language as the rest of the sheet.
+   ========================================================================== */
+
+/* Speed cycles between two gears rather than switching off, so it never wears
+   the struck-through "off" look — the accent is the on-state instead. */
+.chip-cycle[aria-pressed="false"] { opacity: 1; text-decoration: none; }
+.chip-cycle.is-fast { background: var(--accent); color: var(--on-accent); }
+.toggles { flex-wrap: wrap; }
+
+/* The home strip's "distance to next rank" caption, on its own baseline row so
+   an empty meter reads as a gauge with a label, not a stray line. */
+.rank-strip-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-2); }
+.rank-strip-next {
+  font-size: 11px; font-weight: 800; color: var(--on-panel-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* A plain text field, dressed as one of the app's sunken controls. 16px is a
+   hard floor on any focusable field or iOS Safari zooms the page on focus. */
+.text-input {
+  appearance: none; border: 0; width: 100%; min-width: 0;
+  font: inherit; font-size: 16px; font-weight: 800;
+  color: var(--ink); background: var(--card);
+  border-radius: var(--r-1); padding: 13px var(--s-3); min-height: 52px;
+  box-shadow: var(--lift-1);
+}
+.text-input::placeholder { color: rgba(62, 32, 21, .32); }
+.text-input:focus-visible { outline: 3px solid var(--on-bg-faint); outline-offset: 2px; }
+
+/* A pane can pin more than one action (the party lobby pins ready, start and
+   leave); every one of them stays out of the scroller's flex. */
+.pane > .btn { flex: none; margin: 0 auto; width: min(440px, 100%); }
+.pane > .btn + .btn { margin-top: var(--s-2); }
+.lobby-actions { display: flex; gap: var(--s-2); }
+.lobby-actions .btn { flex: 1; }
+
+/* Names, ready ticks and a per-row tag in the party list. */
+.lobby-list .lobby-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lobby-list .tag {
+  flex: none; font-size: 10px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: var(--r-pill);
+  background: var(--sink); color: var(--on-sink);
+}
+.lobby-list .ready-tick {
+  margin-left: auto; flex: none; width: 22px; height: 22px;
+  display: grid; place-items: center; color: var(--on-panel);
+  opacity: 0; transition: opacity var(--t-base) var(--e-out);
+}
+.lobby-list li.is-ready { background: var(--panel-3); }
+.lobby-list li.is-ready .ready-tick { opacity: 1; }
+.lobby-list .ready-tick .ico { width: 18px; height: 18px; }
+
+/* An action already taken — ready, or a vote cast — reads pressed-in, not
+   raised, so the party list stays the thing you look at. */
+.btn.is-armed { background: var(--panel-3); color: var(--on-panel); box-shadow: var(--edge-in), var(--edge), var(--rim); }
+.card .btn.is-armed { background: rgba(62, 32, 21, .12); color: var(--ink); box-shadow: var(--edge-in); }
+
+/* The party's play-again vote on the result card. */
+.party-again { display: flex; flex-direction: column; gap: var(--s-2); width: 100%; }
+.party-again[hidden], .party-again.is-hidden { display: none; }
+.party-again .lobby-list li {
+  background: rgba(62, 32, 21, .07); color: var(--ink);
+  box-shadow: none; padding: 9px 12px; font-size: 14px;
+}
+.party-again .lobby-list li.is-ready { background: rgba(62, 32, 21, .13); }
+.party-again .lobby-list .ready-tick, .party-again .lobby-list .you { color: var(--ink); }
+.party-again .lobby-list .you, .party-again .lobby-list .tag { background: rgba(62, 32, 21, .12); color: var(--ink-dim); }
+
+/* A dot in the turn banner that tracks the active seat's colour (set inline). */
+.turn-dot {
+  width: 12px; height: 12px; border-radius: 50%; flex: none;
+  background: var(--on-sink);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .18);
+  transition: background var(--t-base) var(--e-out);
+}
+.turn-banner { display: inline-flex; align-items: center; gap: 8px; }
+
+/* The bouncy-walls note in Custom setup. */
+#custom-bounce-wrap.is-hidden { display: none; }
+#custom-bounce-note { margin-top: 6px; }

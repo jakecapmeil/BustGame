@@ -53,7 +53,8 @@ export const MODES = {
   custom: {
     key: 'custom', name: 'Custom', tagline: 'Your rules',
     blurb: 'Set the table size, the board, teams and walls yourself.',
-    seats: 4, board: [8, 8], teams: null, wallDensity: 0, theme: 'slate', icon: 'custom',
+    seats: 4, board: [8, 8], teams: null, wallDensity: 0, bounceWalls: false,
+    theme: 'slate', icon: 'custom',
   },
 };
 
@@ -140,7 +141,7 @@ function canSeatEveryone({ cols, rows, seats, blocked }) {
  * `seed` makes the walls reproducible, which is what lets an online host send
  * one number instead of a whole map.
  *
- * @returns {{cols, rows, seats, teams, blocked, seed, mode}}
+ * @returns {{cols, rows, seats, teams, blocked, bounce, seed, mode}}
  */
 export function buildSetup(modeKey, custom = null, seed = Date.now()) {
   const mode = modeFor(modeKey);
@@ -149,7 +150,45 @@ export function buildSetup(modeKey, custom = null, seed = Date.now()) {
   const seats = Math.max(2, Math.min(MAX_SEATS, cfg.seats));
   const teams = cfg.teams ? cfg.teams.slice(0, seats) : null;
   const blocked = makePlayableWalls({ cols, rows, density: cfg.wallDensity, seats, seed });
-  return { cols, rows, seats, teams, blocked, seed, mode: cfg };
+  return { cols, rows, seats, teams, blocked, bounce: !!(cfg.bounceWalls && blocked), seed, mode: cfg };
+}
+
+/**
+ * The smallest board that seats this many players without the opening round
+ * eating the whole map. Openings claim a 3x3 zone apiece and may not overlap,
+ * so the seat count sets a hard floor on the board no matter which mode's map
+ * is being played.
+ */
+export function minBoardFor(seats) {
+  if (seats <= 2) return 7;
+  if (seats <= 4) return 8;
+  if (seats <= 6) return 10;
+  return 12;
+}
+
+/**
+ * A setup for an online party: the *mode* supplies the map (board size, teams,
+ * walls) and the *party* supplies the seat count.
+ *
+ * Online is about getting a group together and then playing round after round,
+ * so the room is not capped at whatever the mode happens to seat — the table
+ * grows to the party and the board grows with it. Teams need an even table, so
+ * an odd party plays the same map free-for-all.
+ *
+ * @returns {{cols, rows, seats, teams, blocked, bounce, seed, mode}}
+ */
+export function buildPartySetup(modeKey, custom = null, partySeats = 2, seed = Date.now()) {
+  const mode = modeFor(modeKey);
+  const cfg = modeKey === 'custom' && custom ? { ...mode, ...custom } : mode;
+  const seats = Math.max(2, Math.min(MAX_SEATS, partySeats));
+  const n = Math.max(cfg.board[0], minBoardFor(seats));
+  const teams = cfg.teams && seats % 2 === 0
+    ? Array.from({ length: seats }, (_, i) => i % 2) : null;
+  const blocked = makePlayableWalls({ cols: n, rows: n, density: cfg.wallDensity, seats, seed });
+  return {
+    cols: n, rows: n, seats, teams, blocked,
+    bounce: !!(cfg.bounceWalls && blocked), seed, mode: cfg,
+  };
 }
 
 /**
@@ -162,6 +201,6 @@ export function buildSetup(modeKey, custom = null, seed = Date.now()) {
 export function describeSetup(cfg, compact = false) {
   const bits = [compact ? `${cfg.seats}p` : `${cfg.seats} seats`, `${cfg.board[0]}×${cfg.board[1]}`];
   if (cfg.teams) bits.push('2v2');
-  if (cfg.wallDensity) bits.push('walls');
+  if (cfg.wallDensity) bits.push(cfg.bounceWalls ? (compact ? 'bounce' : 'bouncy walls') : 'walls');
   return bits.join(' · ');
 }

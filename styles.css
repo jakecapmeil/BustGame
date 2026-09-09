@@ -37,15 +37,28 @@
    ========================================================================== */
 
 :root {
-  /* ---- palette (overridden per theme) ---- */
-  --bg: #B32D1E;
-  --bg-deep: #8E2115;
-  --accent: #F5C31E;
-  --accent-deep: #D3A308;
+  /* ---- palette (overridden per theme) ----
+     Every colour in the app is mixed with one base before it is used — the
+     painter's trick of dropping the same pigment into every mixture on the
+     palette so the whole picture agrees with itself. --base is that pigment
+     and --wash is how much of the raw hue survives the mix, so the entire
+     app can be taken warmer or cooler, louder or quieter, by two numbers.
+     A theme therefore never states a finished colour; it states a raw hue
+     (--raw-*) and lets the mix below finish it. */
+  --base: #FFFEFA;
+  --wash: 74%;
+  /* Fields carry a touch more base than marks do: the ground should settle
+     back and let the pieces on it come forward. */
+  --wash-field: 66%;
+
+  --raw-bg: #B32D1E;
+  --raw-bg-deep: #8E2115;
+  --raw-accent: #F5C31E;
+  --raw-accent-deep: #D3A308;
   --on-accent: #17161C;
-  --tile: #EFE7D6;
-  --tile-dim: #CBBFA9;
-  --wall: #8E241A;
+  --raw-tile: #EFE7D6;
+  --raw-tile-dim: #CBBFA9;
+  --raw-wall: #8E241A;
 
   /* ---- surfaces (light-field set; the dark-field set is below) ----
      A panel is a *lit* face, not a wash: a top highlight, a hairline rim and
@@ -132,6 +145,20 @@
 
 /* ------------------------------------------------------------------ themes */
 
+/* The mix is declared here rather than on :root alone because a var() is
+   substituted where it is *declared*: on :root only, --bg would resolve once
+   against the root's own raw hue and every mode card — each of which carries
+   its own [data-theme] — would come out the same colour. */
+:root, [data-theme] {
+  --bg:          color-mix(in oklab, var(--raw-bg) var(--wash-field), var(--base));
+  --bg-deep:     color-mix(in oklab, var(--raw-bg-deep) var(--wash-field), var(--base));
+  --accent:      color-mix(in oklab, var(--raw-accent) var(--wash), var(--base));
+  --accent-deep: color-mix(in oklab, var(--raw-accent-deep) var(--wash), var(--base));
+  --tile:        color-mix(in oklab, var(--raw-tile) var(--wash), var(--base));
+  --tile-dim:    color-mix(in oklab, var(--raw-tile-dim) var(--wash), var(--base));
+  --wall:        color-mix(in oklab, var(--raw-wall) var(--wash), var(--base));
+}
+
 /* Three primaries, plus ink and paper — the whole app is mixed from these five
    and nothing else. A mode never invents a hue; it picks which primary is the
    field and which is the accent, so every screen is recognisably the same set
@@ -142,45 +169,47 @@
 
    A field and its accent are always two *different* primaries, which is what
    keeps a card readable against the board behind it. */
-[data-theme="ember"] {          /* Duel — deep red field, yellow accent */
-  --bg: #B32D1E; --bg-deep: #8E2115;
-  --accent: #F5C31E; --accent-deep: #D3A308; --on-accent: #17161C;
-  --tile: #EFE7D6; --tile-dim: #CBBFA9; --wall: #8E241A;
+[data-theme="ember"] {   /* Duel — red field, yellow accent */
+  --raw-bg: #B32D1E; --raw-bg-deep: #8E2115;
+  --raw-accent: #F5C31E; --raw-accent-deep: #D3A308; --on-accent: #17161C;
+  --raw-tile: #EFE7D6; --raw-tile-dim: #CBBFA9; --raw-wall: #8E241A;
 }
-[data-theme="tide"] {           /* Rumble — deep blue field, yellow accent */
-  --bg: #153A9E; --bg-deep: #0F2B78;
-  --accent: #F5C31E; --accent-deep: #D3A308; --on-accent: #17161C;
-  --tile: #EFE7D6; --tile-dim: #BEC4DC; --wall: #102A73;
+[data-theme="tide"] {   /* Rumble — blue field, yellow accent */
+  --raw-bg: #153A9E; --raw-bg-deep: #0F2B78;
+  --raw-accent: #F5C31E; --raw-accent-deep: #D3A308; --on-accent: #17161C;
+  --raw-tile: #EFE7D6; --raw-tile-dim: #BEC4DC; --raw-wall: #102A73;
 }
-[data-theme="orchid"] {         /* Big Arena — paper field, red accent */
-  --bg: #EFE7D6; --bg-deep: #DCD1BA;
-  --accent: #E14434; --accent-deep: #BC2E20; --on-accent: #FFFFFF;
-  --tile: #FFFFFF; --tile-dim: #D8CDB8; --wall: #17161C;
+[data-theme="orchid"] {   /* Big Arena — paper field, red accent */
+  --raw-bg: #EFE7D6; --raw-bg-deep: #DCD1BA;
+  --raw-accent: #E14434; --raw-accent-deep: #BC2E20; --on-accent: #FFFFFF;
+  --raw-tile: #FFFFFF; --raw-tile-dim: #D8CDB8; --raw-wall: #17161C;
 }
-[data-theme="blaze"] {          /* Mayhem — ink field, red accent */
-  --bg: #17161C; --bg-deep: #0D0C11;
-  --accent: #E14434; --accent-deep: #BC2E20; --on-accent: #FFFFFF;
-  --tile: #EFE7D6; --tile-dim: #A9A296; --wall: #000000;
+[data-theme="blaze"] {   /* Mayhem — ink field, red accent */
+  --raw-bg: #17161C; --raw-bg-deep: #0D0C11;
+  --raw-accent: #E14434; --raw-accent-deep: #BC2E20; --on-accent: #FFFFFF;
+  --raw-tile: #EFE7D6; --raw-tile-dim: #A9A296; --raw-wall: #000000;
 }
-[data-theme="gild"] {           /* Duos — ochre field, blue accent */
-  --bg: #D9A408; --bg-deep: #B88705;
-  --accent: #1B4FD8; --accent-deep: #143BA6; --on-accent: #FFFFFF;
-  --tile: #FFF9E6; --tile-dim: #DCC98C; --wall: #8A6A05;
+[data-theme="gild"] {   /* Duos — ochre field, blue accent */
+  --raw-bg: #D9A408; --raw-bg-deep: #B88705;
+  --raw-accent: #1B4FD8; --raw-accent-deep: #143BA6; --on-accent: #FFFFFF;
+  --raw-tile: #FFF9E6; --raw-tile-dim: #DCC98C; --raw-wall: #8A6A05;
 }
-[data-theme="toxic"] {          /* Chaos — deep blue field, yellow accent */
-  --bg: #152252; --bg-deep: #0D163A;
-  --accent: #F5C31E; --accent-deep: #D3A308; --on-accent: #17161C;
-  --tile: #E4E7F2; --tile-dim: #AFB6CE; --wall: #070C21;
+[data-theme="toxic"] {   /* Chaos — deep blue field, yellow accent */
+  --raw-bg: #152252; --raw-bg-deep: #0D163A;
+  --raw-accent: #F5C31E; --raw-accent-deep: #D3A308; --on-accent: #17161C;
+  --raw-tile: #E4E7F2; --raw-tile-dim: #AFB6CE; --raw-wall: #070C21;
 }
-[data-theme="slate"] {          /* Custom — ink-grey field, blue accent */
-  --bg: #3A3A42; --bg-deep: #2A2A31;
-  --accent: #4C7DF0; --accent-deep: #2A57C4; --on-accent: #FFFFFF;
-  --tile: #EFE7D6; --tile-dim: #B6B2AA; --wall: #1B1B21;
+[data-theme="slate"] {   /* Custom — ink-grey field, blue accent */
+  --raw-bg: #3A3A42; --raw-bg-deep: #2A2A31;
+  --raw-accent: #4C7DF0; --raw-accent-deep: #2A57C4; --on-accent: #FFFFFF;
+  --raw-tile: #EFE7D6; --raw-tile-dim: #B6B2AA; --raw-wall: #1B1B21;
 }
 
-/* Light fields: panels tint up, running text takes the ink. Yellow and paper
-   are the only two fields bright enough to carry ink type. */
-[data-theme="gild"], [data-theme="orchid"] {
+/* Which of these two sets a field takes is decided by measuring the finished
+   colour (see isLight in main.js), not by listing mode names — the base colour
+   and the wash can then move without stranding a theme on white-on-cream.
+   Light fields: panels tint up, running text takes the ink. */
+[data-field="light"] {
   --ink: #17161C; --ink-dim: rgba(23, 22, 28, 0.62);
   --on-bg: #17161C;
   --on-bg-dim: rgba(23, 22, 28, 0.92); --on-bg-faint: rgba(23, 22, 28, 0.78);
@@ -196,8 +225,7 @@
 /* Dark fields: panels tint *down*, so text on a panel is never worse off than
    text on the field. The prominent surfaces (`-2`, `-3`) still lift, because
    "brighter" is what selected and active have always meant here. */
-[data-theme="ember"], [data-theme="tide"], [data-theme="blaze"],
-[data-theme="toxic"], [data-theme="slate"] {
+[data-field="dark"] {
   --panel: rgba(0, 0, 0, 0.16);
   --panel-2: rgba(255, 255, 255, 0.13);
   --panel-3: rgba(255, 255, 255, 0.28);
@@ -225,13 +253,15 @@ html, body {
   -webkit-font-smoothing: antialiased;
   touch-action: manipulation;
   user-select: none;
-  /* No transition on this background, deliberately. --bg changes on <html>
-     itself, and a transition here never settles: the paint stays frozen on
-     whatever colour the page first rendered with, which is what left the
-     safe-area strips on the launch colour while every card, accent and rail
-     reading --bg had already repainted. Nothing else in a theme swap is
-     animated either, so snapping is also the honest behaviour — the whole
-     screen changes on the same frame. */
+}
+
+/* The field crossfades between themes. It cannot be done from --bg: a
+   transition whose value comes from a custom property that changed on this
+   same element never settles, and the paint stays stuck on the colour the
+   page first rendered with. So applyTheme() resolves --bg and writes it here
+   as a concrete inline background-color, which transitions the ordinary way. */
+body {
+  transition: background-color var(--t-base) var(--e-out);
 }
 
 /* A soft vignette so the flat field has some depth under the board. */

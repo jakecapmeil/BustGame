@@ -114,6 +114,42 @@ function currentSetup(seed = Date.now()) {
   return buildSetup(modeKey, modeKey === 'custom' ? customCfg : null, seed);
 }
 
+/* A 1x1 canvas is the shortest honest way to resolve a computed colour to
+   RGB: `--bg` is a color-mix(), which comes back as an oklab() string that no
+   amount of string parsing turns into channels. Painting it and reading the
+   pixel back asks the engine what it actually drew. */
+const probe = document.createElement('canvas');
+probe.width = 1; probe.height = 1;
+const probeCtx = probe.getContext('2d', { willReadFrequently: true });
+
+/** [r,g,b] 0-255 for any colour the browser can paint, or null. */
+function toRGB(color) {
+  try {
+    probeCtx.clearRect(0, 0, 1, 1);
+    probeCtx.fillStyle = '#000';
+    probeCtx.fillStyle = color;
+    probeCtx.fillRect(0, 0, 1, 1);
+    const d = probeCtx.getImageData(0, 0, 1, 1).data;
+    return [d[0], d[1], d[2]];
+  } catch { return null; }
+}
+
+function toHex(color) {
+  const c = toRGB(color);
+  return c ? '#' + c.map((n) => n.toString(16).padStart(2, '0')).join('') : null;
+}
+
+/** WCAG relative luminance, the standard test for "does ink or white sit on this". */
+function isLight(color) {
+  const c = toRGB(color);
+  if (!c) return false;
+  const [r, g, b] = c.map((n) => {
+    const x = n / 255;
+    return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.42;
+}
+
 /**
  * Repaint the whole app in the mode's palette. The board reads its colours back
  * out of the same custom properties, so canvas and DOM never drift apart.
@@ -129,8 +165,16 @@ function applyTheme(theme) {
     wallInk: 'rgba(0,0,0,0.22)',
     shadow: 'rgba(0,0,0,0.16)',
   });
+  // Written as a concrete colour rather than left to `background: var(--bg)`,
+  // so the field can actually crossfade — see the note on `body` in styles.css.
+  const bg = v('--bg', '#B32D1E');
+  document.body.style.backgroundColor = bg;
+  // Whether this field takes ink or white type is a property of the colour, not
+  // of the mode's name. Measuring it means the base colour and the wash can be
+  // dialled anywhere without a theme quietly ending up white-on-cream.
+  document.documentElement.dataset.field = isLight(bg) ? 'light' : 'dark';
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', v('--bg', '#B32D1E'));
+  if (meta) meta.setAttribute('content', toHex(bg) || bg);
   if (session) refreshBoardOnly();
 }
 
@@ -1333,6 +1377,12 @@ function renderModeGrid() {
       </span>
       <span class="mode-card-check" aria-hidden="true">${icon('check')}</span>`;
     grid.appendChild(b);
+  }
+  // Each card wears a different palette, so each needs its own answer to
+  // "ink or white on this?" — measured once the card is in the document and
+  // its --bg has actually resolved.
+  for (const b of grid.children) {
+    b.dataset.field = isLight(getComputedStyle(b).getPropertyValue('--bg').trim()) ? 'light' : 'dark';
   }
   $('#modes-blurb').textContent = MODES[modeKey].blurb;
   $('#custom-panel').classList.toggle('is-hidden', modeKey !== 'custom');

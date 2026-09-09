@@ -77,11 +77,25 @@
   --lift-3: 0 8px 0 rgba(0, 0, 0, 0.24);
   --float: 0 18px 44px rgba(0, 0, 0, 0.36);
 
-  /* ---- radius ---- */
+  /* ---- radius ----
+     Nested corners follow Apple's concentricity rule (the one SwiftUI's
+     `ConcentricRectangle` applies): an inner corner shares its centre of
+     curvature with the corner it sits inside, so
+
+         inner radius = outer radius - the inset between them
+
+     floored at 0 when the inset is deeper than the outer radius. Every nested
+     radius below is written as that subtraction rather than as a hand-picked
+     number, so a padding change can no longer leave the corners mismatched. */
   --r-1: 12px;
   --r-2: 18px;
   --r-3: 26px;
   --r-pill: 999px;
+
+  /* Corner softness of a rank badge as a share of its own side. One ratio for
+     every size — a 30px badge and a 96px badge are then the same shape, not
+     two different ones. */
+  --badge-corner: 0.3;
 
   /* ---- space ---- */
   --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
@@ -338,14 +352,16 @@ body::before {
 .seg {
   display: flex; gap: 5px;
   background: var(--sink);
-  padding: 5px; border-radius: var(--r-1);
+  --seg-pad: 5px;
+  padding: var(--seg-pad); border-radius: var(--r-1);
   box-shadow: var(--edge-in);
 }
 .seg-btn {
   flex: 1; appearance: none; border: 0;
   font: inherit; font-size: 14px; font-weight: 800;
   padding: 11px 6px; min-height: 44px;
-  border-radius: 9px;
+  /* concentric with .seg: 12px track - 5px inset */
+  border-radius: max(0px, calc(var(--r-1) - var(--seg-pad)));
   background: transparent; color: var(--on-sink);
   cursor: pointer;
   transition: background var(--t-fast) var(--e-out), color var(--t-fast) var(--e-out), transform var(--t-fast);
@@ -374,7 +390,7 @@ body::before {
 .chip-toggle {
   appearance: none; border: 0; font: inherit;
   font-size: 13px; font-weight: 800;
-  padding: 10px 15px; min-height: 40px; border-radius: var(--r-pill);
+  padding: 11px 15px; min-height: 44px; border-radius: var(--r-pill);
   background: var(--panel); color: var(--on-panel);
   box-shadow: var(--lift-1), var(--edge), var(--rim);
   cursor: pointer;
@@ -457,7 +473,9 @@ body::before {
 }
 .mode-hero:active { transform: translateY(4px); box-shadow: 0 1px 0 rgba(0,0,0,.2), var(--edge), var(--rim); }
 .mode-glyph {
-  width: 46px; height: 46px; border-radius: var(--r-1);
+  width: 46px; height: 46px;
+  /* concentric with .mode-hero: 26px card - 12px inset */
+  border-radius: max(0px, calc(var(--r-3) - var(--s-3)));
   display: grid; place-items: center;
   background: var(--accent); color: var(--on-accent);
   box-shadow: var(--lift-1), inset 0 1px 0 rgba(255,255,255,.3);
@@ -540,7 +558,8 @@ body::before {
 }
 .preview-board {
   width: 104px; height: 104px; flex: none;
-  border-radius: var(--r-1);
+  /* concentric with .preview: 26px card - 12px inset */
+  border-radius: max(0px, calc(var(--r-3) - var(--s-3)));
   background: var(--sink); box-shadow: var(--edge-in);
   padding: 7px;
 }
@@ -576,8 +595,8 @@ body::before {
   font-size: 10.5px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase;
   color: var(--on-panel-dim); flex: none;
 }
-.roster-seat .seg { padding: 4px; gap: 5px; }
-.roster-seat .seg-btn { min-height: 36px; font-size: 12.5px; padding: 8px 4px; }
+.roster-seat .seg { --seg-pad: 4px; gap: 5px; }
+.roster-seat .seg-btn { min-height: 44px; font-size: 12.5px; padding: 8px 4px; }
 .roster-seat .kind { flex: none; width: 8.2em; }
 .roster-seat.is-human .diff { display: none; }
 
@@ -621,14 +640,16 @@ body::before {
 .rank-badge {
   --rank: var(--wall);
   display: inline-grid; place-items: center; flex: none;
-  width: 36px; height: 36px; border-radius: var(--r-1);
+  --size: 36px;
+  width: var(--size); height: var(--size);
+  border-radius: calc(var(--size) * var(--badge-corner));
   color: #fff;
   background: var(--rank);
   box-shadow: inset 0 -3px 0 rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.28);
 }
 .rank-badge .ico { width: 76%; height: 76%; }
 .rank-badge-xl {
-  width: 96px; height: 96px; border-radius: 30px;
+  --size: 96px;
   box-shadow: inset 0 -7px 0 rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.3), var(--lift-3);
 }
 
@@ -643,7 +664,7 @@ body::before {
   transition: transform var(--t-fast) var(--e-out), box-shadow var(--t-fast) var(--e-out);
 }
 .rank-strip:active { transform: translateY(3px); box-shadow: var(--edge), var(--rim); }
-.rank-strip .rank-badge { width: 34px; height: 34px; border-radius: 10px; }
+.rank-strip .rank-badge { --size: 34px; }
 .rank-strip-main { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .rank-strip-name { font-size: 13px; font-weight: 900; }
 .rank-strip-trophies { display: flex; align-items: center; gap: 5px; font-size: 17px; font-weight: 900; }
@@ -714,7 +735,7 @@ body::before {
   box-shadow: var(--edge), var(--rim);
   transition: background var(--t-base) var(--e-out), transform var(--t-fast) var(--e-out);
 }
-.ladder li .rank-badge { width: 30px; height: 30px; border-radius: 9px; }
+.ladder li .rank-badge { --size: 30px; }
 .ladder li .lad-min {
   margin-left: auto; display: flex; align-items: center; gap: 4px;
   font-size: 12.5px; color: var(--on-panel-dim);
@@ -749,7 +770,7 @@ body::before {
   display: flex; align-items: center; gap: var(--s-2);
   font-size: 22px; font-weight: 900; color: var(--ink); line-height: 1;
 }
-.tally-total .rank-badge { width: 30px; height: 30px; border-radius: 9px; margin-left: var(--s-1); }
+.tally-total .rank-badge { --size: 30px; margin-left: var(--s-1); }
 .tally .track { width: 100%; background: rgba(62,32,21,.14); margin-top: var(--s-1); }
 .tally .track > i { background: var(--accent-deep); }
 .rank-jump {
@@ -1048,7 +1069,7 @@ body::before {
   .btn { min-height: 48px; padding: 12px 16px; font-size: 16px; }
   .rank-hero { padding: var(--s-3); }
   .rank-hero-count { font-size: 30px; }
-  .rank-badge-xl { width: 60px; height: 60px; border-radius: 20px; }
+  .rank-badge-xl { --size: 60px; }
   .screen-game.is-crowded { gap: 6px; }
 }
 

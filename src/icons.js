@@ -50,6 +50,24 @@ const atom = (cx, cy, rx, ry, n) => {
   return `${out}</g><circle cx="${cx}" cy="${cy}" r="${ry * 0.62}" fill="${SHADE}"/>`;
 };
 
+/**
+ * A seat, drawn the way the board draws one: a disc with a flat shade sitting
+ * in the bottom of it. The game's balls carry that same weighted underside, so
+ * a mode mark reads as a handful of pieces off the board rather than as a set
+ * of plain dots.
+ */
+const ball = (cx, cy, r) => {
+  const h = r * 0.36, w = Math.sqrt(r * r - h * h);
+  return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="currentColor"/>`
+    + `<path d="M${(cx - w).toFixed(2)} ${(cy + h).toFixed(2)}`
+    + `A${r} ${r} 0 0 0 ${(cx + w).toFixed(2)} ${(cy + h).toFixed(2)}Z" fill="${SHADE}"/>`;
+};
+
+/** A wall, with the seam the board hatches into its face. */
+const wall = (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1.4"`
+  + ` fill="currentColor"/><rect x="${x + w * 0.22}" y="${y + h * 0.22}"`
+  + ` width="${(w * 0.56).toFixed(2)}" height="${(h * 0.56).toFixed(2)}" rx=".7" fill="${SHADE}"/>`;
+
 /* ------------------------------------------------------------------ ranks -- */
 
 /**
@@ -170,67 +188,75 @@ export const RANK_ICONS = {
  * the picker reads at a glance.
  */
 export const MODE_ICONS = {
-  /* Two seats, one flashpoint. */
+  /* Two seats, one flashpoint between them. */
   duel: `
-    <circle cx="4.9" cy="12" r="4.1" fill="currentColor"/>
-    <circle cx="19.1" cy="12" r="4.1" fill="currentColor"/>
+    ${ball(5.4, 12, 4.3)}
+    ${ball(18.6, 12, 4.3)}
     ${spark(12, 12, 2.3, 5.4)}`,
 
-  /* Four seats, no allies: everyone facing the middle. */
+  /* Four seats, no allies, all of them facing the middle. The default mode,
+     and the one the app wears at rest. */
   rumble: `
-    <circle cx="12" cy="4.7" r="3.5" fill="currentColor"/>
-    <circle cx="19.3" cy="12" r="3.5" fill="currentColor"/>
-    <circle cx="12" cy="19.3" r="3.5" fill="currentColor"/>
-    <circle cx="4.7" cy="12" r="3.5" fill="currentColor"/>
+    ${ball(12, 5.0, 3.6)}
+    ${ball(19.0, 12, 3.6)}
+    ${ball(12, 19.0, 3.6)}
+    ${ball(5.0, 12, 3.6)}
     ${spark(12, 12, 2.9)}`,
 
-  /* The same four, pushed out to the corners of a bigger board. */
+  /* The same four, pushed to the corners of a board big enough to show its
+     own seams. */
   arena: `
-    <rect x="2.3" y="2.3" width="19.4" height="19.4" rx="4.6" fill="none"
+    <rect x="2.3" y="2.3" width="19.4" height="19.4" rx="5" fill="none"
           stroke="currentColor" stroke-width="2"/>
-    <circle cx="7.9" cy="7.9" r="2.6" fill="currentColor"/>
-    <circle cx="16.1" cy="7.9" r="2.6" fill="currentColor"/>
-    <circle cx="7.9" cy="16.1" r="2.6" fill="currentColor"/>
-    <circle cx="16.1" cy="16.1" r="2.6" fill="currentColor"/>`,
+    <path d="M4.3 12h15.4M12 4.3v15.4" stroke="${SHADE}" stroke-width="1.3"
+          stroke-linecap="round"/>
+    ${ball(7.9, 7.9, 2.7)}
+    ${ball(16.1, 7.9, 2.7)}
+    ${ball(7.9, 16.1, 2.7)}
+    ${ball(16.1, 16.1, 2.7)}`,
 
   /* Eight seats ringing one detonation. */
   mayhem: `
-    <circle cx="12" cy="3.8" r="2.3" fill="currentColor"/>
-    <circle cx="17.8" cy="6.2" r="2.3" fill="currentColor"/>
-    <circle cx="20.2" cy="12" r="2.3" fill="currentColor"/>
-    <circle cx="17.8" cy="17.8" r="2.3" fill="currentColor"/>
-    <circle cx="12" cy="20.2" r="2.3" fill="currentColor"/>
-    <circle cx="6.2" cy="17.8" r="2.3" fill="currentColor"/>
-    <circle cx="3.8" cy="12" r="2.3" fill="currentColor"/>
-    <circle cx="6.2" cy="6.2" r="2.3" fill="currentColor"/>
-    ${spark(12, 12, 3.6)}`,
+    ${ball(12, 3.9, 2.4)}
+    ${ball(17.7, 6.3, 2.4)}
+    ${ball(20.1, 12, 2.4)}
+    ${ball(17.7, 17.7, 2.4)}
+    ${ball(12, 20.1, 2.4)}
+    ${ball(6.3, 17.7, 2.4)}
+    ${ball(3.9, 12, 2.4)}
+    ${ball(6.3, 6.3, 2.4)}
+    ${spark(12, 12, 3.4)}`,
 
-  /* Two pairs, each bound together, meeting in the middle. */
+  /* Two pairs, each strapped together the way the dynamite is, meeting in the
+     middle. The strap is the whole point of the mode: your bust feeds them. */
   duos: `
-    <circle cx="5.4" cy="7" r="3.4" fill="currentColor"/>
-    <circle cx="5.4" cy="17" r="3.4" fill="currentColor"/>
-    <rect x="3.9" y="7" width="3" height="10" fill="currentColor"/>
-    <circle cx="18.6" cy="7" r="3.4" fill="currentColor"/>
-    <circle cx="18.6" cy="17" r="3.4" fill="currentColor"/>
-    <rect x="17.1" y="7" width="3" height="10" fill="currentColor"/>
+    ${ball(5.6, 6.6, 3.4)}
+    ${ball(5.6, 17.4, 3.4)}
+    <rect x="3.9" y="8.6" width="3.4" height="6.8" fill="currentColor"/>
+    <rect x="3.4" y="10.4" width="4.4" height="3.2" rx=".9" fill="${SHADE}"/>
+    ${ball(18.4, 6.6, 3.4)}
+    ${ball(18.4, 17.4, 3.4)}
+    <rect x="16.7" y="8.6" width="3.4" height="6.8" fill="currentColor"/>
+    <rect x="16.2" y="10.4" width="4.4" height="3.2" rx=".9" fill="${SHADE}"/>
     ${spark(12, 12, 2.4, 5.2)}`,
 
-  /* A mirrored maze — literally the shape `makeWalls` deals out. */
+  /* A mirrored maze — the shape makeWalls actually deals — with one seat
+     caught in the middle of it. */
   chaos: `
-    <rect x="2.4" y="3" width="4.4" height="8.6" rx="1.4" fill="currentColor"/>
-    <rect x="9" y="2.6" width="8.6" height="4.4" rx="1.4" fill="currentColor"/>
-    <rect x="17.2" y="12.4" width="4.4" height="8.6" rx="1.4" fill="currentColor"/>
-    <rect x="6.4" y="17" width="8.6" height="4.4" rx="1.4" fill="currentColor"/>
-    <circle cx="12" cy="12" r="3.2" fill="currentColor"/>`,
+    ${wall(2.4, 3.0, 4.4, 8.6)}
+    ${wall(9.0, 2.6, 8.6, 4.4)}
+    ${wall(17.2, 12.4, 4.4, 8.6)}
+    ${wall(6.4, 17.0, 8.6, 4.4)}
+    ${ball(12, 12, 3.2)}`,
 
   /* Your rules: three sliders, none of them where the defaults left them. */
   custom: `
     <rect x="2.5" y="4.6" width="19" height="3.4" rx="1.7" fill="${SHADE}"/>
     <rect x="2.5" y="10.3" width="19" height="3.4" rx="1.7" fill="${SHADE}"/>
     <rect x="2.5" y="16" width="19" height="3.4" rx="1.7" fill="${SHADE}"/>
-    <circle cx="8.2" cy="6.3" r="3.2" fill="currentColor"/>
-    <circle cx="15.6" cy="12" r="3.2" fill="currentColor"/>
-    <circle cx="11" cy="17.7" r="3.2" fill="currentColor"/>`,
+    ${ball(8.2, 6.3, 3.2)}
+    ${ball(15.6, 12, 3.2)}
+    ${ball(11.0, 17.7, 3.2)}`,
 };
 
 /* --------------------------------------------------------------------- ui -- */

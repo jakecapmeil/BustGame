@@ -33,7 +33,7 @@ const settings = loadSettings();
 
 function loadSettings() {
   const base = {
-    sound: true, haptics: true, mode: 'duel', custom: null,
+    sound: true, haptics: true, mode: 'rumble', custom: null,
     speed: 1,        // 1x or 2x — how fast a bot thinks and a cascade plays
     name: '',        // what other players see you as online
   };
@@ -101,7 +101,7 @@ const SEAT_ORDER = {
 };
 
 /** The mode the player has selected; drives every play screen and the theme. */
-let modeKey = settings.mode && MODES[settings.mode] ? settings.mode : 'duel';
+let modeKey = settings.mode && MODES[settings.mode] ? settings.mode : 'rumble';
 let customCfg = { seats: 4, board: [9, 9], teams: null, wallDensity: 0 };
 if (settings.custom) customCfg = { ...customCfg, ...settings.custom };
 
@@ -180,7 +180,7 @@ function applyTheme(theme) {
   });
   // Written as a concrete colour rather than left to `background: var(--bg)`,
   // so the field can actually crossfade — see the note on `body` in styles.css.
-  const bg = v('--bg', '#D47A6A');
+  const bg = v('--bg', '#7A93CE');
   document.body.style.backgroundColor = bg;
   // Whether this field takes ink or white type is a property of the colour, not
   // of the mode's name. Measuring it means the base colour and the wash can be

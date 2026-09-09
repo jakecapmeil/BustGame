@@ -55,14 +55,15 @@
   --wash-field: 44%;
   --wash-accent: 90%;
 
-  --raw-bg: #C4342A;
-  --raw-bg-deep: #9E2418;
+  /* Rumble's duo, because Rumble is the default mode — the app at rest wears
+     the palette of the game it is about to deal. */
+  --raw-bg: #1E46B5;
+  --raw-bg-deep: #15338A;
   --raw-accent: #F5C31E;
   --raw-accent-deep: #D3A308;
- 
   --raw-tile: #EFE7D6;
-  --raw-tile-dim: #CBBFA9;
-  --raw-wall: #8E241A;
+  --raw-tile-dim: #BEC4DC;
+  --raw-wall: #102A73;
 
   /* ---- surfaces (light-field set; the dark-field set is below) ----
      A panel is a *lit* face, not a wash: a top highlight, a hairline rim and
@@ -173,37 +174,41 @@
 
    A field and its accent are always two *different* primaries, which is what
    keeps a card readable against the board behind it. */
-[data-theme="ember"] {   /* Duel — red field, yellow accent */
+[data-theme="ember"] {   /* Duel — red field / blue mark */
   --raw-bg: #C4342A; --raw-bg-deep: #9E2418;
-  --raw-accent: #F5C31E; --raw-accent-deep: #D3A308;
+  --raw-accent: #1B4FD8; --raw-accent-deep: #143BA6;
   --raw-tile: #EFE7D6; --raw-tile-dim: #CBBFA9; --raw-wall: #8E241A;
 }
-[data-theme="tide"] {   /* Rumble — blue field, yellow accent */
+[data-theme="tide"] {   /* Rumble — blue field / yellow mark */
   --raw-bg: #1E46B5; --raw-bg-deep: #15338A;
   --raw-accent: #F5C31E; --raw-accent-deep: #D3A308;
   --raw-tile: #EFE7D6; --raw-tile-dim: #BEC4DC; --raw-wall: #102A73;
 }
-[data-theme="orchid"] {   /* Big Arena — paper field, red accent */
+[data-theme="orchid"] {   /* Big Arena — bone field / red mark */
   --raw-bg: #EFE7D6; --raw-bg-deep: #DCD1BA;
   --raw-accent: #E14434; --raw-accent-deep: #BC2E20;
   --raw-tile: #FFFFFF; --raw-tile-dim: #D8CDB8; --raw-wall: #17161C;
 }
-[data-theme="blaze"] {   /* Mayhem — ink field, red accent */
+/* Mayhem keeps more of its ink than the rest: at the shared field wash it came
+   out mid-grey, which cost the mode the one thing it is meant to look like and
+   left barely any separation between the field and its red mark. */
+[data-theme="blaze"] {   /* Mayhem — ink field / red mark */
+  --wash-field: 80%;
   --raw-bg: #17161C; --raw-bg-deep: #0D0C11;
   --raw-accent: #E14434; --raw-accent-deep: #BC2E20;
   --raw-tile: #EFE7D6; --raw-tile-dim: #A9A296; --raw-wall: #000000;
 }
-[data-theme="gild"] {   /* Duos — ochre field, blue accent */
+[data-theme="gild"] {   /* Duos — ochre field / blue mark */
   --raw-bg: #E0AC12; --raw-bg-deep: #BC8D07;
   --raw-accent: #1B4FD8; --raw-accent-deep: #143BA6;
   --raw-tile: #FFF9E6; --raw-tile-dim: #DCC98C; --raw-wall: #8A6A05;
 }
-[data-theme="toxic"] {   /* Chaos — deep blue field, yellow accent */
-  --raw-bg: #1B2A63; --raw-bg-deep: #111C45;
+[data-theme="toxic"] {   /* Chaos — green field / yellow mark */
+  --raw-bg: #1F4536; --raw-bg-deep: #153228;
   --raw-accent: #F5C31E; --raw-accent-deep: #D3A308;
-  --raw-tile: #E4E7F2; --raw-tile-dim: #AFB6CE; --raw-wall: #070C21;
+  --raw-tile: #E2EBE4; --raw-tile-dim: #AFC2B6; --raw-wall: #0B1F17;
 }
-[data-theme="slate"] {   /* Custom — ink-grey field, blue accent */
+[data-theme="slate"] {   /* Custom — grey field / blue mark */
   --raw-bg: #43434D; --raw-bg-deep: #31313A;
   --raw-accent: #4C7DF0; --raw-accent-deep: #2A57C4;
   --raw-tile: #EFE7D6; --raw-tile-dim: #B6B2AA; --raw-wall: #1B1B21;

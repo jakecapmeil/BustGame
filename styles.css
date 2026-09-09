@@ -7,100 +7,86 @@
    1. EXTRUDED, NOT FLAT. Every control sits on a hard bottom shadow
       (`0 Npx 0`, never blurred), a top highlight (`--edge`) and a hairline
       rim (`--rim`), and collapses into the shadow on press. Highlight + rim
-      are what keep a translucent panel readable as a raised face on a field
-      it is only slightly tinted against — without them a screen of panels
-      reads as one wash. Blurred shadows are reserved for things genuinely
-      floating above the app — modals and the board's tiles.
-   2. ONE ACCENT PER SCREEN. The active mode owns the palette. The only other
-      saturated colours allowed in the chrome are the eight seat colours, and
-      those belong to the board and the score chips. (The rank tints on the
-      ranked screen are the one sanctioned exception: that screen is *about*
-      the rank.)
-   3. BIG, ROUND, CONFIDENT. Radii step 12 / 18 / 26 / pill. Nunito 700-900
+      are what keep a white panel readable as a raised face on paper that is
+      only a shade darker — without them a screen of panels reads as one
+      sheet. Blurred shadows are reserved for things genuinely floating above
+      the app — modals and the board's tiles.
+   2. ONE SHELL, SEVEN HUES. Every screen is the same near-white paper, in
+      every mode. What a mode owns is a single hue — its own, used by no other
+      mode — and that hue is spent only on small things: the primary button,
+      the mode's mark, the selected row, the walls of its board. Docs is blue
+      and Sheets is green, but they are the same white page, and you can tell
+      them apart from across the room. The eight seat colours and the rank
+      tints are the sanctioned exceptions.
+   3. BIG, ROUND, CONFIDENT. Radii step 18 / 28 / 38 / pill. Nunito 700-900
       only — this app has no light type.
-   4. INVERT TO FOCUS. The app is a coloured field carrying near-white text.
-      Anything that needs attention becomes a cream card with dark text.
-      Body copy is the one place the field decides: on the two light fields
-      (ember, gild) white can't reach WCAG AA, so running text there takes
-      the ink instead. Headings stay cream everywhere.
+   4. COLOUR IS ATTENTION. The paper carries ink; nothing is coloured for
+      decoration. A hue appears where you are meant to act, or where you are
+      meant to recognise which mode you are in. Each hue is stated twice —
+      bright and deep — because the bright one fills shapes and the deep one
+      writes words, and only one of them can do each job.
    5. NUMBERS ARE THE HERO. Scores, trophies and deltas get the largest type on
       screen, always tabular so they don't jitter as they count.
    6. MOTION IS PHYSICAL. Things overshoot a little and settle. Nothing moves
       linearly. `prefers-reduced-motion` removes all of it.
 
-   Tokens live on `:root`. A mode swaps only the palette block via
-   `<html data-theme>`; nothing else in the sheet knows which mode is active.
-   Each palette also picks one of two *surface* sets — light-field or
-   dark-field — which decide whether panels tint up or down and whether body
-   copy is ink or white. The mode cards carry their own `data-theme`, so they
-   inherit the right set automatically.
+   Tokens live on `:root`. A mode swaps exactly two of them — `--accent` and
+   `--accent-deep` — via `<html data-theme>`; everything else in the sheet is
+   the same in all seven. The mode cards carry their own `data-theme`, so each
+   one previews its hue without the page changing colour underneath it.
    ========================================================================== */
 
 :root {
-  /* ---- palette (overridden per theme) ----
-     Every colour in the app is mixed with one base before it is used — the
-     painter's trick of dropping the same pigment into every mixture on the
-     palette so the whole picture agrees with itself. --base is that pigment
-     and --wash is how much of the raw hue survives the mix, so the entire
-     app can be taken warmer or cooler, louder or quieter, by two numbers.
-     A theme therefore never states a finished colour; it states a raw hue
-     (--raw-*) and lets the mix below finish it. */
+  /* ---- the shell (never overridden by a mode) ----
+     One near-white paper under everything. It is mixed, not picked: --base is
+     the warm white the whole app is tinted toward — the painter's trick of
+     dropping the same pigment into every mixture on the palette — and the
+     greys below are that same white walked down in even steps. */
   --base: #FFFEFA;
-  --wash: 54%;
-  /* Three strengths, not one. The ground takes the most base and settles
-     back; ordinary marks take less; the accent takes least of all, because it
-     is the face of the primary button and has to carry text on it. A mid-tone
-     accent is the one place this technique can actually hurt you — washed to
-     the middle, neither ink nor white clears 3:1 on it. */
-  --wash-field: 44%;
-  --wash-accent: 90%;
+  --bg: #F2EFE7;        /* the page */
+  --bg-deep: #E7E2D6;   /* the vignette under the board */
+  --card: #FFFFFF;      /* a raised face */
 
-  /* Rumble's duo, because Rumble is the default mode — the app at rest wears
-     the palette of the game it is about to deal. */
-  --raw-bg: #1E46B5;
-  --raw-bg-deep: #15338A;
-  --raw-accent: #F5C31E;
-  --raw-accent-deep: #D3A308;
-  --raw-tile: #EFE7D6;
-  --raw-tile-dim: #BEC4DC;
-  --raw-wall: #102A73;
+  /* ---- palette (the only thing a mode changes) ----
+     Rumble's blue, because Rumble is the default mode. */
+  --accent: #1B4FD8;
+  --accent-deep: #133BA6;
 
-  /* ---- surfaces (light-field set; the dark-field set is below) ----
+  /* ---- surfaces ----
      A panel is a *lit* face, not a wash: a top highlight, a hairline rim and
-     a hard bottom shadow make it read as raised even when its tint is close
-     to the field behind it. */
-  --panel: rgba(255, 255, 255, 0.24);
-  --panel-2: rgba(255, 255, 255, 0.36);
-  --panel-3: rgba(255, 255, 255, 0.54);
-  --sink: rgba(0, 0, 0, 0.30);
-  --card: #EFE7D6;
-  --hairline: rgba(255, 255, 255, 0.22);
-  --rim: inset 0 0 0 1px rgba(255, 255, 255, 0.26);
-  --edge: inset 0 1px 0 rgba(255, 255, 255, 0.55);
-  --edge-in: inset 0 2px 4px rgba(0, 0, 0, 0.22);
-  /* Lifts light type off a dark field. Light fields carry ink type and set
-     this to `none`, where a shadow would only smear it. */
-  --type-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-  /* A seat's colour can be the same colour as the table it is sitting on — a
-     red seat in Duel, played on the red field. The ring is what keeps the two
-     apart, so it belongs on every dot that shows a seat. */
-  --seat-ring: 0 0 0 2px var(--card);
+     a hard bottom shadow make it read as raised against paper it is only a
+     shade away from. */
+  --panel: rgba(255, 255, 255, 0.62);
+  --panel-2: #FFFFFF;
+  --sink: #E4DFD2;      /* a well: segmented tracks, figure boxes, meters */
+  --rim: inset 0 0 0 1px rgba(23, 22, 28, 0.08);
+  --edge: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --edge-in: inset 0 2px 4px rgba(23, 22, 28, 0.13);
+  /* Ink type on paper needs no lift off its background, and a shadow under it
+     only smears. Kept as a token because the saturated faces still use one. */
+  --type-shadow: none;
+  /* Two of the eight seat colours — yellow at 1.6:1, and paper-pale walls
+     behind them — have almost no edge against white. Every dot that shows a
+     seat carries this hairline so the colour is a disc, not a smudge. */
+  --seat-ring: 0 0 0 2px rgba(23, 22, 28, 0.16);
 
   /* ---- ink ---- */
   --ink: #17161C;          /* on --card */
   --ink-dim: rgba(23, 22, 28, 0.62);
-  --on-bg: #FFFFFF;        /* headings on --bg */
-  --on-bg-dim: rgba(23, 22, 28, 0.92);    /* body copy on --bg */
-  --on-bg-faint: rgba(23, 22, 28, 0.78);  /* labels on --bg */
+  --on-bg: #17161C;        /* headings on --bg */
+  --on-bg-dim: rgba(23, 22, 28, 0.86);    /* body copy on --bg */
+  --on-bg-faint: rgba(23, 22, 28, 0.60);  /* labels on --bg */
   --on-panel: #17161C;                    /* text on --panel */
-  --on-panel-dim: rgba(23, 22, 28, 0.74);
-  --on-sink: rgba(255, 255, 255, 0.94);   /* text on --sink, every theme */
+  --on-panel-dim: rgba(23, 22, 28, 0.66);
+  --on-sink: rgba(23, 22, 28, 0.66);      /* text in a well */
 
-  /* ---- elevation ---- */
-  --lift-1: 0 3px 0 rgba(0, 0, 0, 0.20);
-  --lift-2: 0 6px 0 rgba(0, 0, 0, 0.22);
-  --lift-3: 0 8px 0 rgba(0, 0, 0, 0.24);
-  --float: 0 18px 44px rgba(0, 0, 0, 0.36);
+  /* ---- elevation ----
+     Warm ink rather than black: a neutral shadow on warm paper reads as dirt
+     under the object, not as depth. */
+  --lift-1: 0 3px 0 rgba(23, 22, 28, 0.14);
+  --lift-2: 0 5px 0 rgba(23, 22, 28, 0.15);
+  --lift-3: 0 8px 0 rgba(23, 22, 28, 0.17);
+  --float: 0 18px 44px rgba(23, 22, 28, 0.24);
 
   /* ---- radius ----
      Nested corners follow Apple's concentricity rule (the one SwiftUI's
@@ -150,110 +136,46 @@
 
 /* ------------------------------------------------------------------ themes */
 
-/* The mix is declared here rather than on :root alone because a var() is
-   substituted where it is *declared*: on :root only, --bg would resolve once
-   against the root's own raw hue and every mode card — each of which carries
+/* Seven modes, seven hues, and no hue used twice — a colour in this app names
+   exactly one mode, the way blue names Docs and green names Sheets. Each is
+   stated as a bright face and one deeper variant of itself: the bright one
+   fills shapes, the deep one writes words and draws walls. Yellow is why the
+   pair has to exist — #F5C31E is 1.6:1 on paper and can never carry text,
+   while #A87C06 clears AA and is unmistakably the same colour. */
+[data-theme="red"]    { --accent: #E14434; --accent-deep: #A9291B; }  /* Duel */
+[data-theme="blue"]   { --accent: #1B4FD8; --accent-deep: #133BA6; }  /* Rumble */
+[data-theme="yellow"] { --accent: #F5C31E; --accent-deep: #8A6604; }  /* Big Arena */
+[data-theme="violet"] { --accent: #7A4FD0; --accent-deep: #56309F; }  /* Mayhem */
+[data-theme="teal"]   { --accent: #12A0B4; --accent-deep: #0A6273; }  /* Duos */
+[data-theme="green"]  { --accent: #2F9E5E; --accent-deep: #16663B; }  /* Chaos */
+[data-theme="slate"]  { --accent: #5B6070; --accent-deep: #3A3E4B; }  /* Custom */
+
+/* The two places a hue is allowed to spread past its own shape, and the board.
+   Declared here rather than on :root alone because a var() is substituted
+   where it is *declared*: on :root only, --accent-soft would resolve once
+   against the root's own accent and every mode card — each of which carries
    its own [data-theme] — would come out the same colour. */
 :root, [data-theme] {
-  --bg:          color-mix(in oklab, var(--raw-bg) var(--wash-field), var(--base));
-  --bg-deep:     color-mix(in oklab, var(--raw-bg-deep) var(--wash-field), var(--base));
-  --accent:      color-mix(in oklab, var(--raw-accent) var(--wash-accent), var(--base));
-  --accent-deep: color-mix(in oklab, var(--raw-accent-deep) var(--wash-accent), var(--base));
-  --tile:        color-mix(in oklab, var(--raw-tile) var(--wash), var(--base));
-  --tile-dim:    color-mix(in oklab, var(--raw-tile-dim) var(--wash), var(--base));
-  --wall:        color-mix(in oklab, var(--raw-wall) var(--wash), var(--base));
+  --accent-soft: color-mix(in oklab, var(--accent) 13%, var(--base));
+  --accent-line: color-mix(in oklab, var(--accent) 34%, var(--base));
+  /* "This one is chosen" is the same tint everywhere it appears. */
+  --panel-3: var(--accent-soft);
+  /* The board is paper too. Only the walls take the hue — that, and the mark
+     on the picker card, is the whole of a mode's identity on screen. */
+  --tile: #FFFFFF;
+  --tile-dim: color-mix(in oklab, var(--accent) 10%, #EAE5DA);
+  --wall: var(--accent-deep);
 }
 
-/* Three primaries, plus ink and paper — the whole app is mixed from these five
-   and nothing else. A mode never invents a hue; it picks which primary is the
-   field and which is the accent, so every screen is recognisably the same set
-   of colours rearranged.
-
-     red    #E14434   blue  #1B4FD8   yellow #F5C31E
-     ink    #17161C   paper #EFE7D6
-
-   A field and its accent are always two *different* primaries, which is what
-   keeps a card readable against the board behind it. */
-[data-theme="ember"] {   /* Duel — red field / blue mark */
-  --raw-bg: #C4342A; --raw-bg-deep: #9E2418;
-  --raw-accent: #1B4FD8; --raw-accent-deep: #143BA6;
-  --raw-tile: #EFE7D6; --raw-tile-dim: #CBBFA9; --raw-wall: #8E241A;
-}
-[data-theme="tide"] {   /* Rumble — blue field / yellow mark */
-  --raw-bg: #1E46B5; --raw-bg-deep: #15338A;
-  --raw-accent: #F5C31E; --raw-accent-deep: #D3A308;
-  --raw-tile: #EFE7D6; --raw-tile-dim: #BEC4DC; --raw-wall: #102A73;
-}
-[data-theme="orchid"] {   /* Big Arena — bone field / red mark */
-  --raw-bg: #EFE7D6; --raw-bg-deep: #DCD1BA;
-  --raw-accent: #E14434; --raw-accent-deep: #BC2E20;
-  --raw-tile: #FFFFFF; --raw-tile-dim: #D8CDB8; --raw-wall: #17161C;
-}
-/* Mayhem keeps more of its ink than the rest: at the shared field wash it came
-   out mid-grey, which cost the mode the one thing it is meant to look like and
-   left barely any separation between the field and its red mark. */
-[data-theme="blaze"] {   /* Mayhem — ink field / red mark */
-  --wash-field: 80%;
-  --raw-bg: #17161C; --raw-bg-deep: #0D0C11;
-  --raw-accent: #E14434; --raw-accent-deep: #BC2E20;
-  --raw-tile: #EFE7D6; --raw-tile-dim: #A9A296; --raw-wall: #000000;
-}
-[data-theme="gild"] {   /* Duos — ochre field / blue mark */
-  --raw-bg: #E0AC12; --raw-bg-deep: #BC8D07;
-  --raw-accent: #1B4FD8; --raw-accent-deep: #143BA6;
-  --raw-tile: #FFF9E6; --raw-tile-dim: #DCC98C; --raw-wall: #8A6A05;
-}
-[data-theme="toxic"] {   /* Chaos — green field / yellow mark */
-  --raw-bg: #1F4536; --raw-bg-deep: #153228;
-  --raw-accent: #F5C31E; --raw-accent-deep: #D3A308;
-  --raw-tile: #E2EBE4; --raw-tile-dim: #AFC2B6; --raw-wall: #0B1F17;
-}
-[data-theme="slate"] {   /* Custom — grey field / blue mark */
-  --raw-bg: #43434D; --raw-bg-deep: #31313A;
-  --raw-accent: #4C7DF0; --raw-accent-deep: #2A57C4;
-  --raw-tile: #EFE7D6; --raw-tile-dim: #B6B2AA; --raw-wall: #1B1B21;
-}
-
-/* Which of these two sets a field takes is decided by measuring the finished
-   colour (see isLight in main.js), not by listing mode names — the base colour
-   and the wash can then move without stranding a theme on white-on-cream.
-   Light fields: panels tint up, running text takes the ink. */
 /* Ink or white on the accent, decided by measuring it — see isLight in
    main.js. The accent is the face of the primary button, so this is the
-   difference between a readable Start and a pale smear. */
+   difference between a readable Start and a pale smear, and it genuinely
+   differs across the seven: yellow needs ink, blue needs white. */
 /* A default so the first paint, before applyTheme has measured anything, is
    never text with no colour at all. */
-:root { --on-accent: #17161C; }
+:root { --on-accent: #FFFFFF; }
 [data-accent="light"] { --on-accent: #17161C; }
 [data-accent="dark"]  { --on-accent: #FFFFFF; }
-
-[data-field="light"] {
-  --ink: #17161C; --ink-dim: rgba(23, 22, 28, 0.62);
-  --on-bg: #17161C;
-  --on-bg-dim: rgba(23, 22, 28, 0.92); --on-bg-faint: rgba(23, 22, 28, 0.78);
-  --on-panel: #17161C; --on-panel-dim: rgba(23, 22, 28, 0.74);
-  --panel: rgba(23, 22, 28, 0.10);
-  --panel-2: rgba(23, 22, 28, 0.16);
-  --panel-3: rgba(255, 255, 255, 0.72);
-  --rim: inset 0 0 0 1px rgba(23, 22, 28, 0.10);
-  --edge: inset 0 1px 0 rgba(255, 255, 255, 0.45);
-  --type-shadow: none;
-}
-
-/* Dark fields: panels tint *down*, so text on a panel is never worse off than
-   text on the field. The prominent surfaces (`-2`, `-3`) still lift, because
-   "brighter" is what selected and active have always meant here. */
-[data-field="dark"] {
-  --panel: rgba(0, 0, 0, 0.16);
-  --panel-2: rgba(255, 255, 255, 0.13);
-  --panel-3: rgba(255, 255, 255, 0.28);
-  --rim: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
-  --edge: inset 0 1px 0 rgba(255, 255, 255, 0.30);
-  --on-bg-dim: rgba(255, 255, 255, 0.94);
-  --on-bg-faint: rgba(255, 255, 255, 0.80);
-  --on-panel: #FFFFFF;
-  --on-panel-dim: rgba(255, 255, 255, 0.80);
-}
 
 /* ------------------------------------------------------------------- reset */
 
@@ -273,23 +195,12 @@ html, body {
   user-select: none;
 }
 
-/* The field crossfades between themes. It cannot be done from --bg: a
-   transition whose value comes from a custom property that changed on this
-   same element never settles, and the paint stays stuck on the colour the
-   page first rendered with. So applyTheme() resolves --bg and writes it here
-   as a concrete inline background-color, which transitions the ordinary way. */
-body {
-  transition: background-color var(--t-base) var(--e-out);
-}
-
-/* A soft vignette so the flat field has some depth under the board. */
+/* A soft vignette so the flat paper has some depth under the board. */
 body::before {
   content: '';
   position: fixed; inset: 0; pointer-events: none; z-index: 0;
   background: radial-gradient(120% 80% at 50% 0%, transparent 40%, var(--bg-deep) 100%);
   opacity: .6;
-  /* A gradient cannot interpolate either; fade the whole layer instead. */
-  transition: opacity var(--t-slow) var(--e-out);
 }
 
 .num { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1; }
@@ -392,7 +303,7 @@ body::before {
 /* -------------------------------------------------------------------- bar */
 
 .bar { display: flex; align-items: center; gap: var(--s-3); margin-bottom: var(--s-2); flex: none; width: min(440px, 100%); margin-left: auto; margin-right: auto; }
-.bar h2 { margin: 0; font-size: var(--fs-title); font-weight: 900; color: var(--on-bg); letter-spacing: -.01em; text-shadow: 0 2px 0 rgba(0,0,0,.10); }
+.bar h2 { margin: 0; font-size: var(--fs-title); font-weight: 900; color: var(--on-bg); letter-spacing: -.01em; }
 .bar .bar-tail { margin-left: auto; }
 
 /* ---------------------------------------------------------------- controls */
@@ -454,7 +365,7 @@ body::before {
   cursor: pointer;
   transition: background var(--t-fast) var(--e-out), color var(--t-fast) var(--e-out), transform var(--t-fast);
 }
-.seg-btn:active { transform: scale(.95); background: rgba(255,255,255,.12); }
+.seg-btn:active { transform: scale(.95); background: rgba(23,22,28,.07); }
 .seg-btn.is-on { background: var(--card); color: var(--ink); box-shadow: var(--lift-1); }
 .seg-btn.is-on:active { box-shadow: none; transform: translateY(2px) scale(.98); }
 .seg-tight .seg-btn { font-size: 12.5px; padding: 11px 2px; }
@@ -489,7 +400,7 @@ body::before {
 .toggles { display: flex; gap: var(--s-2); justify-content: center; }
 
 .hint { color: var(--on-bg-dim); font-weight: 700; font-size: 14.5px; line-height: 1.5; margin: 0; }
-.err { color: #FFE2DC; font-weight: 800; font-size: 14px; min-height: 20px; margin: 0; text-shadow: 0 1px 0 rgba(0,0,0,.25); }
+.err { color: #A9291B; font-weight: 800; font-size: 14px; min-height: 20px; margin: 0; }
 .err:empty { display: none; }
 .is-hidden { display: none !important; }
 
@@ -502,15 +413,15 @@ body::before {
   letter-spacing: -.045em;
   margin: 0;
   text-align: center;
-  color: var(--card);
-  text-shadow: 0 6px 0 rgba(0, 0, 0, .16);
+  color: var(--ink);
+  text-shadow: 0 6px 0 rgba(23, 22, 28, .12);
   display: flex; align-items: center; justify-content: center; gap: .1em;
   line-height: 1;
 }
 .logo-dot {
   width: .2em; height: .2em; border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 5px 0 rgba(0, 0, 0, .18);
+  box-shadow: 0 5px 0 rgba(23, 22, 28, .16);
   animation: bob 2.4s ease-in-out infinite;
 }
 @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-16%); } }
@@ -591,28 +502,28 @@ body::before {
   appearance: none; border: 0; cursor: pointer; text-align: left;
   display: grid; grid-template-columns: auto 1fr auto; align-items: center;
   gap: var(--s-3);
-  /* Each card wears the palette it will switch the app to — which means the
-     card for the *current* mode is painted the same colour as the field behind
-     it. The top sheen and the hard bottom shadow keep it a raised object
-     rather than a hole in the page; the selected state below does the rest. */
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0) 58%),
-    linear-gradient(150deg, var(--bg) 0%, var(--bg-deep) 100%);
-  color: var(--on-bg);
+  /* Every row is the same white card. What tells them apart is the mark, in
+     the one hue that belongs to that mode — the app grid, not seven wallpapers.
+     The page does not change colour when you scroll the list. */
+  background: var(--card);
+  color: var(--ink);
   border-radius: var(--r-2); padding: var(--s-3);
   min-height: 70px;
-  box-shadow: var(--lift-2), inset 0 0 0 1px rgba(255,255,255,.18);
-  transition: transform var(--t-fast) var(--e-out), box-shadow var(--t-fast) var(--e-out);
+  box-shadow: var(--lift-2), var(--rim);
+  transition: transform var(--t-fast) var(--e-out), box-shadow var(--t-fast) var(--e-out),
+              background-color var(--t-fast) var(--e-out);
 }
-.mode-card:active { transform: translateY(4px); box-shadow: 0 1px 0 rgba(0,0,0,.2), inset 0 0 0 1px rgba(255,255,255,.18); }
-/* Selected: a cream ring — the same cream as a card, the app's "look here"
-   colour — a lift off the page, and the tick lands in a well of the card's
-   own accent. Three tells, so it can never read as a hole. */
+.mode-card:active { transform: translateY(4px); box-shadow: 0 1px 0 rgba(23,22,28,.16), var(--rim); }
+/* Selected: the row floods with the faintest wash of its own hue and takes a
+   ring in the hue at full strength, so the choice is announced in the colour
+   it is a choice of. Three tells — tint, ring, tick — so it can never read as
+   a hole in the list. */
 .mode-card.is-on {
   transform: translateY(-2px);
-  box-shadow: var(--lift-3), 0 0 0 3px var(--card), inset 0 0 0 1px rgba(255,255,255,.28);
+  background: var(--accent-soft);
+  box-shadow: var(--lift-3), 0 0 0 3px var(--accent-deep);
 }
-.mode-card.is-on:active { transform: translateY(2px); box-shadow: var(--lift-1), 0 0 0 3px var(--card), inset 0 0 0 1px rgba(255,255,255,.28); }
+.mode-card.is-on:active { transform: translateY(2px); box-shadow: var(--lift-1), 0 0 0 3px var(--accent-deep); }
 /* Concentric with .mode-card, which is --r-2 rather than the --r-3 the hero
    uses — the same glyph, re-derived for the smaller card it sits in. */
 .mode-card .mode-glyph {
@@ -620,17 +531,18 @@ body::before {
   border-radius: max(0px, calc(var(--r-2) - var(--s-3)));
 }
 .mode-card > span:nth-child(2) { min-width: 0; }
-.mode-card-name { font-size: 16px; font-weight: 900; text-shadow: var(--type-shadow); }
-/* Secondary text takes the card's own body-copy token, so it is ink on the
-   light cards and white on the dark ones — legible on every one of them. */
+.mode-card-name { font-size: 16px; font-weight: 900; }
 .mode-card-tag {
-  display: block; font-size: 12.5px; font-weight: 800; color: var(--on-bg-dim);
+  display: block; font-size: 12.5px; font-weight: 800; color: var(--ink-dim);
   overflow-wrap: anywhere;
 }
 .mode-card-check {
   width: 28px; height: 28px; flex: none; padding: 5px; border-radius: 50%;
   opacity: 0; transform: scale(.5);
-  background: var(--accent); color: var(--on-accent);
+  /* The deep variant, like the ring it sits inside: the bright one has to
+     read against a wash of itself, and yellow cannot. Every deep is dark
+     enough that the tick is white on all seven. */
+  background: var(--accent-deep); color: #FFFFFF;
   box-shadow: var(--lift-1), inset 0 1px 0 rgba(255,255,255,.3);
   transition: opacity var(--t-fast) var(--e-out), transform var(--t-base) var(--e-pop);
 }
@@ -672,8 +584,7 @@ body::before {
   font-size: 13.5px; font-weight: 700; line-height: 1.45; color: var(--on-bg-dim);
   padding: 0 var(--s-1);
 }
-.diff-note b { color: var(--on-bg); font-weight: 900; text-shadow: 0 1px 0 rgba(0,0,0,.12); }
-[data-theme="ember"] .diff-note b, [data-theme="gild"] .diff-note b { color: var(--on-bg-dim); text-shadow: none; }
+.diff-note b { color: var(--on-bg); font-weight: 900; }
 
 /* --------------------------------------------------------------- line-up */
 
@@ -767,7 +678,7 @@ body::before {
 /* progress track. The fill never drops below a round nub, so an empty track
    reads as "the start of a bar", not as a stray line. */
 .track {
-  --track-fill: var(--accent);
+  --track-fill: var(--accent-deep);
   height: 8px; border-radius: var(--r-pill); background: var(--sink); overflow: hidden;
   box-shadow: var(--edge-in), inset 0 0 0 1px rgba(255,255,255,.10);
 }
@@ -805,7 +716,7 @@ body::before {
   display: flex; align-items: center; gap: var(--s-2);
   font-size: 44px; font-weight: 900; line-height: 1; letter-spacing: -.02em;
 }
-.rank-hero .track { width: 100%; --track-fill: var(--rank); margin-top: var(--s-1); background: rgba(0,0,0,.28); }
+.rank-hero .track { width: 100%; --track-fill: var(--rank); margin-top: var(--s-1); background: rgba(23,22,28,.16); }
 .rank-hero-next { font-size: 13px; font-weight: 800; color: var(--on-panel-dim); }
 
 .stat-row { display: flex; gap: var(--s-2); }
@@ -922,7 +833,7 @@ body::before {
 #board:focus { outline: none; }
 #board:focus-visible {
   outline: none;
-  box-shadow: var(--lift-2), var(--edge), inset 0 0 0 1px rgba(255,255,255,.4), 0 0 0 4px rgba(255,255,255,.22), 0 0 24px rgba(255,255,255,.28);
+  box-shadow: var(--lift-2), var(--edge), 0 0 0 4px var(--accent-line);
 }
 
 .seat { display: none; align-items: center; justify-content: center; padding: 2px; min-width: 0; }
@@ -1045,9 +956,8 @@ body::before {
   transform: translateX(-50%);
   padding: 8px 18px; border-radius: var(--r-pill);
   background: var(--panel-2);
-  color: #fff; font-size: 13px; font-weight: 900; letter-spacing: .05em;
-  text-shadow: 0 1px 0 rgba(0,0,0,.22);
-  box-shadow: var(--lift-1), inset 0 1px 0 rgba(255,255,255,.35);
+  color: var(--on-panel); font-size: 13px; font-weight: 900; letter-spacing: .05em;
+  box-shadow: var(--lift-1), var(--rim);
   pointer-events: none; z-index: 3; max-width: 66vw; text-align: center;
   transition: background var(--t-base) var(--e-out);
 }
@@ -1057,7 +967,7 @@ body::before {
 .overlay {
   position: fixed; inset: 0; z-index: 10;
   display: grid; place-items: center;
-  background: rgba(20, 10, 6, 0.58);
+  background: rgba(23, 22, 28, 0.48);
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   padding: var(--s-5);
   animation: fade var(--t-base) var(--e-out);
@@ -1274,18 +1184,18 @@ body::before {
 /* An action already taken — ready, or a vote cast — reads pressed-in, not
    raised, so the party list stays the thing you look at. */
 .btn.is-armed { background: var(--panel-3); color: var(--on-panel); box-shadow: var(--edge-in), var(--edge), var(--rim); }
-.card .btn.is-armed { background: rgba(62, 32, 21, .12); color: var(--ink); box-shadow: var(--edge-in); }
+.card .btn.is-armed { background: rgba(23, 22, 28, .10); color: var(--ink); box-shadow: var(--edge-in); }
 
 /* The party's play-again vote on the result card. */
 .party-again { display: flex; flex-direction: column; gap: var(--s-2); width: 100%; }
 .party-again[hidden], .party-again.is-hidden { display: none; }
 .party-again .lobby-list li {
-  background: rgba(62, 32, 21, .07); color: var(--ink);
+  background: rgba(23, 22, 28, .06); color: var(--ink);
   box-shadow: none; padding: 9px 12px; font-size: 14px;
 }
-.party-again .lobby-list li.is-ready { background: rgba(62, 32, 21, .13); }
+.party-again .lobby-list li.is-ready { background: rgba(23, 22, 28, .11); }
 .party-again .lobby-list .ready-tick, .party-again .lobby-list .you { color: var(--ink); }
-.party-again .lobby-list .you, .party-again .lobby-list .tag { background: rgba(62, 32, 21, .12); color: var(--ink-dim); }
+.party-again .lobby-list .you, .party-again .lobby-list .tag { background: rgba(23, 22, 28, .10); color: var(--ink-dim); }
 
 /* A dot in the turn banner that tracks the active seat's colour (set inline). */
 .turn-dot {

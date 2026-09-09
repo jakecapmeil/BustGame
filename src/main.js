@@ -115,9 +115,10 @@ function currentSetup(seed = Date.now()) {
 }
 
 /* A 1x1 canvas is the shortest honest way to resolve a computed colour to
-   RGB: `--bg` is a color-mix(), which comes back as an oklab() string that no
-   amount of string parsing turns into channels. Painting it and reading the
-   pixel back asks the engine what it actually drew. */
+   RGB: a mode card's `--accent` may arrive as a color-mix(), which comes back
+   as an oklab() string that no amount of string parsing turns into channels.
+   Painting it and reading the pixel back asks the engine what it actually
+   drew. */
 const probe = document.createElement('canvas');
 probe.width = 1; probe.height = 1;
 const probeCtx = probe.getContext('2d', { willReadFrequently: true });
@@ -132,11 +133,6 @@ function toRGB(color) {
     const d = probeCtx.getImageData(0, 0, 1, 1).data;
     return [d[0], d[1], d[2]];
   } catch { return null; }
-}
-
-function toHex(color) {
-  const c = toRGB(color);
-  return c ? '#' + c.map((n) => n.toString(16).padStart(2, '0')).join('') : null;
 }
 
 /**
@@ -164,35 +160,27 @@ function isLight(color) {
 }
 
 /**
- * Repaint the whole app in the mode's palette. The board reads its colours back
- * out of the same custom properties, so canvas and DOM never drift apart.
+ * Point the app at the mode's hue. The page itself does not change colour —
+ * only the accent does, and the board, which reads its colours back out of the
+ * same custom properties so canvas and DOM never drift apart.
  */
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   const cs = getComputedStyle(document.documentElement);
   const v = (name, fallback) => (cs.getPropertyValue(name) || '').trim() || fallback;
   setBoardSkin({
-    tile: v('--tile', '#EFE7D6'),
-    tileDim: v('--tile-dim', '#CBBFA9'),
-    wall: v('--wall', '#8E241A'),
-    wallInk: 'rgba(0,0,0,0.22)',
-    shadow: 'rgba(0,0,0,0.16)',
+    tile: v('--tile', '#FFFFFF'),
+    tileDim: v('--tile-dim', '#EAE5DA'),
+    wall: v('--wall', '#133BA6'),
+    wallInk: 'rgba(0,0,0,0.18)',
+    shadow: 'rgba(23,22,28,0.12)',
   });
-  // Written as a concrete colour rather than left to `background: var(--bg)`,
-  // so the field can actually crossfade — see the note on `body` in styles.css.
-  const bg = v('--bg', '#7A93CE');
-  document.body.style.backgroundColor = bg;
-  // Whether this field takes ink or white type is a property of the colour, not
-  // of the mode's name. Measuring it means the base colour and the wash can be
-  // dialled anywhere without a theme quietly ending up white-on-cream.
-  document.documentElement.dataset.field = isLight(bg) ? 'light' : 'dark';
-  // The accent is a field of its own — it is the whole face of the primary
-  // button — and the wash lightened it far enough that white stopped working
-  // on four of the seven themes. Measured for the same reason the field is.
+  // Ink or white on the accent is a property of the colour, not of the mode's
+  // name, and across seven hues it genuinely goes both ways: yellow wants ink,
+  // blue wants white. Measuring it means a hue can be re-picked without
+  // stranding a button on text nobody can read.
   document.documentElement.dataset.accent =
-    isLight(v('--accent', '#F5C31E')) ? 'light' : 'dark';
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', toHex(bg) || bg);
+    isLight(v('--accent', '#1B4FD8')) ? 'light' : 'dark';
   if (session) refreshBoardOnly();
 }
 
@@ -1396,12 +1384,11 @@ function renderModeGrid() {
       <span class="mode-card-check" aria-hidden="true">${icon('check')}</span>`;
     grid.appendChild(b);
   }
-  // Each card wears a different palette, so each needs its own answer to
-  // "ink or white on this?" — measured once the card is in the document and
-  // its --bg has actually resolved.
+  // Each card carries a different hue on its mark, so each needs its own
+  // answer to "ink or white on this?" — measured once the card is in the
+  // document and its --accent has actually resolved.
   for (const b of grid.children) {
     const cs = getComputedStyle(b);
-    b.dataset.field = isLight(cs.getPropertyValue('--bg').trim()) ? 'light' : 'dark';
     b.dataset.accent = isLight(cs.getPropertyValue('--accent').trim()) ? 'light' : 'dark';
   }
   $('#modes-blurb').textContent = MODES[modeKey].blurb;

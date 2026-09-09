@@ -238,11 +238,11 @@ export function drawBoard(ctx, L, view) {
         ctx.fill();
       }
       roundRect(ctx, x + 1.5, y + 1.5, L.tile - 3, L.tile - 3, radius - 1.5);
-      // White reads on the red fill; on a bare cream tile it vanishes, so the
+      // White reads on the red fill; on a bare white tile it vanishes, so the
       // half of your zone that missed is outlined in ink instead.
       ctx.strokeStyle = kind === 'clash'
         ? `rgba(255, 236, 232, ${0.9 * a})`
-        : `rgba(62, 32, 21, ${0.5 * a})`;
+        : `rgba(23, 22, 28, ${0.45 * a})`;
       ctx.lineWidth = Math.max(1.5, L.tile * 0.04);
       ctx.stroke();
       ctx.restore();
@@ -250,8 +250,9 @@ export function drawBoard(ctx, L, view) {
 
     // Playable hint for the local player, in the seat's own colour. During
     // the opening the board is bare and this is the only thing saying "tap
-    // here", so the bed tints as well as rings; in play the tiles already
-    // carry your colour and a breathing ring is enough.
+    // here", so the bed tints as well as rings; in play a breathing ring on
+    // its own is enough. The ring is the seat's colour in both cases — the
+    // tiles are white now, and a white ring on a white tile is nothing.
     if (legal && legal.has(i)) {
       const p = view.pulse || 0;
       const col = view.hintColor || '#FFFFFF';
@@ -269,7 +270,7 @@ export function drawBoard(ctx, L, view) {
       }
       const inset = ctx.lineWidth / 2 + 0.5;
       roundRect(ctx, x + inset, y + inset, L.tile - inset * 2, L.tile - inset * 2, Math.max(2, radius - inset));
-      ctx.strokeStyle = view.opening ? col : '#FFFFFF';
+      ctx.strokeStyle = col;
       ctx.stroke();
       ctx.restore();
     }

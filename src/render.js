@@ -35,9 +35,9 @@ export const PLAYER_COLORS = [
 // Repainted from CSS custom properties whenever the theme changes, so the
 // board always sits in the same world as the rest of the app.
 export const BOARD_SKIN = {
-  tile: '#EFE7D6',
-  tileDim: '#CBBFA9',
-  wall: '#8E241A',
+  tile: '#F4EEE4',
+  tileDim: '#DDD5C6',
+  wall: '#B56455',
   wallInk: 'rgba(0,0,0,0.20)',
   shadow: 'rgba(90, 45, 25, 0.16)',
 };

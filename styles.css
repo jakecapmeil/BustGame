@@ -46,16 +46,20 @@
      A theme therefore never states a finished colour; it states a raw hue
      (--raw-*) and lets the mix below finish it. */
   --base: #FFFEFA;
-  --wash: 74%;
-  /* Fields carry a touch more base than marks do: the ground should settle
-     back and let the pieces on it come forward. */
-  --wash-field: 66%;
+  --wash: 54%;
+  /* Three strengths, not one. The ground takes the most base and settles
+     back; ordinary marks take less; the accent takes least of all, because it
+     is the face of the primary button and has to carry text on it. A mid-tone
+     accent is the one place this technique can actually hurt you — washed to
+     the middle, neither ink nor white clears 3:1 on it. */
+  --wash-field: 44%;
+  --wash-accent: 90%;
 
-  --raw-bg: #B32D1E;
-  --raw-bg-deep: #8E2115;
+  --raw-bg: #C4342A;
+  --raw-bg-deep: #9E2418;
   --raw-accent: #F5C31E;
   --raw-accent-deep: #D3A308;
-  --on-accent: #17161C;
+ 
   --raw-tile: #EFE7D6;
   --raw-tile-dim: #CBBFA9;
   --raw-wall: #8E241A;
@@ -152,8 +156,8 @@
 :root, [data-theme] {
   --bg:          color-mix(in oklab, var(--raw-bg) var(--wash-field), var(--base));
   --bg-deep:     color-mix(in oklab, var(--raw-bg-deep) var(--wash-field), var(--base));
-  --accent:      color-mix(in oklab, var(--raw-accent) var(--wash), var(--base));
-  --accent-deep: color-mix(in oklab, var(--raw-accent-deep) var(--wash), var(--base));
+  --accent:      color-mix(in oklab, var(--raw-accent) var(--wash-accent), var(--base));
+  --accent-deep: color-mix(in oklab, var(--raw-accent-deep) var(--wash-accent), var(--base));
   --tile:        color-mix(in oklab, var(--raw-tile) var(--wash), var(--base));
   --tile-dim:    color-mix(in oklab, var(--raw-tile-dim) var(--wash), var(--base));
   --wall:        color-mix(in oklab, var(--raw-wall) var(--wash), var(--base));
@@ -170,38 +174,38 @@
    A field and its accent are always two *different* primaries, which is what
    keeps a card readable against the board behind it. */
 [data-theme="ember"] {   /* Duel — red field, yellow accent */
-  --raw-bg: #B32D1E; --raw-bg-deep: #8E2115;
-  --raw-accent: #F5C31E; --raw-accent-deep: #D3A308; --on-accent: #17161C;
+  --raw-bg: #C4342A; --raw-bg-deep: #9E2418;
+  --raw-accent: #F5C31E; --raw-accent-deep: #D3A308;
   --raw-tile: #EFE7D6; --raw-tile-dim: #CBBFA9; --raw-wall: #8E241A;
 }
 [data-theme="tide"] {   /* Rumble — blue field, yellow accent */
-  --raw-bg: #153A9E; --raw-bg-deep: #0F2B78;
-  --raw-accent: #F5C31E; --raw-accent-deep: #D3A308; --on-accent: #17161C;
+  --raw-bg: #1E46B5; --raw-bg-deep: #15338A;
+  --raw-accent: #F5C31E; --raw-accent-deep: #D3A308;
   --raw-tile: #EFE7D6; --raw-tile-dim: #BEC4DC; --raw-wall: #102A73;
 }
 [data-theme="orchid"] {   /* Big Arena — paper field, red accent */
   --raw-bg: #EFE7D6; --raw-bg-deep: #DCD1BA;
-  --raw-accent: #E14434; --raw-accent-deep: #BC2E20; --on-accent: #FFFFFF;
+  --raw-accent: #E14434; --raw-accent-deep: #BC2E20;
   --raw-tile: #FFFFFF; --raw-tile-dim: #D8CDB8; --raw-wall: #17161C;
 }
 [data-theme="blaze"] {   /* Mayhem — ink field, red accent */
   --raw-bg: #17161C; --raw-bg-deep: #0D0C11;
-  --raw-accent: #E14434; --raw-accent-deep: #BC2E20; --on-accent: #FFFFFF;
+  --raw-accent: #E14434; --raw-accent-deep: #BC2E20;
   --raw-tile: #EFE7D6; --raw-tile-dim: #A9A296; --raw-wall: #000000;
 }
 [data-theme="gild"] {   /* Duos — ochre field, blue accent */
-  --raw-bg: #D9A408; --raw-bg-deep: #B88705;
-  --raw-accent: #1B4FD8; --raw-accent-deep: #143BA6; --on-accent: #FFFFFF;
+  --raw-bg: #E0AC12; --raw-bg-deep: #BC8D07;
+  --raw-accent: #1B4FD8; --raw-accent-deep: #143BA6;
   --raw-tile: #FFF9E6; --raw-tile-dim: #DCC98C; --raw-wall: #8A6A05;
 }
 [data-theme="toxic"] {   /* Chaos — deep blue field, yellow accent */
-  --raw-bg: #152252; --raw-bg-deep: #0D163A;
-  --raw-accent: #F5C31E; --raw-accent-deep: #D3A308; --on-accent: #17161C;
+  --raw-bg: #1B2A63; --raw-bg-deep: #111C45;
+  --raw-accent: #F5C31E; --raw-accent-deep: #D3A308;
   --raw-tile: #E4E7F2; --raw-tile-dim: #AFB6CE; --raw-wall: #070C21;
 }
 [data-theme="slate"] {   /* Custom — ink-grey field, blue accent */
-  --raw-bg: #3A3A42; --raw-bg-deep: #2A2A31;
-  --raw-accent: #4C7DF0; --raw-accent-deep: #2A57C4; --on-accent: #FFFFFF;
+  --raw-bg: #43434D; --raw-bg-deep: #31313A;
+  --raw-accent: #4C7DF0; --raw-accent-deep: #2A57C4;
   --raw-tile: #EFE7D6; --raw-tile-dim: #B6B2AA; --raw-wall: #1B1B21;
 }
 
@@ -209,6 +213,15 @@
    colour (see isLight in main.js), not by listing mode names — the base colour
    and the wash can then move without stranding a theme on white-on-cream.
    Light fields: panels tint up, running text takes the ink. */
+/* Ink or white on the accent, decided by measuring it — see isLight in
+   main.js. The accent is the face of the primary button, so this is the
+   difference between a readable Start and a pale smear. */
+/* A default so the first paint, before applyTheme has measured anything, is
+   never text with no colour at all. */
+:root { --on-accent: #17161C; }
+[data-accent="light"] { --on-accent: #17161C; }
+[data-accent="dark"]  { --on-accent: #FFFFFF; }
+
 [data-field="light"] {
   --ink: #17161C; --ink-dim: rgba(23, 22, 28, 0.62);
   --on-bg: #17161C;

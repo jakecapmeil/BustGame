@@ -139,15 +139,28 @@ function toHex(color) {
   return c ? '#' + c.map((n) => n.toString(16).padStart(2, '0')).join('') : null;
 }
 
-/** WCAG relative luminance, the standard test for "does ink or white sit on this". */
-function isLight(color) {
+/**
+ * Does ink read better than white on this colour?
+ *
+ * The threshold is not a taste call: contrast against white and contrast
+ * against black are equal at a luminance of sqrt(0.05 * 1.05) - 0.05, and ink
+ * wins above it. Guessing higher is what put white body copy on the washed red
+ * field at 2.9:1, under the 4.5:1 AA needs — ink on that same field is 5.7:1.
+ */
+const INK_CROSSOVER = Math.sqrt(0.05 * 1.05) - 0.05;   // ~0.179
+
+function luminance(color) {
   const c = toRGB(color);
-  if (!c) return false;
+  if (!c) return 0;
   const [r, g, b] = c.map((n) => {
     const x = n / 255;
     return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
   });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.42;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function isLight(color) {
+  return luminance(color) > INK_CROSSOVER;
 }
 
 /**
@@ -167,12 +180,17 @@ function applyTheme(theme) {
   });
   // Written as a concrete colour rather than left to `background: var(--bg)`,
   // so the field can actually crossfade — see the note on `body` in styles.css.
-  const bg = v('--bg', '#B32D1E');
+  const bg = v('--bg', '#D47A6A');
   document.body.style.backgroundColor = bg;
   // Whether this field takes ink or white type is a property of the colour, not
   // of the mode's name. Measuring it means the base colour and the wash can be
   // dialled anywhere without a theme quietly ending up white-on-cream.
   document.documentElement.dataset.field = isLight(bg) ? 'light' : 'dark';
+  // The accent is a field of its own — it is the whole face of the primary
+  // button — and the wash lightened it far enough that white stopped working
+  // on four of the seven themes. Measured for the same reason the field is.
+  document.documentElement.dataset.accent =
+    isLight(v('--accent', '#F5C31E')) ? 'light' : 'dark';
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', toHex(bg) || bg);
   if (session) refreshBoardOnly();
@@ -1382,7 +1400,9 @@ function renderModeGrid() {
   // "ink or white on this?" — measured once the card is in the document and
   // its --bg has actually resolved.
   for (const b of grid.children) {
-    b.dataset.field = isLight(getComputedStyle(b).getPropertyValue('--bg').trim()) ? 'light' : 'dark';
+    const cs = getComputedStyle(b);
+    b.dataset.field = isLight(cs.getPropertyValue('--bg').trim()) ? 'light' : 'dark';
+    b.dataset.accent = isLight(cs.getPropertyValue('--accent').trim()) ? 'light' : 'dark';
   }
   $('#modes-blurb').textContent = MODES[modeKey].blurb;
   $('#custom-panel').classList.toggle('is-hidden', modeKey !== 'custom');

@@ -6,8 +6,8 @@
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#D98E74",
-  "theme_color": "#D98E74",
+  "background_color": "#B32D1E",
+  "theme_color": "#B32D1E",
   "categories": ["games", "board"],
   "icons": [
     { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" },

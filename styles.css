@@ -38,14 +38,14 @@
 
 :root {
   /* ---- palette (overridden per theme) ---- */
-  --bg: #D98E74;
-  --bg-deep: #C97A60;
-  --accent: #F2564B;
-  --accent-deep: #C6392F;
-  --on-accent: #FFFFFF;
-  --tile: #F8EBDA;
-  --tile-dim: #E0C6B4;
-  --wall: #8B6B57;
+  --bg: #B32D1E;
+  --bg-deep: #8E2115;
+  --accent: #F5C31E;
+  --accent-deep: #D3A308;
+  --on-accent: #17161C;
+  --tile: #EFE7D6;
+  --tile-dim: #CBBFA9;
+  --wall: #8E241A;
 
   /* ---- surfaces (light-field set; the dark-field set is below) ----
      A panel is a *lit* face, not a wash: a top highlight, a hairline rim and
@@ -55,20 +55,27 @@
   --panel-2: rgba(255, 255, 255, 0.36);
   --panel-3: rgba(255, 255, 255, 0.54);
   --sink: rgba(0, 0, 0, 0.30);
-  --card: #FBF1E4;
+  --card: #EFE7D6;
   --hairline: rgba(255, 255, 255, 0.22);
   --rim: inset 0 0 0 1px rgba(255, 255, 255, 0.26);
   --edge: inset 0 1px 0 rgba(255, 255, 255, 0.55);
   --edge-in: inset 0 2px 4px rgba(0, 0, 0, 0.22);
+  /* Lifts light type off a dark field. Light fields carry ink type and set
+     this to `none`, where a shadow would only smear it. */
+  --type-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  /* A seat's colour can be the same colour as the table it is sitting on — a
+     red seat in Duel, played on the red field. The ring is what keeps the two
+     apart, so it belongs on every dot that shows a seat. */
+  --seat-ring: 0 0 0 2px var(--card);
 
   /* ---- ink ---- */
-  --ink: #3E2015;          /* on --card */
-  --ink-dim: rgba(62, 32, 21, 0.62);
+  --ink: #17161C;          /* on --card */
+  --ink-dim: rgba(23, 22, 28, 0.62);
   --on-bg: #FFFFFF;        /* headings on --bg */
-  --on-bg-dim: rgba(62, 32, 21, 0.90);    /* body copy on --bg */
-  --on-bg-faint: rgba(62, 32, 21, 0.78);  /* labels on --bg */
-  --on-panel: #3E2015;                    /* text on --panel */
-  --on-panel-dim: rgba(62, 32, 21, 0.74);
+  --on-bg-dim: rgba(23, 22, 28, 0.92);    /* body copy on --bg */
+  --on-bg-faint: rgba(23, 22, 28, 0.78);  /* labels on --bg */
+  --on-panel: #17161C;                    /* text on --panel */
+  --on-panel-dim: rgba(23, 22, 28, 0.74);
   --on-sink: rgba(255, 255, 255, 0.94);   /* text on --sink, every theme */
 
   /* ---- elevation ---- */
@@ -87,15 +94,15 @@
      floored at 0 when the inset is deeper than the outer radius. Every nested
      radius below is written as that subtraction rather than as a hand-picked
      number, so a padding change can no longer leave the corners mismatched. */
-  --r-1: 12px;
-  --r-2: 18px;
-  --r-3: 26px;
+  --r-1: 18px;
+  --r-2: 28px;
+  --r-3: 38px;
   --r-pill: 999px;
 
   /* Corner softness of a rank badge as a share of its own side. One ratio for
      every size — a 30px badge and a 96px badge are then the same shape, not
      two different ones. */
-  --badge-corner: 0.3;
+  --badge-corner: 0.32;
 
   /* ---- space ---- */
   --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
@@ -125,54 +132,71 @@
 
 /* ------------------------------------------------------------------ themes */
 
-[data-theme="ember"] {
-  --bg: #D98E74; --bg-deep: #C97A60;
-  --accent: #F2564B; --accent-deep: #C6392F; --on-accent: #FFF;
-  --tile: #F8EBDA; --tile-dim: #E0C6B4; --wall: #8B6B57;
+/* Three primaries, plus ink and paper — the whole app is mixed from these five
+   and nothing else. A mode never invents a hue; it picks which primary is the
+   field and which is the accent, so every screen is recognisably the same set
+   of colours rearranged.
+
+     red    #E14434   blue  #1B4FD8   yellow #F5C31E
+     ink    #17161C   paper #EFE7D6
+
+   A field and its accent are always two *different* primaries, which is what
+   keeps a card readable against the board behind it. */
+[data-theme="ember"] {          /* Duel — deep red field, yellow accent */
+  --bg: #B32D1E; --bg-deep: #8E2115;
+  --accent: #F5C31E; --accent-deep: #D3A308; --on-accent: #17161C;
+  --tile: #EFE7D6; --tile-dim: #CBBFA9; --wall: #8E241A;
 }
-[data-theme="tide"] {
-  --bg: #337D8B; --bg-deep: #296874;
-  --accent: #FFC65C; --accent-deep: #D99B2E; --on-accent: #26343A;
-  --tile: #EAF6F5; --tile-dim: #C2DBDA; --wall: #1E4F5A;
+[data-theme="tide"] {           /* Rumble — deep blue field, yellow accent */
+  --bg: #153A9E; --bg-deep: #0F2B78;
+  --accent: #F5C31E; --accent-deep: #D3A308; --on-accent: #17161C;
+  --tile: #EFE7D6; --tile-dim: #BEC4DC; --wall: #102A73;
 }
-[data-theme="orchid"] {
-  --bg: #7A5BA8; --bg-deep: #644789;
-  --accent: #FF7BAC; --accent-deep: #D4548A; --on-accent: #33193F;
-  --tile: #F3ECFA; --tile-dim: #D3C4E4; --wall: #452F66;
+[data-theme="orchid"] {         /* Big Arena — paper field, red accent */
+  --bg: #EFE7D6; --bg-deep: #DCD1BA;
+  --accent: #E14434; --accent-deep: #BC2E20; --on-accent: #FFFFFF;
+  --tile: #FFFFFF; --tile-dim: #D8CDB8; --wall: #17161C;
 }
-[data-theme="blaze"] {
-  --bg: #BE3F6B; --bg-deep: #9E3057;
-  --accent: #FFC24B; --accent-deep: #D69A24; --on-accent: #46162C;
-  --tile: #FDECF1; --tile-dim: #E5C3D0; --wall: #7A2647;
+[data-theme="blaze"] {          /* Mayhem — ink field, red accent */
+  --bg: #17161C; --bg-deep: #0D0C11;
+  --accent: #E14434; --accent-deep: #BC2E20; --on-accent: #FFFFFF;
+  --tile: #EFE7D6; --tile-dim: #A9A296; --wall: #000000;
 }
-[data-theme="gild"] {
-  --bg: #C08829; --bg-deep: #A0701C;
-  --accent: #45C4D4; --accent-deep: #2A9AA8; --on-accent: #10353A;
-  --tile: #FBF0DA; --tile-dim: #E0CBA2; --wall: #74501A;
+[data-theme="gild"] {           /* Duos — ochre field, blue accent */
+  --bg: #D9A408; --bg-deep: #B88705;
+  --accent: #1B4FD8; --accent-deep: #143BA6; --on-accent: #FFFFFF;
+  --tile: #FFF9E6; --tile-dim: #DCC98C; --wall: #8A6A05;
 }
-[data-theme="toxic"] {
-  --bg: #2F3B35; --bg-deep: #232C27;
-  --accent: #A8E063; --accent-deep: #7CB13F; --on-accent: #1B2417;
-  --tile: #DDE8DC; --tile-dim: #B4C4B3; --wall: #131B16;
+[data-theme="toxic"] {          /* Chaos — deep blue field, yellow accent */
+  --bg: #152252; --bg-deep: #0D163A;
+  --accent: #F5C31E; --accent-deep: #D3A308; --on-accent: #17161C;
+  --tile: #E4E7F2; --tile-dim: #AFB6CE; --wall: #070C21;
 }
-[data-theme="slate"] {
-  --bg: #54607A; --bg-deep: #434D63;
-  --accent: #7FC8F8; --accent-deep: #4E9CD0; --on-accent: #17293A;
-  --tile: #EDF1F7; --tile-dim: #C7CFDC; --wall: #2E3648;
+[data-theme="slate"] {          /* Custom — ink-grey field, blue accent */
+  --bg: #3A3A42; --bg-deep: #2A2A31;
+  --accent: #4C7DF0; --accent-deep: #2A57C4; --on-accent: #FFFFFF;
+  --tile: #EFE7D6; --tile-dim: #B6B2AA; --wall: #1B1B21;
 }
 
-/* Light fields: panels tint up, running text takes the ink. */
-[data-theme="ember"] { --ink: #3E2015; }
-[data-theme="gild"]  {
-  --ink: #3A2A08; --ink-dim: rgba(58, 42, 8, 0.62);
-  --on-bg-dim: rgba(58, 42, 8, 0.92); --on-bg-faint: rgba(58, 42, 8, 0.80);
-  --on-panel: #3A2A08; --on-panel-dim: rgba(58, 42, 8, 0.76);
+/* Light fields: panels tint up, running text takes the ink. Yellow and paper
+   are the only two fields bright enough to carry ink type. */
+[data-theme="gild"], [data-theme="orchid"] {
+  --ink: #17161C; --ink-dim: rgba(23, 22, 28, 0.62);
+  --on-bg: #17161C;
+  --on-bg-dim: rgba(23, 22, 28, 0.92); --on-bg-faint: rgba(23, 22, 28, 0.78);
+  --on-panel: #17161C; --on-panel-dim: rgba(23, 22, 28, 0.74);
+  --panel: rgba(23, 22, 28, 0.10);
+  --panel-2: rgba(23, 22, 28, 0.16);
+  --panel-3: rgba(255, 255, 255, 0.72);
+  --rim: inset 0 0 0 1px rgba(23, 22, 28, 0.10);
+  --edge: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  --type-shadow: none;
 }
 
 /* Dark fields: panels tint *down*, so text on a panel is never worse off than
    text on the field. The prominent surfaces (`-2`, `-3`) still lift, because
    "brighter" is what selected and active have always meant here. */
-[data-theme="tide"], [data-theme="orchid"], [data-theme="blaze"],
+[data-theme="ember"], [data-theme="tide"], [data-theme="blaze"],
 [data-theme="toxic"], [data-theme="slate"] {
   --panel: rgba(0, 0, 0, 0.16);
   --panel-2: rgba(255, 255, 255, 0.13);
@@ -201,7 +225,13 @@ html, body {
   -webkit-font-smoothing: antialiased;
   touch-action: manipulation;
   user-select: none;
-  transition: background var(--t-slow) var(--e-out);
+  /* No transition on this background, deliberately. --bg changes on <html>
+     itself, and a transition here never settles: the paint stays frozen on
+     whatever colour the page first rendered with, which is what left the
+     safe-area strips on the launch colour while every card, accent and rail
+     reading --bg had already repainted. Nothing else in a theme swap is
+     animated either, so snapping is also the honest behaviour — the whole
+     screen changes on the same frame. */
 }
 
 /* A soft vignette so the flat field has some depth under the board. */
@@ -210,7 +240,8 @@ body::before {
   position: fixed; inset: 0; pointer-events: none; z-index: 0;
   background: radial-gradient(120% 80% at 50% 0%, transparent 40%, var(--bg-deep) 100%);
   opacity: .6;
-  transition: background var(--t-slow) var(--e-out);
+  /* A gradient cannot interpolate either; fade the whole layer instead. */
+  transition: opacity var(--t-slow) var(--e-out);
 }
 
 .num { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1; }
@@ -228,9 +259,8 @@ body::before {
 }
 .screen.is-active { display: flex; animation: screen-in var(--t-slow) var(--e-out); }
 @keyframes screen-in {
-  from { opacity: 0; transform: translateY(14px) scale(.985); }
-  60%  { opacity: 1; }
-  to   { opacity: 1; transform: none; }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 /* The blocks of a screen settle in one after another — a beat behind the
    screen itself — so a change of screen reads as things arriving, not as a
@@ -268,11 +298,19 @@ body::before {
 }
 .stack.setup { justify-content: flex-start; }
 .scroller {
+  /* The soft edges below are painted over the scroller's own box, so they eat
+     whatever sits in the first --fade-t / last --fade-b pixels of it. Pay for
+     them in padding, or the first and last cards are permanently half-faded
+     and a selected card can never scroll clear. --ring is the sideways room a
+     selected card's outline needs, which `overflow` would otherwise clip. */
+  --fade-t: 18px;
+  --fade-b: 30px;
+  --ring: 5px;
   flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
   display: flex; flex-direction: column; gap: var(--s-3);
-  padding: var(--s-2) 0 var(--s-5);
+  padding: var(--fade-t) var(--ring) var(--fade-b);
   scrollbar-width: none;
-  width: min(440px, 100%); margin: 0 auto;
+  width: min(calc(440px + var(--ring) * 2), 100%); margin: 0 auto;
 }
 .scroller::-webkit-scrollbar { display: none; }
 /* Content scrolls; it never squashes to fit. (A flex child with its own
@@ -283,8 +321,10 @@ body::before {
    mistake. */
 .screen > .scroller,
 .pane > .scroller {
-  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 18px, #000 calc(100% - 30px), transparent 100%);
-  mask-image: linear-gradient(180deg, transparent 0, #000 18px, #000 calc(100% - 30px), transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 var(--fade-t),
+                      #000 calc(100% - var(--fade-b)), transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 var(--fade-t),
+              #000 calc(100% - var(--fade-b)), transparent 100%);
 }
 /* A setup screen's content is short; auto margins centre it in the space
    above the pinned button when it fits, and behave like a normal scroller
@@ -474,8 +514,10 @@ body::before {
 .mode-hero:active { transform: translateY(4px); box-shadow: 0 1px 0 rgba(0,0,0,.2), var(--edge), var(--rim); }
 .mode-glyph {
   width: 46px; height: 46px;
-  /* concentric with .mode-hero: 26px card - 12px inset */
-  border-radius: max(0px, calc(var(--r-3) - var(--s-3)));
+  /* Concentric with .mode-hero. The governing inset is the horizontal one:
+     the glyph is centred vertically, so as the card grows a line taller it is
+     the left edge, not the top, that still holds it against the corner. */
+  border-radius: max(0px, calc(var(--r-3) - var(--s-4)));
   display: grid; place-items: center;
   background: var(--accent); color: var(--on-accent);
   box-shadow: var(--lift-1), inset 0 1px 0 rgba(255,255,255,.3);
@@ -487,7 +529,7 @@ body::before {
 .mode-hero-name { font-size: var(--fs-head); font-weight: 900; line-height: 1.15; }
 .mode-hero-sub {
   display: block; font-size: 12.5px; font-weight: 800; color: var(--on-panel-dim); line-height: 1.35;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .mode-hero-cue {
   font-size: 11px; font-weight: 900; color: var(--on-panel); letter-spacing: .08em;
@@ -508,7 +550,7 @@ body::before {
   background:
     linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0) 58%),
     linear-gradient(150deg, var(--bg) 0%, var(--bg-deep) 100%);
-  color: #fff;
+  color: var(--on-bg);
   border-radius: var(--r-2); padding: var(--s-3);
   min-height: 70px;
   box-shadow: var(--lift-2), inset 0 0 0 1px rgba(255,255,255,.18);
@@ -523,14 +565,19 @@ body::before {
   box-shadow: var(--lift-3), 0 0 0 3px var(--card), inset 0 0 0 1px rgba(255,255,255,.28);
 }
 .mode-card.is-on:active { transform: translateY(2px); box-shadow: var(--lift-1), 0 0 0 3px var(--card), inset 0 0 0 1px rgba(255,255,255,.28); }
-.mode-card .mode-glyph { width: 44px; height: 44px; }
+/* Concentric with .mode-card, which is --r-2 rather than the --r-3 the hero
+   uses — the same glyph, re-derived for the smaller card it sits in. */
+.mode-card .mode-glyph {
+  width: 44px; height: 44px;
+  border-radius: max(0px, calc(var(--r-2) - var(--s-3)));
+}
 .mode-card > span:nth-child(2) { min-width: 0; }
-.mode-card-name { font-size: 16px; font-weight: 900; text-shadow: 0 1px 3px rgba(0,0,0,.35); }
+.mode-card-name { font-size: 16px; font-weight: 900; text-shadow: var(--type-shadow); }
 /* Secondary text takes the card's own body-copy token, so it is ink on the
    light cards and white on the dark ones — legible on every one of them. */
 .mode-card-tag {
   display: block; font-size: 12.5px; font-weight: 800; color: var(--on-bg-dim);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .mode-card-check {
   width: 28px; height: 28px; flex: none; padding: 5px; border-radius: 50%;
@@ -589,7 +636,7 @@ body::before {
   box-shadow: var(--lift-1), var(--edge), var(--rim);
 }
 .roster-main { display: flex; align-items: center; gap: 10px; }
-.roster-seat .dot { width: 18px; height: 18px; border-radius: 50%; flex: none; box-shadow: inset 0 -2px 0 rgba(0,0,0,.16); }
+.roster-seat .dot { width: 18px; height: 18px; border-radius: 50%; flex: none; box-shadow: var(--seat-ring), inset 0 -2px 0 rgba(0,0,0,.18); }
 .roster-seat .who { font-size: 14px; font-weight: 800; flex: 1; }
 .roster-seat .team-tag {
   font-size: 10.5px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase;
@@ -609,7 +656,7 @@ body::before {
   border: 0; border-radius: var(--r-2); padding: 14px 10px; min-height: 56px;
   background: var(--card); color: var(--ink); box-shadow: var(--lift-2);
 }
-.code-input::placeholder { color: rgba(62,32,21,.28); }
+.code-input::placeholder { color: rgba(23,22,28,.28); }
 .room-code {
   font-size: 44px; font-weight: 900; letter-spacing: .18em; text-align: center;
   color: var(--on-panel); background: var(--panel); border-radius: var(--r-2);
@@ -623,7 +670,7 @@ body::before {
   font-weight: 800; font-size: 15px;
   box-shadow: var(--lift-1), var(--edge), var(--rim);
 }
-.lobby-list .dot { width: 16px; height: 16px; border-radius: 50%; flex: none; }
+.lobby-list .dot { width: 16px; height: 16px; border-radius: 50%; flex: none; box-shadow: var(--seat-ring); }
 .lobby-list .you { margin-left: auto; font-size: 12px; color: var(--on-panel-dim); }
 
 /* ------------------------------------------------------------------ ranked */
@@ -771,7 +818,7 @@ body::before {
   font-size: 22px; font-weight: 900; color: var(--ink); line-height: 1;
 }
 .tally-total .rank-badge { --size: 30px; margin-left: var(--s-1); }
-.tally .track { width: 100%; background: rgba(62,32,21,.14); margin-top: var(--s-1); }
+.tally .track { width: 100%; background: rgba(23,22,28,.14); margin-top: var(--s-1); }
 .tally .track > i { background: var(--accent-deep); }
 .rank-jump {
   font-size: 13.5px; font-weight: 900;
@@ -896,7 +943,7 @@ body::before {
   transition: background var(--t-base) var(--e-out), box-shadow var(--t-base) var(--e-out),
               opacity var(--t-base), transform var(--t-base) var(--e-pop);
 }
-.score-chip .dot { width: 18px; height: 18px; border-radius: 50%; flex: none; box-shadow: inset 0 -2px 0 rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.3); }
+.score-chip .dot { width: 18px; height: 18px; border-radius: 50%; flex: none; box-shadow: var(--seat-ring), inset 0 -2px 0 rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.3); }
 .score-chip .val { font-size: 18px; font-weight: 900; min-width: 1.1em; text-align: center; }
 .score-chip .who { font-size: 11.5px; font-weight: 800; color: var(--on-panel-dim); }
 /* Which of these is me? On a rail of eight identical pills that is the first
@@ -993,11 +1040,11 @@ body::before {
 .card .hint + .btn-primary { margin-top: var(--s-3); }
 /* A plain .btn is cream — the same cream as the card it sits on — so inside a
    card it takes a white face and an ink hairline to stay a button. */
-.card .btn { background: #FFF; box-shadow: var(--lift-2), inset 0 0 0 2px rgba(62,32,21,.11); }
-.card .btn:active { box-shadow: 0 1px 0 rgba(0,0,0,.2), inset 0 0 0 2px rgba(62,32,21,.11); }
+.card .btn { background: #FFF; box-shadow: var(--lift-2), inset 0 0 0 2px rgba(23,22,28,.11); }
+.card .btn:active { box-shadow: 0 1px 0 rgba(0,0,0,.2), inset 0 0 0 2px rgba(23,22,28,.11); }
 .card .btn-primary { background: var(--accent); color: var(--on-accent); box-shadow: var(--lift-2), inset 0 1px 0 rgba(255,255,255,.28); }
 .card .btn-primary:active { box-shadow: 0 1px 0 rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.28); }
-.card .btn-ghost { background: rgba(62,32,21,.09); color: var(--ink); box-shadow: var(--lift-1); }
+.card .btn-ghost { background: rgba(23,22,28,.09); color: var(--ink); box-shadow: var(--lift-1); }
 .card .btn-ghost:active { box-shadow: none; }
 
 /* The win token: the winner's colour carrying the trophy, on a spark of the
@@ -1054,7 +1101,8 @@ body::before {
   .menu-row .btn-sm { padding-left: 6px; padding-right: 6px; font-size: 14px; }
   .preview-board { width: 84px; height: 84px; }
   .preview-name { font-size: 19px; }
-  .seg-tight .seg-btn { font-size: 11.5px; padding-left: 0; padding-right: 0; }
+  .seg-tight { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .seg-tight .seg-btn { font-size: 12px; padding-left: 0; padding-right: 0; }
   .rule { grid-template-columns: 1fr; }
   .rule-fig { display: none; }
 }
@@ -1104,7 +1152,8 @@ body::before {
 .rules b { color: var(--on-panel); font-weight: 900; }
 .rule-fig {
   width: 96px; height: 96px; flex: none;
-  border-radius: var(--r-1);
+  /* concentric with .rule: --r-2 card, --s-4 inset */
+  border-radius: max(0px, calc(var(--r-2) - var(--s-4)));
   background: var(--sink); box-shadow: var(--edge-in);
   padding: 8px;
 }
@@ -1194,8 +1243,8 @@ body::before {
 .turn-dot {
   width: 12px; height: 12px; border-radius: 50%; flex: none;
   background: var(--on-sink);
-  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .18);
-  transition: background var(--t-base) var(--e-out);
+  box-shadow: var(--seat-ring), inset 0 -2px 0 rgba(0, 0, 0, .18);
+  transition: background-color var(--t-base) var(--e-out);
 }
 .turn-banner { display: inline-flex; align-items: center; gap: 8px; }
 

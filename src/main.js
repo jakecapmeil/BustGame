@@ -123,14 +123,14 @@ function applyTheme(theme) {
   const cs = getComputedStyle(document.documentElement);
   const v = (name, fallback) => (cs.getPropertyValue(name) || '').trim() || fallback;
   setBoardSkin({
-    tile: v('--tile', '#F8EBDA'),
-    tileDim: v('--tile-dim', '#E0C6B4'),
-    wall: v('--wall', '#8B6B57'),
+    tile: v('--tile', '#EFE7D6'),
+    tileDim: v('--tile-dim', '#CBBFA9'),
+    wall: v('--wall', '#8E241A'),
     wallInk: 'rgba(0,0,0,0.22)',
     shadow: 'rgba(0,0,0,0.16)',
   });
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', v('--bg', '#D98E74'));
+  if (meta) meta.setAttribute('content', v('--bg', '#B32D1E'));
   if (session) refreshBoardOnly();
 }
 

@@ -14,23 +14,30 @@ import { EMPTY, MAX_BALLS, neighbors } from './engine.js';
  * The last four were chosen for hue separation from those, so an eight-player
  * Mayhem board stays readable.
  */
+/* Seats are drawn from the same five-colour set as the rest of the app. The
+   first three are the primaries themselves, because two- and four-seat games
+   are what most people play and those should be the purest reds, blues and
+   yellows on the board. Seats 4-8 extend the set for Mayhem, staying inside
+   the same poster palette rather than reaching for pastels.
+   A seat can land on a field of its own colour (red seat, red table), so every
+   dot is drawn with a paper ring — see `.dot` in styles.css. */
 export const PLAYER_COLORS = [
-  { ball: '#F2564B', tint: 'rgba(242, 86, 75, 0.20)', ink: '#C6392F', name: 'Red' },
-  { ball: '#25B7E8', tint: 'rgba(37, 183, 232, 0.20)', ink: '#1487B0', name: 'Blue' },
-  { ball: '#F0A430', tint: 'rgba(240, 164, 48, 0.22)', ink: '#C07A14', name: 'Amber' },
-  { ball: '#9B72E0', tint: 'rgba(155, 114, 224, 0.20)', ink: '#6F49B4', name: 'Violet' },
-  { ball: '#3EB56B', tint: 'rgba(62, 181, 107, 0.20)', ink: '#2A8850', name: 'Green' },
-  { ball: '#EE4B96', tint: 'rgba(238, 75, 150, 0.20)', ink: '#BB2E6E', name: 'Pink' },
-  { ball: '#0FA8A0', tint: 'rgba(15, 168, 160, 0.20)', ink: '#0B7B75', name: 'Teal' },
-  { ball: '#6B7A99', tint: 'rgba(107, 122, 153, 0.22)', ink: '#4B5770', name: 'Slate' },
+  { ball: '#E14434', tint: 'rgba(225, 68, 52, 0.22)', ink: '#A82519', name: 'Red' },
+  { ball: '#1B4FD8', tint: 'rgba(27, 79, 216, 0.22)', ink: '#1234A0', name: 'Blue' },
+  { ball: '#F5C31E', tint: 'rgba(245, 195, 30, 0.24)', ink: '#B08A05', name: 'Yellow' },
+  { ball: '#17161C', tint: 'rgba(23, 22, 28, 0.20)', ink: '#000000', name: 'Ink' },
+  { ball: '#2F9E5E', tint: 'rgba(47, 158, 94, 0.22)', ink: '#1F7343', name: 'Green' },
+  { ball: '#F07818', tint: 'rgba(240, 120, 24, 0.22)', ink: '#B45408', name: 'Orange' },
+  { ball: '#18A5C4', tint: 'rgba(24, 165, 196, 0.22)', ink: '#0E7691', name: 'Teal' },
+  { ball: '#7A4FD0', tint: 'rgba(122, 79, 208, 0.22)', ink: '#54329B', name: 'Violet' },
 ];
 
 // Repainted from CSS custom properties whenever the theme changes, so the
 // board always sits in the same world as the rest of the app.
 export const BOARD_SKIN = {
-  tile: '#F8EBDA',
-  tileDim: '#E0C6B4',
-  wall: '#8B6B57',
+  tile: '#EFE7D6',
+  tileDim: '#CBBFA9',
+  wall: '#8E241A',
   wallInk: 'rgba(0,0,0,0.20)',
   shadow: 'rgba(90, 45, 25, 0.16)',
 };

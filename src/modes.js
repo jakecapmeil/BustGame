@@ -5,11 +5,12 @@
  * seats are paired into teams, and whether the map has walls. It is orthogonal
  * to how you play it (solo / local / online) and to ranked scoring.
  *
- * Each mode also names a theme — the one hue that belongs to it and to no
- * other mode, set via `document.documentElement.dataset.theme` — and an
- * `icon`, the key of a hand-drawn mark in `icons.js`. Modes are data, not
- * code: adding one is a single entry here, a two-line `[data-theme]` block in
- * styles.css naming a hue nothing else uses, and one icon.
+ * Each mode also names a theme — its duo, a field and a mark that belong to
+ * it and to no other mode, set via `document.documentElement.dataset.theme` —
+ * and an `icon`, the key of a hand-drawn mark in `icons.js`. Themes are named
+ * for their field. Modes are data, not code: adding one is a single entry
+ * here, a one-line `[data-theme]` block in styles.css naming two colours
+ * nothing else uses, and one icon.
  *
  * Wall generation lives here rather than in the engine so the engine stays
  * free of randomness: `makeWalls` is seeded and deterministic, and the caller
@@ -24,17 +25,17 @@ export const MODES = {
   duel: {
     key: 'duel', name: 'Duel', tagline: 'One on one',
     blurb: 'The purest version. Two colours, a small board, nowhere to hide.',
-    seats: 2, board: [7, 7], teams: null, wallDensity: 0, theme: 'red', icon: 'duel',
+    seats: 2, board: [7, 7], teams: null, wallDensity: 0, theme: 'ink', icon: 'duel',
   },
   rumble: {
     key: 'rumble', name: 'Rumble', tagline: 'Four-way free-for-all',
     blurb: 'Four colours, one board. Everyone for themselves.',
-    seats: 4, board: [8, 8], teams: null, wallDensity: 0, theme: 'blue', icon: 'rumble',
+    seats: 4, board: [8, 8], teams: null, wallDensity: 0, theme: 'cobalt', icon: 'rumble',
   },
   arena: {
     key: 'arena', name: 'Big Arena', tagline: 'Four-way, room to move',
     blurb: 'The same four-way brawl with room to manoeuvre — and longer chains.',
-    seats: 4, board: [10, 10], teams: null, wallDensity: 0, theme: 'yellow', icon: 'arena',
+    seats: 4, board: [10, 10], teams: null, wallDensity: 0, theme: 'pitch', icon: 'arena',
   },
   mayhem: {
     key: 'mayhem', name: 'Mayhem', tagline: 'Eight-player brawl',
@@ -44,18 +45,18 @@ export const MODES = {
   duos: {
     key: 'duos', name: 'Duos', tagline: 'Two on two',
     blurb: 'Partners share a win. Busts feed your team-mate instead of stealing from them.',
-    seats: 4, board: [10, 10], teams: [0, 1, 0, 1], wallDensity: 0, theme: 'teal', icon: 'duos',
+    seats: 4, board: [10, 10], teams: [0, 1, 0, 1], wallDensity: 0, theme: 'petrol', icon: 'duos',
   },
   chaos: {
     key: 'chaos', name: 'Chaos', tagline: 'Four-way in a mirrored maze',
     blurb: 'A mirrored maze of walls. Balls fired into a wall are gone — pick your angles.',
-    seats: 4, board: [10, 10], teams: null, wallDensity: 0.13, theme: 'green', icon: 'chaos',
+    seats: 4, board: [10, 10], teams: null, wallDensity: 0.13, theme: 'cocoa', icon: 'chaos',
   },
   custom: {
     key: 'custom', name: 'Custom', tagline: 'Your rules',
     blurb: 'Set the table size, the board, teams and walls yourself.',
     seats: 4, board: [8, 8], teams: null, wallDensity: 0, bounceWalls: false,
-    theme: 'slate', icon: 'custom',
+    theme: 'chalk', icon: 'custom',
   },
 };
 

@@ -4,89 +4,60 @@
 
    Six rules everything here follows:
 
-   1. EXTRUDED, NOT FLAT. Every control sits on a hard bottom shadow
-      (`0 Npx 0`, never blurred), a top highlight (`--edge`) and a hairline
-      rim (`--rim`), and collapses into the shadow on press. Highlight + rim
-      are what keep a white panel readable as a raised face on paper that is
-      only a shade darker — without them a screen of panels reads as one
-      sheet. Blurred shadows are reserved for things genuinely floating above
-      the app — modals and the board's tiles.
-   2. ONE SHELL, SEVEN HUES. Every screen is the same near-white paper, in
-      every mode. What a mode owns is a single hue — its own, used by no other
-      mode — and that hue is spent only on small things: the primary button,
-      the mode's mark, the selected row, the walls of its board. Docs is blue
-      and Sheets is green, but they are the same white page, and you can tell
-      them apart from across the room. The eight seat colours and the rank
+   1. EXTRUDED, NOT LIT. Every control sits on a hard bottom shadow
+      (`0 Npx 0`, never blurred), a top edge (`--edge`) and a hairline rim
+      (`--rim`), and collapses into the shadow on press. Edge + rim are what
+      keep a glass panel readable as a raised face on the field behind it.
+      Surfaces are flat colour: nothing is lit from above — no vignettes, no
+      glows, no gradient standing in for a light source. Blurred shadows are
+      reserved for things genuinely floating above the app — modals and the
+      board's tiles.
+   2. EVERY MODE IS A DUO. A mode owns two colours: a field, which is the
+      full-strength ground of every screen, and a mark, which is what you
+      press — the play button, the mode glyph, the meters, the numbers.
+      Fourteen colours across seven modes, none used twice and no duo made of
+      two shades of one hue, so a mode is recognisable from across the room by
+      its pair. Controls are frosted glass over the field, so the field stays
+      the colour of the whole screen. The eight seat colours and the rank
       tints are the sanctioned exceptions.
-   3. BIG, ROUND, CONFIDENT. Radii step 18 / 28 / 38 / pill. Nunito 700-900
-      only — this app has no light type.
-   4. COLOUR IS ATTENTION. The paper carries ink; nothing is coloured for
-      decoration. A hue appears where you are meant to act, or where you are
-      meant to recognise which mode you are in. Each hue is stated twice —
-      bright and deep — because the bright one fills shapes and the deep one
-      writes words, and only one of them can do each job.
+   3. SEMI, NEVER PILL. A box keeps straight sides: its radius stays at or
+      under about a third of its height (16 on a 56px button, 12 on a 44px
+      row), so nothing grows semicircle ends. Circles are for the game's balls.
+      Nunito 700-900 only — this app has no light type.
+   4. COLOUR IS ATTENTION. The field carries the type; the mark appears where
+      you are meant to act. Each mark is stated twice — bright and deep —
+      because the bright one stands on the field and the deep one writes on
+      white, and only one of them can do each job.
    5. NUMBERS ARE THE HERO. Scores, trophies and deltas get the largest type on
       screen, always tabular so they don't jitter as they count.
    6. MOTION IS PHYSICAL. Things overshoot a little and settle. Nothing moves
       linearly. `prefers-reduced-motion` removes all of it.
 
-   Tokens live on `:root`. A mode swaps exactly two of them — `--accent` and
-   `--accent-deep` — via `<html data-theme>`; everything else in the sheet is
-   the same in all seven. The mode cards carry their own `data-theme`, so each
-   one previews its hue without the page changing colour underneath it.
+   Tokens live on `:root`. A mode swaps three of them — `--bg` (the field),
+   `--accent` (the mark) and `--accent-deep` — via `<html data-theme>`, and
+   whether its field takes the dark-field or light-field surface set is
+   measured from the colour (`data-field`, see applyTheme in main.js). The
+   mode cards carry their own `data-theme` and `data-field`, so each one is a
+   swatch of the duo it switches to.
    ========================================================================== */
 
 :root {
-  /* ---- the shell (never overridden by a mode) ----
-     One near-white paper under everything. It is mixed, not picked: --base is
-     the warm white the whole app is tinted toward — the painter's trick of
-     dropping the same pigment into every mixture on the palette — and the
-     greys below are that same white walked down in even steps. */
-  --base: #FFFEFA;
-  --bg: #F2EFE7;        /* the page */
-  --bg-deep: #E7E2D6;   /* the vignette under the board */
-  --card: #FFFFFF;      /* a raised face */
+  /* ---- the duo (a mode overrides these three) ----
+     Rumble's, because Rumble is the default mode: the app at rest wears the
+     palette of the game it is about to deal. */
+  --bg: #1F48C4;           /* the field: Cobalt */
+  --accent: #F7C526;       /* the mark: Sunflower */
+  --accent-deep: #8A6604;  /* the mark taken dark enough to write on white */
 
-  /* ---- palette (the only thing a mode changes) ----
-     Rumble's blue, because Rumble is the default mode. */
-  --accent: #1B4FD8;
-  --accent-deep: #133BA6;
-
-  /* ---- surfaces ----
-     A panel is a *lit* face, not a wash: a top highlight, a hairline rim and
-     a hard bottom shadow make it read as raised against paper it is only a
-     shade away from. */
-  --panel: rgba(255, 255, 255, 0.62);
-  --panel-2: #FFFFFF;
-  --sink: #E4DFD2;      /* a well: segmented tracks, figure boxes, meters */
-  --rim: inset 0 0 0 1px rgba(23, 22, 28, 0.08);
-  --edge: inset 0 1px 0 rgba(255, 255, 255, 0.85);
-  --edge-in: inset 0 2px 4px rgba(23, 22, 28, 0.13);
-  /* Ink type on paper needs no lift off its background, and a shadow under it
-     only smears. Kept as a token because the saturated faces still use one. */
-  --type-shadow: none;
-  /* Two of the eight seat colours — yellow at 1.6:1, and paper-pale walls
-     behind them — have almost no edge against white. Every dot that shows a
-     seat carries this hairline so the colour is a disc, not a smudge. */
-  --seat-ring: 0 0 0 2px rgba(23, 22, 28, 0.16);
-
-  /* ---- ink ---- */
-  --ink: #17161C;          /* on --card */
+  /* A white face, the same in every mode: text fields, modals, the chosen
+     segment of a segmented control. Ink writes on it. */
+  --card: #FFFFFF;
+  --ink: #17161C;
   --ink-dim: rgba(23, 22, 28, 0.62);
-  --on-bg: #17161C;        /* headings on --bg */
-  --on-bg-dim: rgba(23, 22, 28, 0.86);    /* body copy on --bg */
-  --on-bg-faint: rgba(23, 22, 28, 0.60);  /* labels on --bg */
-  --on-panel: #17161C;                    /* text on --panel */
-  --on-panel-dim: rgba(23, 22, 28, 0.66);
-  --on-sink: rgba(23, 22, 28, 0.66);      /* text in a well */
+  --type-shadow: none;
 
-  /* ---- elevation ----
-     Warm ink rather than black: a neutral shadow on warm paper reads as dirt
-     under the object, not as depth. */
-  --lift-1: 0 3px 0 rgba(23, 22, 28, 0.14);
-  --lift-2: 0 5px 0 rgba(23, 22, 28, 0.15);
-  --lift-3: 0 8px 0 rgba(23, 22, 28, 0.17);
-  --float: 0 18px 44px rgba(23, 22, 28, 0.24);
+  /* A shadow under something floating above the whole app. */
+  --float: 0 18px 44px rgba(0, 0, 0, 0.36);
 
   /* ---- radius ----
      Nested corners follow Apple's concentricity rule (the one SwiftUI's
@@ -101,7 +72,6 @@
   --r-1: 18px;
   --r-2: 28px;
   --r-3: 38px;
-  --r-pill: 999px;
 
   /* Corner softness of a rank badge as a share of its own side. One ratio for
      every size — a 30px badge and a 96px badge are then the same shape, not
@@ -136,44 +106,100 @@
 
 /* ------------------------------------------------------------------ themes */
 
-/* Seven modes, seven hues, and no hue used twice — a colour in this app names
-   exactly one mode, the way blue names Docs and green names Sheets. Each is
-   stated as a bright face and one deeper variant of itself: the bright one
-   fills shapes, the deep one writes words and draws walls. Yellow is why the
-   pair has to exist — #F5C31E is 1.6:1 on paper and can never carry text,
-   while #A87C06 clears AA and is unmistakably the same colour. */
-[data-theme="red"]    { --accent: #E14434; --accent-deep: #A9291B; }  /* Duel */
-[data-theme="blue"]   { --accent: #1B4FD8; --accent-deep: #133BA6; }  /* Rumble */
-[data-theme="yellow"] { --accent: #F5C31E; --accent-deep: #8A6604; }  /* Big Arena */
-[data-theme="violet"] { --accent: #7A4FD0; --accent-deep: #56309F; }  /* Mayhem */
-[data-theme="teal"]   { --accent: #12A0B4; --accent-deep: #0A6273; }  /* Duos */
-[data-theme="green"]  { --accent: #2F9E5E; --accent-deep: #16663B; }  /* Chaos */
-[data-theme="slate"]  { --accent: #5B6070; --accent-deep: #3A3E4B; }  /* Custom */
-
-/* The two places a hue is allowed to spread past its own shape, and the board.
-   Declared here rather than on :root alone because a var() is substituted
-   where it is *declared*: on :root only, --accent-soft would resolve once
-   against the root's own accent and every mode card — each of which carries
-   its own [data-theme] — would come out the same colour. */
+/* Declared on every themed element, not on :root alone, because a var() is
+   substituted where it is *declared*: on :root only, these would resolve once
+   against the root's own field, and every mode card — each of which carries
+   its own [data-theme] — would come out the same colour. Stated before the
+   themes so a theme can still override one of them (Custom's walls). */
 :root, [data-theme] {
-  --accent-soft: color-mix(in oklab, var(--accent) 13%, var(--base));
-  --accent-line: color-mix(in oklab, var(--accent) 34%, var(--base));
-  /* "This one is chosen" is the same tint everywhere it appears. */
-  --panel-3: var(--accent-soft);
-  /* The board is paper too. Only the walls take the hue — that, and the mark
-     on the picker card, is the whole of a mode's identity on screen. */
+  --accent-line: color-mix(in oklab, var(--accent) 60%, transparent);
+  /* White tiles on the field; the walls are the field itself, seen through
+     the board, so a wall reads as a hole rather than as a piece. */
   --tile: #FFFFFF;
-  --tile-dim: color-mix(in oklab, var(--accent) 10%, #EAE5DA);
-  --wall: var(--accent-deep);
+  --tile-dim: color-mix(in oklab, var(--bg) 16%, #E9E4D8);
+  --wall: var(--bg);
 }
 
-/* Ink or white on the accent, decided by measuring it — see isLight in
-   main.js. The accent is the face of the primary button, so this is the
+/* Seven modes, seven duos: a field you stand on and a mark you press.
+
+     Duel       Ink    / Vermilion       Duos    Petrol / Chartreuse
+     Rumble     Cobalt / Sunflower       Chaos   Cocoa  / Cyan
+     Big Arena  Pitch  / Bubblegum       Custom  Chalk  / Slate
+     Mayhem     Violet / Tangerine
+
+   Every mark clears 3:1 on its own field, so a mark can stand on the field as
+   a bare shape — a button face, a meter, a number — with no frame around it.
+   --accent-deep is the mark taken dark enough to write on white, for the few
+   marks that land on a modal. */
+[data-theme="ink"]    { --bg: #17161C; --accent: #EC4430; --accent-deep: #B52A18; }  /* Duel */
+[data-theme="cobalt"] { --bg: #1F48C4; --accent: #F7C526; --accent-deep: #8A6604; }  /* Rumble */
+[data-theme="pitch"]  { --bg: #146638; --accent: #FF9FC8; --accent-deep: #B0306E; }  /* Big Arena */
+[data-theme="violet"] { --bg: #5A33B8; --accent: #FF8A2A; --accent-deep: #A84C06; }  /* Mayhem */
+[data-theme="petrol"] { --bg: #0B6571; --accent: #C9E843; --accent-deep: #5E7A0C; }  /* Duos */
+[data-theme="cocoa"]  { --bg: #553322; --accent: #4ED0EE; --accent-deep: #0A6F87; }  /* Chaos */
+/* Chalk is the one light field, so its walls take the slate mark — chalk
+   walls on white tiles would be nothing. */
+[data-theme="chalk"]  { --bg: #F1E9D9; --accent: #454A57; --accent-deep: #454A57; --wall: #454A57; }  /* Custom */
+
+/* ---- surfaces ----
+   Two sets, and which one a field takes is measured from the colour (isLight
+   in main.js), not listed by mode name. The dark-field set is frosted glass
+   over the field: panels are white at low opacity, type is white, shadows are
+   black. The light-field set turns the glass milky and the type ink. */
+:root, [data-field="dark"] {
+  --face: rgba(255, 255, 255, 0.14);     /* a plain button */
+  --panel: rgba(255, 255, 255, 0.11);
+  --panel-2: rgba(255, 255, 255, 0.15);
+  --panel-3: rgba(255, 255, 255, 0.27);  /* "this one is chosen" */
+  --sink: rgba(0, 0, 0, 0.26);           /* a well: tracks, segmented controls, meters */
+  --rim: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  --edge: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  --edge-in: inset 0 2px 4px rgba(0, 0, 0, 0.26);
+  /* A seat can be the colour of the field under it — the ink seat in Duel,
+     the blue seat in Rumble — so every dot that shows a seat carries a ring. */
+  --seat-ring: 0 0 0 2px rgba(255, 255, 255, 0.72);
+  --on-bg: #FFFFFF;                          /* headings on the field */
+  --on-bg-dim: rgba(255, 255, 255, 0.9);     /* body copy on the field */
+  --on-bg-faint: rgba(255, 255, 255, 0.78);  /* labels on the field */
+  --on-panel: #FFFFFF;
+  /* Glass lightens the field under it, so secondary type on a panel can only
+     step back a little before it drops under 4.5:1 (Duos is the tightest). */
+  --on-panel-dim: rgba(255, 255, 255, 0.92);
+  --on-sink: rgba(255, 255, 255, 0.88);
+  --lift-1: 0 3px 0 rgba(0, 0, 0, 0.22);
+  --lift-2: 0 5px 0 rgba(0, 0, 0, 0.24);
+  --lift-3: 0 8px 0 rgba(0, 0, 0, 0.26);
+}
+/* A modal card is white on every field, so everything inside it — a
+   segmented control, a meter — takes the light set too. */
+[data-field="light"], .card {
+  --face: rgba(255, 255, 255, 0.62);
+  --panel: rgba(255, 255, 255, 0.5);
+  --panel-2: rgba(255, 255, 255, 0.72);
+  --panel-3: rgba(255, 255, 255, 0.92);
+  --sink: rgba(23, 22, 28, 0.12);
+  --rim: inset 0 0 0 1px rgba(23, 22, 28, 0.1);
+  --edge: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --edge-in: inset 0 2px 4px rgba(23, 22, 28, 0.14);
+  --seat-ring: 0 0 0 2px rgba(23, 22, 28, 0.16);
+  --on-bg: #17161C;
+  --on-bg-dim: rgba(23, 22, 28, 0.86);
+  --on-bg-faint: rgba(23, 22, 28, 0.64);
+  --on-panel: #17161C;
+  --on-panel-dim: rgba(23, 22, 28, 0.68);
+  --on-sink: rgba(23, 22, 28, 0.7);
+  --lift-1: 0 3px 0 rgba(23, 22, 28, 0.14);
+  --lift-2: 0 5px 0 rgba(23, 22, 28, 0.15);
+  --lift-3: 0 8px 0 rgba(23, 22, 28, 0.17);
+}
+
+/* Ink or white on the mark, decided by measuring it — see isLight in
+   main.js. The mark is the face of the primary button, so this is the
    difference between a readable Start and a pale smear, and it genuinely
-   differs across the seven: yellow needs ink, blue needs white. */
+   differs across the seven: sunflower needs ink, vermilion needs white. */
 /* A default so the first paint, before applyTheme has measured anything, is
-   never text with no colour at all. */
-:root { --on-accent: #FFFFFF; }
+   never text with no colour at all. Rumble's sunflower takes ink. */
+:root { --on-accent: #17161C; }
 [data-accent="light"] { --on-accent: #17161C; }
 [data-accent="dark"]  { --on-accent: #FFFFFF; }
 
@@ -193,14 +219,8 @@ html, body {
   -webkit-font-smoothing: antialiased;
   touch-action: manipulation;
   user-select: none;
-}
-
-/* A soft vignette so the flat paper has some depth under the board. */
-body::before {
-  content: '';
-  position: fixed; inset: 0; pointer-events: none; z-index: 0;
-  background: radial-gradient(120% 80% at 50% 0%, transparent 40%, var(--bg-deep) 100%);
-  opacity: .6;
+  /* Changing mode crossfades the field rather than cutting to it. */
+  transition: background-color var(--t-slow) var(--e-out), color var(--t-slow) var(--e-out);
 }
 
 .num { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1; }
@@ -311,16 +331,16 @@ body::before {
 .btn {
   appearance: none; border: 0;
   font: inherit; font-size: var(--fs-head); font-weight: 900;
-  color: var(--ink);
-  background: var(--card);
-  border-radius: var(--r-2);
+  color: var(--on-panel);
+  background: var(--face);
+  border-radius: 16px;
   padding: var(--s-4) var(--s-4);
   min-height: 56px;
-  box-shadow: var(--lift-2);
+  box-shadow: var(--lift-2), var(--edge), var(--rim);
   cursor: pointer;
   transition: transform var(--t-fast) var(--e-out), box-shadow var(--t-fast) var(--e-out), opacity var(--t-base);
 }
-.btn:active { transform: translateY(5px); box-shadow: 0 1px 0 rgba(0,0,0,.2); }
+.btn:active { transform: translateY(5px); box-shadow: 0 1px 0 rgba(0,0,0,.2), var(--edge), var(--rim); }
 .btn-primary { background: var(--accent); color: var(--on-accent); box-shadow: var(--lift-2), inset 0 1px 0 rgba(255,255,255,.28); }
 .btn-primary:active { box-shadow: 0 1px 0 rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.28); }
 /* Secondary, not disabled: a real raised face in the panel tint with the
@@ -330,14 +350,14 @@ body::before {
   box-shadow: var(--lift-2), var(--edge), var(--rim);
 }
 .btn-ghost:active { box-shadow: 0 1px 0 rgba(0,0,0,.2), var(--edge), var(--rim); }
-.btn-sm { min-height: 46px; font-size: var(--fs-body); padding: var(--s-3); border-radius: var(--r-1); }
+.btn-sm { min-height: 46px; font-size: var(--fs-body); padding: var(--s-3); border-radius: 14px; }
 .btn-sm:active { transform: translateY(4px); }
 .btn[disabled] { opacity: .4; pointer-events: none; }
 
 .icon-btn {
   appearance: none; border: 0;
   width: 44px; height: 44px; flex: none;
-  border-radius: var(--r-1);
+  border-radius: 14px;
   background: var(--panel-2);
   color: var(--on-panel);
   display: grid; place-items: center;
@@ -389,7 +409,7 @@ body::before {
 .chip-toggle {
   appearance: none; border: 0; font: inherit;
   font-size: 13px; font-weight: 800;
-  padding: 11px 15px; min-height: 44px; border-radius: var(--r-pill);
+  padding: 11px 15px; min-height: 44px; border-radius: 12px;
   background: var(--panel); color: var(--on-panel);
   box-shadow: var(--lift-1), var(--edge), var(--rim);
   cursor: pointer;
@@ -400,7 +420,12 @@ body::before {
 .toggles { display: flex; gap: var(--s-2); justify-content: center; }
 
 .hint { color: var(--on-bg-dim); font-weight: 700; font-size: 14.5px; line-height: 1.5; margin: 0; }
-.err { color: #A9291B; font-weight: 800; font-size: 14px; min-height: 20px; margin: 0; }
+/* An error sits on a white slip of its own: red type has to read on seven
+   different fields, and on most of them it can't. */
+.err {
+  color: #A9291B; background: #FFF1EE; font-weight: 800; font-size: 14px; margin: 0;
+  padding: 8px 12px; border-radius: 12px; box-shadow: var(--lift-1);
+}
 .err:empty { display: none; }
 .is-hidden { display: none !important; }
 
@@ -413,8 +438,8 @@ body::before {
   letter-spacing: -.045em;
   margin: 0;
   text-align: center;
-  color: var(--ink);
-  text-shadow: 0 6px 0 rgba(23, 22, 28, .12);
+  color: var(--on-bg);
+  text-shadow: 0 6px 0 rgba(0, 0, 0, .2);
   display: flex; align-items: center; justify-content: center; gap: .1em;
   line-height: 1;
 }
@@ -466,17 +491,16 @@ body::before {
   display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--s-3);
   width: 100%; text-align: left;
   background: var(--panel-2); color: var(--on-panel);
-  border-radius: var(--r-3); padding: var(--s-3) var(--s-4);
+  border-radius: 20px; padding: var(--s-3) var(--s-4);
   box-shadow: var(--lift-2), var(--edge), var(--rim);
   transition: transform var(--t-fast) var(--e-out), box-shadow var(--t-fast) var(--e-out);
 }
 .mode-hero:active { transform: translateY(4px); box-shadow: 0 1px 0 rgba(0,0,0,.2), var(--edge), var(--rim); }
 .mode-glyph {
   width: 46px; height: 46px;
-  /* Concentric with .mode-hero. The governing inset is the horizontal one:
-     the glyph is centred vertically, so as the card grows a line taller it is
-     the left edge, not the top, that still holds it against the corner. */
-  border-radius: max(0px, calc(var(--r-3) - var(--s-4)));
+  /* A share of its own side, like a rank badge, rather than concentric with
+     the card: the card's 16px inset would leave it square at a 20px corner. */
+  border-radius: 13px;
   display: grid; place-items: center;
   background: var(--accent); color: var(--on-accent);
   box-shadow: var(--lift-1), inset 0 1px 0 rgba(255,255,255,.3);
@@ -491,9 +515,9 @@ body::before {
   overflow-wrap: anywhere;
 }
 .mode-hero-cue {
-  font-size: 11px; font-weight: 900; color: var(--on-panel); letter-spacing: .08em;
-  padding: 6px 10px; border-radius: var(--r-pill);
-  background: var(--sink); color: var(--on-sink); box-shadow: var(--edge-in);
+  font-size: 11px; font-weight: 900; letter-spacing: .08em;
+  padding: 6px 10px; border-radius: 7px;
+  background: var(--accent); color: var(--on-accent); box-shadow: 0 2px 0 rgba(0,0,0,.22);
 }
 
 /* The picker grid. Each card previews its own theme. */
@@ -502,48 +526,36 @@ body::before {
   appearance: none; border: 0; cursor: pointer; text-align: left;
   display: grid; grid-template-columns: auto 1fr auto; align-items: center;
   gap: var(--s-3);
-  /* Every row is the same white card. What tells them apart is the mark, in
-     the one hue that belongs to that mode — the app grid, not seven wallpapers.
-     The page does not change colour when you scroll the list. */
-  background: var(--card);
-  color: var(--ink);
-  border-radius: var(--r-2); padding: var(--s-3);
+  /* Each row is a swatch of the duo it switches to: the card is that mode's
+     field, its glyph is that mode's mark. The card carries its own
+     data-theme and data-field, so its type and glass follow its own field. */
+  background: var(--bg);
+  color: var(--on-bg);
+  border-radius: 20px; padding: var(--s-3);
   min-height: 70px;
-  box-shadow: var(--lift-2), var(--rim);
-  transition: transform var(--t-fast) var(--e-out), box-shadow var(--t-fast) var(--e-out),
-              background-color var(--t-fast) var(--e-out);
+  box-shadow: var(--lift-2), var(--edge), var(--rim);
+  transition: transform var(--t-fast) var(--e-out), box-shadow var(--t-fast) var(--e-out);
 }
-.mode-card:active { transform: translateY(4px); box-shadow: 0 1px 0 rgba(23,22,28,.16), var(--rim); }
-/* Selected: the row floods with the faintest wash of its own hue and takes a
-   ring in the hue at full strength, so the choice is announced in the colour
-   it is a choice of. Three tells — tint, ring, tick — so it can never read as
-   a hole in the list. */
+.mode-card:active { transform: translateY(4px); box-shadow: 0 1px 0 rgba(0,0,0,.2), var(--edge), var(--rim); }
+/* Selected: lifted, and ringed white-then-ink, which reads on every field the
+   list can sit on — including a card that is the same colour as the page. */
 .mode-card.is-on {
   transform: translateY(-2px);
-  background: var(--accent-soft);
-  box-shadow: var(--lift-3), 0 0 0 3px var(--accent-deep);
+  box-shadow: var(--lift-3), 0 0 0 3px #FFFFFF, 0 0 0 5px #17161C;
 }
-.mode-card.is-on:active { transform: translateY(2px); box-shadow: var(--lift-1), 0 0 0 3px var(--accent-deep); }
-/* Concentric with .mode-card, which is --r-2 rather than the --r-3 the hero
-   uses — the same glyph, re-derived for the smaller card it sits in. */
-.mode-card .mode-glyph {
-  width: 44px; height: 44px;
-  border-radius: max(0px, calc(var(--r-2) - var(--s-3)));
-}
+.mode-card.is-on:active { transform: translateY(2px); box-shadow: var(--lift-1), 0 0 0 3px #FFFFFF, 0 0 0 5px #17161C; }
+.mode-card .mode-glyph { width: 44px; height: 44px; border-radius: 13px; }
 .mode-card > span:nth-child(2) { min-width: 0; }
 .mode-card-name { font-size: 16px; font-weight: 900; }
 .mode-card-tag {
-  display: block; font-size: 12.5px; font-weight: 800; color: var(--ink-dim);
+  display: block; font-size: 12.5px; font-weight: 800; color: var(--on-bg-dim);
   overflow-wrap: anywhere;
 }
 .mode-card-check {
-  width: 28px; height: 28px; flex: none; padding: 5px; border-radius: 50%;
+  width: 28px; height: 28px; flex: none; padding: 5px; border-radius: 8px;
   opacity: 0; transform: scale(.5);
-  /* The deep variant, like the ring it sits inside: the bright one has to
-     read against a wash of itself, and yellow cannot. Every deep is dark
-     enough that the tick is white on all seven. */
-  background: var(--accent-deep); color: #FFFFFF;
-  box-shadow: var(--lift-1), inset 0 1px 0 rgba(255,255,255,.3);
+  background: var(--accent); color: var(--on-accent);
+  box-shadow: var(--lift-1);
   transition: opacity var(--t-fast) var(--e-out), transform var(--t-base) var(--e-pop);
 }
 .mode-card.is-on .mode-card-check { opacity: 1; transform: scale(1); }
@@ -612,7 +624,7 @@ body::before {
 .code-input {
   flex: 1; min-width: 0; font: inherit; font-size: 24px; font-weight: 900;
   letter-spacing: .22em; text-align: center; text-transform: uppercase;
-  border: 0; border-radius: var(--r-2); padding: 14px 10px; min-height: 56px;
+  border: 0; border-radius: 16px; padding: 14px 10px; min-height: 56px;
   background: var(--card); color: var(--ink); box-shadow: var(--lift-2);
 }
 .code-input::placeholder { color: rgba(23,22,28,.28); }
@@ -625,7 +637,7 @@ body::before {
 .lobby-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .lobby-list li {
   display: flex; align-items: center; gap: 11px;
-  background: var(--panel); color: var(--on-panel); border-radius: var(--r-1); padding: 12px 15px;
+  background: var(--panel); color: var(--on-panel); border-radius: 12px; padding: 12px 15px;
   font-weight: 800; font-size: 15px;
   box-shadow: var(--lift-1), var(--edge), var(--rim);
 }
@@ -665,7 +677,7 @@ body::before {
   display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--s-3);
   width: 100%; text-align: left;
   background: var(--panel); color: var(--on-panel);
-  border-radius: var(--r-2); padding: 10px var(--s-3);
+  border-radius: 16px; padding: 10px var(--s-3);
   box-shadow: var(--lift-1), var(--edge), var(--rim);
   transition: transform var(--t-fast) var(--e-out), box-shadow var(--t-fast) var(--e-out);
 }
@@ -675,14 +687,15 @@ body::before {
 .rank-strip-name { font-size: 13px; font-weight: 900; }
 .rank-strip-trophies { display: flex; align-items: center; gap: 5px; font-size: 17px; font-weight: 900; }
 
-/* progress track. The fill never drops below a round nub, so an empty track
-   reads as "the start of a bar", not as a stray line. */
+/* progress track. The fill never drops below a nub, so an empty track reads
+   as "the start of a bar", not as a stray line. The fill is the mark: it is
+   what you are working toward. */
 .track {
-  --track-fill: var(--accent-deep);
-  height: 8px; border-radius: var(--r-pill); background: var(--sink); overflow: hidden;
+  --track-fill: var(--accent);
+  height: 8px; border-radius: 3px; background: var(--sink); overflow: hidden;
   box-shadow: var(--edge-in), inset 0 0 0 1px rgba(255,255,255,.10);
 }
-.track-lg { height: 12px; }
+.track-lg { height: 12px; border-radius: 4px; }
 .track > i {
   display: block; height: 100%; width: 0%;
   min-width: 8px;
@@ -693,35 +706,28 @@ body::before {
 }
 .track-lg > i { min-width: 12px; }
 
-/* ranked hero: the rank's own tint glows up behind the badge, so the one
-   colour the screen is about isn't confined to a 92px square. */
+/* ranked hero: the rank's badge and its bar carry the rank's tint; the card
+   itself is plain glass, lit by nothing. */
 .rank-hero {
   --rank: var(--wall);
-  position: relative; overflow: hidden;
   display: flex; flex-direction: column; align-items: center; gap: var(--s-2);
   text-align: center;
-  background: var(--panel-2); color: var(--on-panel); border-radius: var(--r-3);
+  background: var(--panel-2); color: var(--on-panel); border-radius: 28px;
   padding: var(--s-5) var(--s-4) var(--s-4);
   box-shadow: var(--lift-2), var(--edge), var(--rim);
 }
-.rank-hero::before {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(90% 70% at 50% 0%, var(--rank) 0%, transparent 70%);
-  opacity: .45;
-}
-.rank-hero > * { position: relative; }
 .rank-hero .rank-badge-xl { margin-bottom: var(--s-1); }
 .rank-hero-name { font-size: 23px; font-weight: 900; letter-spacing: -.01em; }
 .rank-hero-count {
   display: flex; align-items: center; gap: var(--s-2);
   font-size: 44px; font-weight: 900; line-height: 1; letter-spacing: -.02em;
 }
-.rank-hero .track { width: 100%; --track-fill: var(--rank); margin-top: var(--s-1); background: rgba(23,22,28,.16); }
+.rank-hero .track { width: 100%; --track-fill: var(--rank); margin-top: var(--s-1); }
 .rank-hero-next { font-size: 13px; font-weight: 800; color: var(--on-panel-dim); }
 
 .stat-row { display: flex; gap: var(--s-2); }
 .stat {
-  flex: 1; background: var(--panel); color: var(--on-panel); border-radius: var(--r-1);
+  flex: 1; background: var(--panel); color: var(--on-panel); border-radius: 14px;
   padding: 10px var(--s-2); text-align: center;
   box-shadow: var(--lift-1), var(--edge), var(--rim);
 }
@@ -736,7 +742,7 @@ body::before {
   --rank: var(--wall);
   position: relative;
   display: flex; align-items: center; gap: 10px;
-  background: var(--panel); border-radius: var(--r-1); padding: 7px 12px 7px 10px;
+  background: var(--panel); border-radius: 12px; padding: 7px 12px 7px 10px;
   color: var(--on-panel); font-weight: 800; font-size: 14px;
   box-shadow: var(--edge), var(--rim);
   transition: background var(--t-base) var(--e-out), transform var(--t-fast) var(--e-out);
@@ -749,13 +755,13 @@ body::before {
 .ladder li .lad-lock { width: 14px; height: 14px; margin-right: 4px; opacity: .75; }
 .ladder li .lad-you {
   font-size: 9.5px; font-weight: 900; letter-spacing: .12em;
-  padding: 3px 7px; border-radius: var(--r-pill);
-  background: var(--rank); color: #fff;
+  padding: 3px 7px; border-radius: 5px;
+  background: var(--accent); color: var(--on-accent);
   box-shadow: inset 0 -2px 0 rgba(0,0,0,.2);
 }
 .ladder li.is-here {
   background: var(--panel-3); color: var(--on-panel);
-  box-shadow: var(--lift-1), var(--edge), var(--rim), inset 4px 0 0 var(--rank);
+  box-shadow: var(--lift-1), var(--edge), var(--rim), inset 4px 0 0 var(--accent);
   padding-left: 14px;
   font-weight: 900;
 }
@@ -781,7 +787,7 @@ body::before {
 .tally .track > i { background: var(--accent-deep); }
 .rank-jump {
   font-size: 13.5px; font-weight: 900;
-  padding: 7px 15px; border-radius: var(--r-pill);
+  padding: 7px 15px; border-radius: 10px;
   animation: pop-in var(--t-slow) var(--e-pop);
 }
 .rank-jump[hidden] { display: none; }
@@ -895,7 +901,7 @@ body::before {
 
 .score-chip {
   display: flex; align-items: center; gap: 8px;
-  background: var(--panel-2); color: var(--on-panel); border-radius: var(--r-pill);
+  background: var(--panel-2); color: var(--on-panel); border-radius: 10px;
   padding: 6px 13px 6px 7px;
   white-space: nowrap;
   box-shadow: var(--lift-1), var(--edge), var(--rim);
@@ -909,7 +915,7 @@ body::before {
    thing you look for, so the seat this device plays says so outright. */
 .score-chip .me {
   font-size: 9.5px; font-weight: 900; letter-spacing: .1em;
-  padding: 2px 6px; border-radius: var(--r-pill);
+  padding: 2px 6px; border-radius: 5px;
   background: var(--sink); color: var(--on-sink); box-shadow: var(--edge-in);
 }
 /* The active seat is lit: brighter face, a ring in the seat's own colour
@@ -932,7 +938,7 @@ body::before {
 .share-bar {
   display: none;
   height: 10px; flex: none;
-  border-radius: var(--r-pill);
+  border-radius: 3px;
   background: var(--tile);
   box-shadow: var(--edge-in), var(--lift-1);
   overflow: hidden;
@@ -954,7 +960,7 @@ body::before {
 .turn-banner {
   position: absolute; left: 50%; top: calc(var(--safe-t) + 8px);
   transform: translateX(-50%);
-  padding: 8px 18px; border-radius: var(--r-pill);
+  padding: 8px 18px; border-radius: 12px;
   background: var(--panel-2);
   color: var(--on-panel); font-size: 13px; font-weight: 900; letter-spacing: .05em;
   box-shadow: var(--lift-1), var(--rim);
@@ -996,9 +1002,9 @@ body::before {
 .card h2 + .hint { margin-top: -4px; }
 .card .btn-primary { margin-top: var(--s-2); }
 .card .hint + .btn-primary { margin-top: var(--s-3); }
-/* A plain .btn is cream — the same cream as the card it sits on — so inside a
-   card it takes a white face and an ink hairline to stay a button. */
-.card .btn { background: #FFF; box-shadow: var(--lift-2), inset 0 0 0 2px rgba(23,22,28,.11); }
+/* A plain .btn is glass, which is nothing on a white modal, so inside a card
+   it takes a white face, ink type and an ink hairline to stay a button. */
+.card .btn { background: #FFF; color: var(--ink); box-shadow: var(--lift-2), inset 0 0 0 2px rgba(23,22,28,.11); }
 .card .btn:active { box-shadow: 0 1px 0 rgba(0,0,0,.2), inset 0 0 0 2px rgba(23,22,28,.11); }
 .card .btn-primary { background: var(--accent); color: var(--on-accent); box-shadow: var(--lift-2), inset 0 1px 0 rgba(255,255,255,.28); }
 .card .btn-primary:active { box-shadow: 0 1px 0 rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.28); }
@@ -1152,7 +1158,7 @@ body::before {
   appearance: none; border: 0; width: 100%; min-width: 0;
   font: inherit; font-size: 16px; font-weight: 800;
   color: var(--ink); background: var(--card);
-  border-radius: var(--r-1); padding: 13px var(--s-3); min-height: 52px;
+  border-radius: 14px; padding: 13px var(--s-3); min-height: 52px;
   box-shadow: var(--lift-1);
 }
 .text-input::placeholder { color: rgba(62, 32, 21, .32); }
@@ -1169,7 +1175,7 @@ body::before {
 .lobby-list .lobby-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lobby-list .tag {
   flex: none; font-size: 10px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase;
-  padding: 2px 7px; border-radius: var(--r-pill);
+  padding: 2px 7px; border-radius: 5px;
   background: var(--sink); color: var(--on-sink);
 }
 .lobby-list .ready-tick {

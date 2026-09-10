@@ -42,7 +42,7 @@ Two independent choices: **what** you play (the mode) and **who** you play it wi
 ### Modes — the shape of a match
 
 Pick one on the mode screen; it applies everywhere and repaints the whole app in
-that mode's palette.
+that mode's duo — a field for the background and a mark for what you press.
 
 | Mode | Shape | Board |
 |---|---|---|
@@ -353,17 +353,33 @@ in the background (stale-while-revalidate), so an update lands on the next load.
 
 `styles.css` opens with the full statement of it; the short version is six rules:
 
-1. **Extruded, not flat.** Controls sit on a hard, unblurred bottom shadow and a
-   top highlight, and collapse into the shadow on press. The highlight is what
-   keeps a translucent panel legible as a raised face on a field it is barely
-   tinted against. Blur is reserved for things genuinely floating — modals, and
-   the board's tiles.
-2. **One accent per screen.** The active mode owns the palette. The only other
-   saturated colours in the chrome are the eight seat colours, and those belong to
-   the board.
-3. **Big, round, confident.** Radii step 12 / 18 / 26 / pill. Nunito 700–900 only.
-4. **Invert to focus.** The app is a coloured field carrying near-white text;
-   anything that demands attention becomes a cream card with dark text.
+1. **Extruded, not lit.** Controls sit on a hard, unblurred bottom shadow and a
+   top edge, and collapse into the shadow on press. The edge is what keeps a
+   glass panel legible as a raised face on the field behind it. Surfaces are
+   flat colour — no vignettes or glows faking a light source. Blur is reserved
+   for things genuinely floating — modals, and the board's tiles.
+2. **Every mode is a duo.** A field (the full-colour ground of every screen) and
+   a mark (the play button, the mode glyph, meters, numbers). Fourteen colours
+   across seven modes, none used twice, and no duo made of two shades of one hue:
+
+   | Mode | Field | Mark |
+   |---|---|---|
+   | Duel | Ink | Vermilion |
+   | Rumble | Cobalt | Sunflower |
+   | Big Arena | Pitch | Bubblegum |
+   | Mayhem | Violet | Tangerine |
+   | Duos | Petrol | Chartreuse |
+   | Chaos | Cocoa | Cyan |
+   | Custom | Chalk | Slate |
+
+   The only other saturated colours in the chrome are the eight seat colours and
+   the rank tints.
+3. **Semi, never pill.** Boxes keep straight sides: a radius stays at or under
+   about a third of the box's height. Circles are for the game's balls. Nunito
+   700–900 only.
+4. **Glass on the field.** Controls are frosted glass over the field, so the
+   field stays the colour of the whole screen; whether it takes white type or
+   ink is measured from the colour. Modals and text fields are white cards.
 5. **Numbers are the hero.** Scores, trophies and deltas get the largest type on
    screen, always tabular so they don't jitter while counting.
 6. **Motion is physical.** Things overshoot slightly and settle. Nothing is linear.
@@ -376,6 +392,7 @@ in the background (stale-while-revalidate), so an update lands on the next load.
    by their container rather than a font size. That is why a 92px rank hero and a
    28px ladder badge are optically identical.
 
-Themes swap only a palette block via `<html data-theme>`; nothing else in the sheet
-knows which mode is active. The canvas reads the same custom properties back out
+Themes swap only a duo block (`--bg`, `--accent`, `--accent-deep`) via
+`<html data-theme>`, plus a measured `data-field` that picks the dark- or
+light-field surface set; nothing else in the sheet knows which mode is active. The canvas reads the same custom properties back out
 through `setBoardSkin`, so board and DOM can never drift apart.

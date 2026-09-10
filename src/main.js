@@ -159,28 +159,40 @@ function isLight(color) {
   return luminance(color) > INK_CROSSOVER;
 }
 
+function toHex(color) {
+  const c = toRGB(color);
+  return c ? '#' + c.map((n) => n.toString(16).padStart(2, '0')).join('') : null;
+}
+
 /**
- * Point the app at the mode's hue. The page itself does not change colour —
- * only the accent does, and the board, which reads its colours back out of the
- * same custom properties so canvas and DOM never drift apart.
+ * Repaint the app in the mode's duo: its field becomes the ground of every
+ * screen and its mark the colour you press. The board reads its colours back
+ * out of the same custom properties, so canvas and DOM never drift apart.
  */
 function applyTheme(theme) {
-  document.documentElement.dataset.theme = theme;
-  const cs = getComputedStyle(document.documentElement);
+  const root = document.documentElement;
+  root.dataset.theme = theme;
+  const cs = getComputedStyle(root);
   const v = (name, fallback) => (cs.getPropertyValue(name) || '').trim() || fallback;
   setBoardSkin({
     tile: v('--tile', '#FFFFFF'),
-    tileDim: v('--tile-dim', '#EAE5DA'),
-    wall: v('--wall', '#133BA6'),
-    wallInk: 'rgba(0,0,0,0.18)',
-    shadow: 'rgba(23,22,28,0.12)',
+    tileDim: v('--tile-dim', '#E9E4D8'),
+    wall: v('--wall', '#1F48C4'),
+    wallInk: 'rgba(0,0,0,0.22)',
+    shadow: 'rgba(0,0,0,0.18)',
   });
-  // Ink or white on the accent is a property of the colour, not of the mode's
-  // name, and across seven hues it genuinely goes both ways: yellow wants ink,
-  // blue wants white. Measuring it means a hue can be re-picked without
-  // stranding a button on text nobody can read.
-  document.documentElement.dataset.accent =
-    isLight(v('--accent', '#1B4FD8')) ? 'light' : 'dark';
+  // Whether a field takes white type on glass or ink type on milk is a
+  // property of the colour, not of the mode's name — six of the seven fields
+  // are dark, Custom's chalk is not. The same goes for ink or white on the
+  // mark, which is the face of the primary button. Measuring both means a
+  // colour can be re-picked without stranding text nobody can read.
+  const bg = v('--bg', '#1F48C4');
+  root.dataset.field = isLight(bg) ? 'light' : 'dark';
+  root.dataset.accent = isLight(v('--accent', '#F7C526')) ? 'light' : 'dark';
+  // The browser chrome follows the field (iOS standalone ignores live changes,
+  // which is why the status bar is translucent — see index.html).
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', toHex(bg) || bg);
   if (session) refreshBoardOnly();
 }
 
@@ -1368,7 +1380,7 @@ function renderModeGrid() {
     b.className = 'mode-card' + (key === modeKey ? ' is-on' : '');
     b.dataset.mode = key;
     b.setAttribute('aria-pressed', String(key === modeKey));
-    // Each card previews the palette it will switch the app to.
+    // Each card is a swatch of the duo it will switch the app to.
     b.dataset.theme = MODES[key].theme;
     // One descriptor per card: the tagline already says who is playing, so
     // the only fact worth adding is the board. Custom is whatever you made it.
@@ -1384,11 +1396,12 @@ function renderModeGrid() {
       <span class="mode-card-check" aria-hidden="true">${icon('check')}</span>`;
     grid.appendChild(b);
   }
-  // Each card carries a different hue on its mark, so each needs its own
-  // answer to "ink or white on this?" — measured once the card is in the
-  // document and its --accent has actually resolved.
+  // Each card wears a different duo, so each needs its own answer to "ink or
+  // white on this?" — for its field and for its mark — measured once the card
+  // is in the document and its colours have actually resolved.
   for (const b of grid.children) {
     const cs = getComputedStyle(b);
+    b.dataset.field = isLight(cs.getPropertyValue('--bg').trim()) ? 'light' : 'dark';
     b.dataset.accent = isLight(cs.getPropertyValue('--accent').trim()) ? 'light' : 'dark';
   }
   $('#modes-blurb').textContent = MODES[modeKey].blurb;

@@ -1,17 +1,18 @@
 <!doctype html>
-<html lang="en" data-theme="blue">
+<html lang="en" data-theme="cobalt" data-field="dark" data-accent="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
-<meta name="theme-color" content="#F2EFE7">
+<meta name="theme-color" content="#1F48C4">
 <meta name="description" content="BUST — a fast tactical board game of chain reactions. Load a tile past three balls and it bursts, flinging one ball to every neighbour and stealing whatever they land on.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="BUST">
-<!-- The page is the same near-white paper in every mode, so the bar can be
-     the ordinary one: dark glyphs on light, matching the page under them.
-     `black-translucent` would put white glyphs on that white paper. -->
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<!-- Translucent so the status bar shows the mode's field and tracks it: iOS
+     ignores live theme-color changes in a standalone PWA, which would leave the
+     bar frozen on the launch colour. Six of the seven fields are dark, which is
+     what the white glyphs are for. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>BUST</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">

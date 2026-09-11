@@ -711,9 +711,18 @@ function scheduleAI() {
   if (s.phase === PHASE_OVER) return;
   const p = s.players[s.turn];
   if (p.kind !== 'ai') return;
-  // Online games are driven by the host only; there are no bots there anyway.
-  if (session.mode === 'online' && !session.room?.isHost) return;
-
+  // In online mode, only the host's AI sends moves; other seats receive
+  // moves from the host, so we allow the thinking but only the host broadcasts.
+  if (session.mode === 'online' && !session.room?.isHost) {
+    // Still schedule the thinking timeout so the turn order stays smooth,
+    // but don't enqueue a move — it will be provided by the host's AI.
+    clearTimeout(session.aiTimer);
+    const myEpoch = epoch;
+    session.aiTimer = setTimeout(() => {
+      if (!session || epoch !== myEpoch) return;
+    }, (s.phase === PHASE_PLACE ? AI_THINK_OPEN : AI_THINK) / gameSpeed());
+    return;
+  }
   clearTimeout(session.aiTimer);
   const myEpoch = epoch;
   // A real beat of "thinking" before a bot commits. Long enough that a table of
@@ -1862,12 +1871,24 @@ function renderPartyOver() {
   again.classList.toggle('is-armed', iAmReady());
 }
 
+/** Helper: produce a player entry with a name and kind ('human' or 'ai'). */
+function makePlayer(i, roster) {
+  const r = roster[i];
+  return { name: r ? r.name || `Player ${i + 1}` : `Player ${i + 1}`, kind: r ? r.kind : 'ai' };
+}
+
 /** Host: deal a round to whoever is in the party right now. */
 function hostStartRound() {
   if (!room?.isHost) return;
   const setup = partySetup();
-  const players = partySeatNames().slice(0, setup.seats);
+  const roster = lobby.roster;
+  const players = setup.seats.map((_, i) => makePlayer(i, roster)).slice(0, setup.seats);
   if (players.length < 2) return;
+  // Fill any remaining seats with bots of medium difficulty
+  while (players.length < setup.seats) {
+    const idx = players.length;
+    players.push({ name: `Bot ${idx + 1}`, kind: 'ai' });
+  }
   const config = {
     cols: setup.cols, rows: setup.rows, modeKey,
     teams: setup.teams ? Array.from(setup.teams) : null,

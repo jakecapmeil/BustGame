@@ -19,6 +19,16 @@
         "8742"
       ],
       "port": 8742
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "web/devserver.py",
+        "8751",
+        "web/dist"
+      ],
+      "port": 8751
     }
   ]
 }

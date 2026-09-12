@@ -559,8 +559,20 @@ export class BoardAnimator {
 
   /* -- the single loop -------------------------------------------------- */
 
-  _raf(cb) { const f = this._svc.raf || globalThis.requestAnimationFrame; return f(cb); }
-  _cancelRaf(id) { const f = this._svc.cancelRaf || globalThis.cancelAnimationFrame; return f(id); }
+  /**
+   * Call an injected platform service by name, falling back to the global.
+   * Browsers brand-check natives like `requestAnimationFrame`/`setInterval`
+   * against their receiver, so a bare extracted reference (`const f = window.x;
+   * f()`) throws "Illegal invocation" — this always calls through the right
+   * receiver instead.
+   */
+  _call(name, native, ...args) {
+    const fn = this._svc[name];
+    return fn ? fn(...args) : native(...args);
+  }
+
+  _raf(cb) { return this._call('raf', globalThis.requestAnimationFrame.bind(globalThis), cb); }
+  _cancelRaf(id) { return this._call('cancelRaf', globalThis.cancelAnimationFrame.bind(globalThis), id); }
 
   _ensureLoop() {
     if (this._looping) return;
@@ -586,19 +598,17 @@ export class BoardAnimator {
    */
   _startWatchdog() {
     if (this._wd) return;
-    const setInt = this._svc.setInterval || globalThis.setInterval;
-    const clrInt = this._svc.clearInterval || globalThis.clearInterval;
-    const id = setInt(() => {
+    const id = this._call('setInterval', globalThis.setInterval.bind(globalThis), () => {
       if (this._mode !== 'play') return;
       const t = nowMs();
       if (t - this._lastTick > 150) this._advance(t); // rAF has gone quiet
     }, 100);
     if (id && typeof id.unref === 'function') id.unref(); // don't hold Node's loop open
-    this._wd = { id, clrInt };
+    this._wd = id;
   }
 
   _stopWatchdog() {
-    if (this._wd) this._wd.clrInt(this._wd.id);
+    if (this._wd) this._call('clearInterval', globalThis.clearInterval.bind(globalThis), this._wd);
     this._wd = 0;
   }
 

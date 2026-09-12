@@ -2,3 +2,9 @@
 node_modules/
 *.log
 .wrangler/
+# build outputs
+web/dist/
+ios/www/
+# generated native project (Capacitor) + generated asset/icon sets
+ios/ios/
+ios/Resources/

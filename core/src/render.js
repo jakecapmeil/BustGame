@@ -455,7 +455,15 @@ function drawFlyers(ctx, L, busts, t) {
 
 /* --------------------------------------------------------------- animator -- */
 
+/** Shared timing, injectable so the animator runs headless (tests, ios). */
 const nowMs = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+
+/** The pixel ratio, whether it arrives as a number, a provider, or nothing. */
+function resolveDpr(v) {
+  if (typeof v === 'function') v = v();
+  if (!v || !Number.isFinite(v)) v = 1;
+  return Math.min(3, Math.max(1, v));
+}
 
 /**
  * Plays a frame script. Resolves once the last wave has landed.
@@ -470,9 +478,17 @@ const nowMs = () => (typeof performance !== 'undefined' && performance.now ? per
  * last frame, or if `cancel()` interrupts it, so nothing awaiting it can hang.
  */
 export class BoardAnimator {
-  constructor(canvas) {
+  /**
+   * @param {object} canvas     a drawing surface with `getContext('2d')` — the
+   *                            shell supplies this (a <canvas>, a headless stub)
+   * @param {object} [services] platform services injected by the shell:
+   *                            { raf, cancelRaf, now, setInterval, clearInterval,
+   *                              dpr, setBitmap(W,H,dpr,cssW,cssH) }
+   */
+  constructor(canvas, services = {}) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
+    this._svc = services;
     this.L = null;
     this.staticView = null;
     this.speed = 1;
@@ -484,14 +500,16 @@ export class BoardAnimator {
     this._wd = 0; // watchdog interval — drives playback when rAF is starved
     this._flash = null; // opening-collision flash, { tiles, at, dur }
     this._play = null; // { frames, chrome, onEvent, idx, waveNo, announced, frameStart, resolve }
+    this._W = 0;
+    this._H = 0;
   }
 
-  resize(cssW, cssH, cols, rows) {
-    const dpr = Math.min((typeof window !== 'undefined' && window.devicePixelRatio) || 1, 3);
-    this.canvas.width = Math.round(cssW * dpr);
-    this.canvas.height = Math.round(cssH * dpr);
-    this.canvas.style.width = `${cssW}px`;
-    this.canvas.style.height = `${cssH}px`;
+  resize(cssW, cssH, cols, rows, dprInput) {
+    const { _svc } = this;
+    const dpr = resolveDpr(dprInput ?? _svc.dpr);
+    this._W = Math.round(cssW * dpr);
+    this._H = Math.round(cssH * dpr);
+    if (typeof _svc.setBitmap === 'function') _svc.setBitmap(this._W, this._H, dpr, cssW, cssH);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.L = computeLayout(cssW, cssH, cols, rows);
     if (this._mode !== 'play') this.renderStatic();
@@ -535,11 +553,14 @@ export class BoardAnimator {
   renderStatic() {
     if (!this.L || !this.staticView) return;
     const ctx = this.ctx;
-    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.clearRect(0, 0, this._W || 0, this._H || 0);
     drawBoard(ctx, this.L, { ...this.staticView, ...this._overlays() });
   }
 
   /* -- the single loop -------------------------------------------------- */
+
+  _raf(cb) { const f = this._svc.raf || globalThis.requestAnimationFrame; return f(cb); }
+  _cancelRaf(id) { const f = this._svc.cancelRaf || globalThis.cancelAnimationFrame; return f(id); }
 
   _ensureLoop() {
     if (this._looping) return;
@@ -551,9 +572,9 @@ export class BoardAnimator {
       if (this._mode === 'play') this._advance(now);
       else this.renderStatic();
       if (this._mode === 'stopped') { this._looping = false; this._rafId = 0; return; }
-      this._rafId = requestAnimationFrame(tick);
+      this._rafId = this._raf(tick);
     };
-    this._rafId = requestAnimationFrame(tick);
+    this._rafId = this._raf(tick);
   }
 
   /**
@@ -565,17 +586,19 @@ export class BoardAnimator {
    */
   _startWatchdog() {
     if (this._wd) return;
-    const id = setInterval(() => {
+    const setInt = this._svc.setInterval || globalThis.setInterval;
+    const clrInt = this._svc.clearInterval || globalThis.clearInterval;
+    const id = setInt(() => {
       if (this._mode !== 'play') return;
       const t = nowMs();
       if (t - this._lastTick > 150) this._advance(t); // rAF has gone quiet
     }, 100);
     if (id && typeof id.unref === 'function') id.unref(); // don't hold Node's loop open
-    this._wd = id;
+    this._wd = { id, clrInt };
   }
 
   _stopWatchdog() {
-    if (this._wd) clearInterval(this._wd);
+    if (this._wd) this._wd.clrInt(this._wd.id);
     this._wd = 0;
   }
 
@@ -589,7 +612,7 @@ export class BoardAnimator {
   stopIdle() {
     if (this._mode !== 'idle') return;
     this._mode = 'stopped';
-    if (this._rafId) cancelAnimationFrame(this._rafId);
+    if (this._rafId) this._cancelRaf(this._rafId);
     this._rafId = 0;
     this._looping = false;
     this._stopWatchdog();
@@ -669,7 +692,7 @@ export class BoardAnimator {
   _drawFrame(f, p, t) {
     if (!this.L) return;
     const ctx = this.ctx;
-    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.clearRect(0, 0, this._W || 0, this._H || 0);
     const over = this._overlays();
 
     if (f.kind === 'wave') {
@@ -717,7 +740,7 @@ export class BoardAnimator {
     const p = this._play;
     this._play = null;
     this._mode = 'stopped';
-    if (this._rafId) cancelAnimationFrame(this._rafId);
+    if (this._rafId) this._cancelRaf(this._rafId);
     this._rafId = 0;
     this._looping = false;
     this._stopWatchdog();

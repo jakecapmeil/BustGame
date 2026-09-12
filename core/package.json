@@ -1,0 +1,13 @@
+{
+  "name": "@bust/core",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BUST — DOM-free game logic, canvas rendering and generic input contract. Shared by the web PWA and the iOS native app.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

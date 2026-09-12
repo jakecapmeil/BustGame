@@ -245,8 +245,12 @@ export class BustNet {
  */
 export async function loadNet(base) {
   // Resolved against this module rather than the document, so the app works
-  // from a project-pages subpath without knowing what that path is.
-  const dir = new URL(base || '../assets/net/', import.meta.url);
+  // from a project-pages subpath without knowing what that path is. A native
+  // shell (ios) can pin the path outright by setting `globalThis.__BUST_NET_BASE__`
+  // before the app boots, which survives bundling (import.meta.url no longer
+  // points at this module once everything is packed into one file).
+  const resolved = base || globalThis.__BUST_NET_BASE__ || '../assets/net/';
+  const dir = new URL(resolved, import.meta.url);
   const at = (name) => new URL(name, dir).href;
   const [metaRes, binRes] = await Promise.all([
     fetch(at('bust_net.json')),

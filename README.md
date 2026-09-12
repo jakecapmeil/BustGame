@@ -4,8 +4,30 @@ A fast tactical board game of chain reactions. Load a tile past three balls and 
 **busts** — flinging one ball to every orthogonal neighbour and stealing whatever
 they land on. Wipe every other colour off the board to win.
 
-Mobile-first PWA. Vanilla ES modules, a canvas board, **no build step**. Deploys to
-GitHub Pages from the repo root as-is.
+Mobile-first PWA **and** a native-ish iOS app, sharing one codebase via an npm
+workspaces monorepo:
+
+- **`/core`** (`@bust/core`) — DOM-free game logic, canvas rendering and a
+  generic input contract. Zero `document`/`window`/mouse/touch code; shells
+  inject storage, audio, network and an input adapter.
+- **`/web`** (`@bust/web`) — the PWA shell: mouse/keyboard input adapter,
+  screens/menus/HUD, localStorage, WebAudio, PeerJS. Deploys to Cloudflare as
+  plain static ES modules (no bundler).
+- **`/ios`** (`@bust/ios`) — a Capacitor app re-using `/web`'s presentation with
+  a touch input adapter + Haptics, bundled by esbuild into `ios/www`.
+
+```
+npm test          # core unit tests (engine, render, rank, net, nn)
+npm run dev:web   # build web/dist + local preview
+npm run deploy:web
+npm run build:ios # esbuild → ios/www
+npm run sync:ios  # generate native project + Info.plist
+npm run open:ios  # open ios/ios/App/App.xcworkspace in Xcode
+```
+
+Platform seams: `/web/src/input-adapter.js` and `/ios/src/touch-input.js` both
+translate native events onto the same core contract; `/ios` also patches
+haptics and safe-areas. See `/web/README.md` and `/ios/README.md`.
 
 ---
 

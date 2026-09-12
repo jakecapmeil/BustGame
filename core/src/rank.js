@@ -259,15 +259,23 @@ export function applyDelta(trophies, delta) {
 const PROFILE_KEY = 'bust.rank.v1';
 const FRESH = { trophies: 0, best: 0, played: 0, won: 0, streak: 0 };
 
-export function loadProfile() {
+/**
+ * @param {object} [storage] {getItem,setItem} — the shell's persistence. In a
+ *                           browser that is `localStorage`; a native shell
+ *                           injects its own store. Falls back to
+ *                           `globalThis.localStorage` when nothing is given.
+ */
+export function loadProfile(storage = globalThis.localStorage) {
   try {
-    const raw = JSON.parse(localStorage.getItem(PROFILE_KEY) || '{}');
+    const raw = JSON.parse((storage && storage.getItem ? storage.getItem(PROFILE_KEY) : null) || '{}');
     return { ...FRESH, ...raw };
   } catch { return { ...FRESH }; }
 }
 
-export function saveProfile(p) {
-  try { localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); } catch { /* private mode */ }
+export function saveProfile(p, storage = globalThis.localStorage) {
+  try {
+    if (storage && storage.setItem) storage.setItem(PROFILE_KEY, JSON.stringify(p));
+  } catch { /* private mode */ }
 }
 
 /**

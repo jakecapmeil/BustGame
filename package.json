@@ -2,11 +2,22 @@
   "name": "bustgame",
   "version": "1.0.0",
   "private": true,
-  "description": "BUST — chain-reaction board game (PWA)",
+  "description": "BUST — chain-reaction board game. npm workspaces monorepo: /core (DOM-free game), /web (PWA), /ios (Capacitor native app).",
+  "workspaces": [
+    "core",
+    "web",
+    "ios"
+  ],
   "scripts": {
-    "test": "node --test test/*.test.mjs",
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "test": "node --test core/test/*.test.mjs",
+    "dev:web": "npm run dev -w web",
+    "serve:web": "npm run serve -w web",
+    "build:web": "npm run build -w web",
+    "deploy:web": "npm run deploy -w web",
+    "build:ios": "npm run build -w ios",
+    "sync:ios": "npm run sync -w ios",
+    "init:ios": "npm run init -w ios",
+    "open:ios": "npm run open -w ios"
   },
   "devDependencies": {
     "wrangler": "^4"

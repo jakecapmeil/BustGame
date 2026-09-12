@@ -8,7 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { RANK_ICONS, MODE_ICONS, UI_ICONS, icon } from '../src/icons.js';
+import { RANK_ICONS, MODE_ICONS, UI_ICONS, icon } from '../../web/src/icons.js';
 import { RANKS } from '../src/rank.js';
 import { MODES, MODE_ORDER } from '../src/modes.js';
 

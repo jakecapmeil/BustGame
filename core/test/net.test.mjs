@@ -88,7 +88,7 @@ class FakePeer extends Emitter {
 globalThis.window = { Peer: FakePeer };
 if (!globalThis.crypto) globalThis.crypto = (await import('node:crypto')).webcrypto;
 
-const { hostRoom, joinRoom, cleanName, normaliseCode, MAX_PARTY } = await import('../src/net.js');
+const { hostRoom, joinRoom, cleanName, normaliseCode, MAX_PARTY } = await import('../../web/src/net.js');
 
 /* ------------------------------------------------------------- harness -- */
 

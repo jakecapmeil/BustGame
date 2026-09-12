@@ -1,0 +1,25 @@
+{
+  "name": "@bust/ios",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BUST — Capacitor (iOS) shell. Reuses the /web presentation controller + HTML/CSS, bundles /core + a touch input adapter into ios/www, and wraps it as a native iOS project.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs && node scripts/assets.mjs",
+    "sync": "cap sync ios && node scripts/iospatch.mjs",
+    "init": "node scripts/build.mjs && cap add ios && node scripts/iospatch.mjs",
+    "open": "cap open ios",
+    "dev": "npm run build && cap sync ios && node scripts/iospatch.mjs"
+  },
+  "dependencies": {
+    "@bust/core": "*",
+    "@capacitor/core": "^7.1.0",
+    "@capacitor/haptics": "^7.0.5"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.1.0",
+    "@capacitor/ios": "^7.1.0",
+    "esbuild": "^0.25.0"
+  }
+}

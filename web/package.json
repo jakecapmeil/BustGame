@@ -1,0 +1,16 @@
+{
+  "name": "@bust/web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BUST — the web/PWA shell. Thin platform layer (mouse/keyboard input, localStorage, WebAudio, PeerJS) over @bust/core.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs && wrangler dev",
+    "deploy": "node scripts/build.mjs && wrangler deploy",
+    "serve": "node scripts/build.mjs && python3 devserver.py dist"
+  },
+  "dependencies": {
+    "@bust/core": "*"
+  }
+}

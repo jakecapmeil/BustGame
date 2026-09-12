@@ -1,0 +1,14 @@
+{
+  "appId": "com.bust.game",
+  "appName": "BUST",
+  "webDir": "./www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "ios": {
+  },
+  "assets": {
+    "input": ["./Resources/icon-source.png"],
+    "output": "./Resources/"
+  }
+}

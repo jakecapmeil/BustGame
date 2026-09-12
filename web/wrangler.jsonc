@@ -3,11 +3,11 @@
   "name": "bustgame",
   "compatibility_date": "2026-09-03",
   // Assets-only Worker: no `main`, no Worker script. Cloudflare serves the
-  // repo root as-is — same files GitHub Pages serves, same no-build-step deal.
-  // `.assetsignore` keeps the non-site files (docs, tests, tooling) out of the
-  // upload.
+  // built bundle at ./dist (see scripts/build.mjs), which holds every web
+  // public file plus a resolved copy of /core — still plain ES modules, no
+  // build step, exactly the same no-build-step deal as before.
   "assets": {
-    "directory": "./",
+    "directory": "./dist",
     // BUST is one page; unknown paths just fall through to a plain 404, which
     // the service worker already handles offline. No SPA rewrite needed.
     "html_handling": "auto-trailing-slash"

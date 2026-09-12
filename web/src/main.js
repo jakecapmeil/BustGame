@@ -7,21 +7,26 @@
  * animation and desync the board.
  */
 
+// Game logic + rendering live in @bust/core (a plain ES module tree, imported
+// by relative path so the site keeps shipping as static files — no build step).
 import {
   createGame, applyMove, isLegalMove, legalMoves, scores, winnersOf,
   openingMask, blockingStarts,
   PHASE_PLACE, PHASE_PLAY, PHASE_OVER,
-} from './engine.js';
-import { chooseMoveAsync, difficultyLabel, DIFFICULTY_ORDER, NEEDS_NET, warmNeural } from './ai.js';
+} from '../../core/src/index.js';
+import { chooseMoveAsync, difficultyLabel, DIFFICULTY_ORDER, NEEDS_NET, warmNeural } from '../../core/src/ai.js';
 import {
   RANKS, rankFor, rankIndexFor, progressToNext, nextRank,
   matchmake, scoreResult, recordMatch, loadProfile, saveProfile,
-} from './rank.js';
-import { BoardAnimator, PLAYER_COLORS, hitTest, setBoardSkin } from './render.js';
+} from '../../core/src/rank.js';
+import {
+  BoardAnimator, PLAYER_COLORS, setBoardSkin, tileFromPointer, ACTION,
+} from '../../core/src/index.js';
 import {
   MODES, MODE_ORDER, MAX_SEATS, modeFor, buildSetup, buildPartySetup, describeSetup,
   minBoardFor,
-} from './modes.js';
+} from '../../core/src/modes.js';
+import { installBoardInput } from './input-adapter.js';
 import { icon, paintIcons } from './icons.js';
 import { sfx, unlock as unlockAudio, setEnabled as setSoundEnabled, buzz } from './audio.js';
 import { hostRoom, joinRoom, normaliseCode, cleanName, MAX_PARTY } from './net.js';
@@ -220,7 +225,18 @@ const turnBanner = $('#turn-banner');
 const turnText = $('#turn-text');
 const turnDot = $('#turn-dot');
 const liveRegion = $('#a11y-live');
-const animator = new BoardAnimator(canvas);
+const animator = new BoardAnimator(canvas, {
+  // Platform services the renderer needs. The web shell hands the renderer its
+  // high-DPI ratio and the bitmap-sizing hook (a real <canvas>); both are
+  // injected so the same renderer runs unchanged in a native shell.
+  dpr: () => (typeof window !== 'undefined' && window.devicePixelRatio) || 1,
+  setBitmap: (W, H, dpr, cssW, cssH) => {
+    canvas.width = W;
+    canvas.height = H;
+    canvas.style.width = `${cssW}px`;
+    canvas.style.height = `${cssH}px`;
+  },
+});
 
 /** Push a message to the screen-reader live region (deduped). */
 let lastAnnounced = '';
@@ -894,14 +910,13 @@ function flushPlan() {
   commitTile(idx);
 }
 
-function onBoardPointer(ev) {
+/** A tap on the board: same decision path as the adapter's pointer events. */
+function handleBoardPointer(x, y) {
   unlockAudio();
   // The board can still be on screen for a beat after a session is torn down
   // (a dropped connection, say), and planning would reach straight into it.
   if (!session || !animator.L) return;
-  const rect = canvas.getBoundingClientRect();
-  const pt = ev.changedTouches ? ev.changedTouches[0] : ev;
-  const idx = hitTest(animator.L, pt.clientX - rect.left, pt.clientY - rect.top);
+  const idx = tileFromPointer(animator.L, x, y);
   if (idx < 0) return;
   keyActive = false; // a tap takes over from the keyboard cursor
   if (!canActNow()) { planTap(idx); return; }
@@ -912,7 +927,12 @@ function onBoardPointer(ev) {
   commitTile(idx);
 }
 
-function onBoardKey(ev) {
+/**
+ * A translated keyboard/controller intent (see core ACTION). The adapter has
+ * already turned the raw key into one of these, so this function stays free of
+ * any particular key's name.
+ */
+function handleBoardAction(action) {
   if (!session || session.over || !session.state) return;
   const s = session.state;
   const { cols, rows } = s;
@@ -921,13 +941,12 @@ function onBoardKey(ev) {
 
   let dx = 0;
   let dy = 0;
-  switch (ev.key) {
-    case 'ArrowLeft': case 'a': dx = -1; break;
-    case 'ArrowRight': case 'd': dx = 1; break;
-    case 'ArrowUp': case 'w': dy = -1; break;
-    case 'ArrowDown': case 's': dy = 1; break;
-    case 'Enter': case ' ': case 'Spacebar':
-      ev.preventDefault();
+  switch (action) {
+    case ACTION.NAV_LEFT:  dx = -1; break;
+    case ACTION.NAV_RIGHT: dx = 1; break;
+    case ACTION.NAV_UP:    dy = -1; break;
+    case ACTION.NAV_DOWN:  dy = 1; break;
+    case ACTION.ACTIVATE:
       unlockAudio();
       if (canActNow()) commitTile(keyCursor);
       else if (session.planned === keyCursor) { sfx.ui(); clearPlan(); }
@@ -935,7 +954,6 @@ function onBoardKey(ev) {
       return;
     default: return;
   }
-  ev.preventDefault();
   keyActive = true;
   const cx = Math.min(cols - 1, Math.max(0, (keyCursor % cols) + dx));
   const cy = Math.min(rows - 1, Math.max(0, ((keyCursor / cols) | 0) + dy));
@@ -946,9 +964,19 @@ function onBoardKey(ev) {
   refreshBoardOnly();
 }
 
-canvas.addEventListener('pointerup', onBoardPointer);
-canvas.addEventListener('keydown', onBoardKey);
-canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+// The mouse/keyboard adapter translates platform events into the generic
+// pointer coordinates + actions core understands (see core/src/input.js).
+// A native shell (ios) may install its own input adapter — a touch adapter —
+// before this module loads by setting `globalThis.__BUST_INPUT__`; it receives
+// the same { onPointer, onAction } handler shape.
+const inputHook = globalThis.__BUST_INPUT__;
+const installInput = inputHook && inputHook.install
+  ? inputHook.install
+  : installBoardInput;
+installInput(canvas, {
+  onPointer: handleBoardPointer,
+  onAction: handleBoardAction,
+});
 
 /* ---------------------------------------------------------- knocked out -- */
 

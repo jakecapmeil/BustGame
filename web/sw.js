@@ -2,23 +2,29 @@
    Solo and pass-and-play work with no connection at all; only the online mode
    needs the network, and that request is deliberately never cached. */
 
-const CACHE = 'bust-v18';
+const CACHE = 'bust-v19';
 const ASSETS = [
   './',
   'index.html',
   'styles.css',
   'manifest.webmanifest',
+  // web shell
   'src/main.js',
-  'src/engine.js',
-  'src/ai.js',
-  'src/nn.js',
-  'src/nn-bot.js',
-  'src/render.js',
+  'src/input-adapter.js',
   'src/icons.js',
-  'src/modes.js',
-  'src/rank.js',
   'src/audio.js',
   'src/net.js',
+  // resolved core (@bust/core), DOM-free game + rendering
+  'core/src/index.js',
+  'core/src/engine.js',
+  'core/src/modes.js',
+  'core/src/rank.js',
+  'core/src/ai.js',
+  'core/src/nn.js',
+  'core/src/nn-bot.js',
+  'core/src/render.js',
+  'core/src/input.js',
+  // favicon
   'assets/icon.svg',
   'assets/icon-192.png',
   'assets/icon-512.png',

@@ -88,5 +88,10 @@ export const sfx = {
 
 /** Short haptic tick where the platform supports it. */
 export function buzz(ms = 12) {
+  // Native shells (ios) inject a bridge that routes this into the platform's
+  // haptics; otherwise use the browser's Navigator vibration when present.
+  if (typeof globalThis.__BUST_HAPTIC__ === 'function') {
+    try { globalThis.__BUST_HAPTIC__(ms); return; } catch { /* ignore */ }
+  }
   if (navigator.vibrate) { try { navigator.vibrate(ms); } catch { /* ignore */ } }
 }

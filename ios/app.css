@@ -1,0 +1,27 @@
+/* BUST — iOS-only presentation tweaks layered over styles.css. */
+
+/* The board takes touch only, and the touch adapter suppresses the synthetic
+   mouse/pointer events — so a tap commits exactly once. */
+#board { touch-action: none; }
+
+/* Safe areas: notch / home indicator / rounded corners. styles.css already maps
+   env(safe-area-inset-*) for the standalone PWA; keep them honoured under the
+   WebView too, where the status bar is hidden and the app is edge-to-edge. */
+:root {
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+}
+
+/* Capacitor hides the URL bar / browser chrome, so the app fills from the top
+   edge; keep the interactive content clear of the notch. */
+@media (min-width: 700px) and (device-pixel-ratio: 1) {
+  body { padding-top: var(--safe-t); }
+}
+
+/* iOS 17 Haptics needs no visual reset, but reduced-motion users get a calmer
+   board regardless of platform. */
+@media (prefers-reduced-motion: reduce) {
+  #board { animation: none; }
+}
